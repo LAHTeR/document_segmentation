@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "document-segmentation"
+version = "0.1.0"
+description = ""
+authors = ["Carsten Schnober <c.schnober@esciencecenter.nl>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
