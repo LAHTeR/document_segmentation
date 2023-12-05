@@ -7,7 +7,16 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+requests = "^2.31.0"
+pagexml-tools = "^0.4.2"
 
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.3"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.1.7"
 
 [build-system]
 requires = ["poetry-core"]
