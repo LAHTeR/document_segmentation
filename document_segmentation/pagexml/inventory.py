@@ -6,7 +6,12 @@ from pathlib import Path
 import requests
 from pagexml.parser import parse_pagexml_file
 
-from ..settings import DEFAULT_BASE_PATH, DEFAULT_SERVER
+from ..settings import (
+    DEFAULT_BASE_PATH,
+    DEFAULT_SERVER,
+    SERVER_PASSWORD,
+    SERVER_USERNAME,
+)
 from .pagexml import PageXML
 
 
@@ -28,20 +33,35 @@ class Inventory:
     def _xml_file_name(self, page: int) -> str:
         return f"NL-HaNA_1.04.02_{self._inv_nr}_{page:04}.xml"
 
-    def download(self, username, password, *, overwrite: bool = False) -> Path:
+    def download(
+        self,
+        *,
+        username=SERVER_USERNAME,
+        password=SERVER_PASSWORD,
+        overwrite: bool = False,
+    ) -> Path:
         if not self.local_file.exists() or overwrite:
-            remote_url = f"{self._server}{self._base_path}{self.filename.stem}"
+            remote_url = f"{self._server}{self._base_path}{self.local_file.name}"
+
             logging.info(f"Downloading '{remote_url}' to '{self.local_file}'")
             r = requests.get(remote_url, auth=(username, password))
-            with self.local_file.open("wb") as f:
-                f.write(r.content)
-        else:
-            logging.warning(f"File {self.local_file} already exists, skipping download")
+            r.raise_for_status()
 
-        assert self.local_file.exists(), f"Downloading {self.local_file} failed."
+            with self.local_file.open("wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        else:
+            logging.info(f"File {self.local_file} already exists, skipping download")
+
+        if not zipfile.is_zipfile(self.local_file):
+            raise RuntimeError(
+                f"{self.local_file} for invetory number '{self._inv_nr}' is not a Zip file."
+            )
         return self.local_file
 
     def pagexml(self, page_nr: int) -> PageXML:
+        self.download()
+
         with zipfile.ZipFile(self.local_file, "r") as zip_ref:
             try:
                 xml_file_path = next(

@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.11"
 requests = "^2.31.0"
 pagexml-tools = "^0.4.2"
+openpyxl = "^3.1.2"
 
 
 [tool.poetry.group.test.dependencies]
