@@ -1,5 +1,17 @@
 # Document Segmentation
 
+## Usage
+
+Run the [scripts/evaluate.py](scripts/evaluate.py) script.
+It downloads the necessary data from the HUC server into the local temporary directory.
+
+Set your HUC credentials in the `HUC_USER` and `HUC_PASSWORD` environment variables, and run the script.
+For instance:
+
+```console
+HUC_USER=... HUC_PASSWORD=... python scripts/evaluate.py
+```
+
 ## Development Instructions
 
 This project uses Python 3.11 and Poetry.
