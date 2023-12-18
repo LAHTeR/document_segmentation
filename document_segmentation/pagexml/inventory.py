@@ -9,6 +9,7 @@ from pagexml.parser import parse_pagexml_file
 from ..settings import (
     DEFAULT_BASE_PATH,
     DEFAULT_SERVER,
+    PAGEXML_CACHE_DIRECTORY,
     SERVER_PASSWORD,
     SERVER_USERNAME,
 )
@@ -16,9 +17,9 @@ from .pagexml import PageXML
 
 
 class Inventory:
-    def __init__(self, inv_nr: str, *, cache_directory=None) -> None:
+    def __init__(self, inv_nr: str, *, cache_directory=PAGEXML_CACHE_DIRECTORY) -> None:
         self._inv_nr: str = inv_nr
-        self._cache_directory: Path = Path(cache_directory or tempfile.gettempdir())
+        self._cache_directory: Path = cache_directory
 
         self._server: str = DEFAULT_SERVER
         assert self._server.endswith("/"), "Server URL must end with a slash"
@@ -33,14 +34,13 @@ class Inventory:
     def _xml_file_name(self, page: int) -> str:
         return f"NL-HaNA_1.04.02_{self._inv_nr}_{page:04}.xml"
 
-    def download(
-        self,
-        *,
-        username=SERVER_USERNAME,
-        password=SERVER_PASSWORD,
-        overwrite: bool = False,
-    ) -> Path:
-        if not self.local_file.exists() or overwrite:
+    def download(self, *, username=SERVER_USERNAME, password=SERVER_PASSWORD) -> Path:
+        self._cache_directory.mkdir(parents=True, exist_ok=True)
+
+        # TODO: check local file using hash
+        if self.local_file.exists():
+            logging.info(f"File {self.local_file} already exists, skipping download")
+        else:
             remote_url = f"{self._server}{self._base_path}{self.local_file.name}"
 
             logging.info(f"Downloading '{remote_url}' to '{self.local_file}'")
@@ -50,12 +50,10 @@ class Inventory:
             with self.local_file.open("wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
-        else:
-            logging.info(f"File {self.local_file} already exists, skipping download")
 
         if not zipfile.is_zipfile(self.local_file):
             raise RuntimeError(
-                f"{self.local_file} for invetory number '{self._inv_nr}' is not a Zip file."
+                f"{self.local_file} for invetory number '{self._inv_nr}' is not a Zip file. Remove file '{self.local_file}' manually to re-download."
             )
         return self.local_file
 

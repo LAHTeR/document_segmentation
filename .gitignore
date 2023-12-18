@@ -94,3 +94,6 @@ __pypackages__/
 
 # Mac OS
 .DS_Store
+
+# Local PageXML cache
+document_segmentation/data/pagexml_cache

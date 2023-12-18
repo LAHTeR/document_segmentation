@@ -8,6 +8,9 @@ CWD = Path(__file__).parent.absolute()
 DATA_DIR = CWD / "data"
 TEST_SHEET = DATA_DIR / "Spreadsheet Renate Revised.xlsx"
 
+PAGEXML_CACHE_DIRECTORY: Path = DATA_DIR / "pagexml_cache"
+"""Directory that contains the downloaded PageXML files."""
+
 DEFAULT_SERVER = "https://hucdrive.huc.knaw.nl/"
 DEFAULT_BASE_PATH = "HTR/obp-v2-pagexml-leon-metadata-trimmed-2023-11/"
 
