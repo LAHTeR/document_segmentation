@@ -21,8 +21,12 @@ if not SERVER_PASSWORD:
 
 
 # TODO: list all document types and their spelling variants
-DOCUMENT_TYPES: Mapping[str, list[str]] = {
-    "Journaal": ["Journaal", "Journael"],
-    "Resolutie": ["Resolutie"],
+DOCUMENT_TYPES: Mapping[str, set[str]] = {
+    "Journaal": {"Journaal", "Journael"},
+    "Resolutie": {"Resolutie", "resolutien"},
+    "Dagregister": {"Daghregister", "Dagregister", "Dag Register", "dag-register"},
+    "Notulen": {"Notulen"},
+    # "Register": {"Register"},
+    "Monsterrol": {"Monsterrol", "Monsterrolle", "Monster Rolle"},
 }
 """A mapping from document types to all spelling variants of that type."""
