@@ -37,10 +37,11 @@ class PageXML:
         first_paragraph = self.top_paragraph()
 
         if first_paragraph:
-            for word in first_paragraph.get_words():
-                yield from {
-                    document_type
-                    for document_type, keywords in DOCUMENT_TYPES.items()
-                    for keyword in keywords
-                    if keyword == word.text
-                }
+            for line in first_paragraph.get_lines():
+                if line.text:
+                    yield from {
+                        document_type
+                        for document_type, keywords in DOCUMENT_TYPES.items()
+                        for keyword in keywords
+                        if keyword.casefold() in line.text.casefold()
+                    }
