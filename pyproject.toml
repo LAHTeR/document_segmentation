@@ -6,7 +6,7 @@ authors = ["Carsten Schnober <c.schnober@esciencecenter.nl>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.9"
 requests = "^2.31.0"
 pagexml-tools = "^0.4.2"
 openpyxl = "^3.1.2"
