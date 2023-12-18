@@ -6,7 +6,7 @@ authors = ["Carsten Schnober <c.schnober@esciencecenter.nl>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.9"
 requests = "^2.31.0"
 pagexml-tools = "^0.4.2"
 openpyxl = "^3.1.2"
@@ -19,6 +19,7 @@ pytest = "^7.4.3"
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.7"
 pre-commit = "^3.6.0"
+pytest-cov = "^4.1.0"
 
 [build-system]
 requires = ["poetry-core"]

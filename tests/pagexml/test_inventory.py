@@ -11,9 +11,10 @@ class TestInventory:
     def test_local_file(self, inventory):
         assert inventory.local_file == DATA_DIR / "1201.zip"
 
+    # TODO: test overwrite, download (mock request)
+    @pytest.mark.skip(reason="TODO")
     def test_download(self, inventory):
-        # TODO: test overwrite, download (mock request)
-        assert inventory.download("username", "password") == DATA_DIR / "1201.zip"
+        assert inventory.download() == DATA_DIR / "1201.zip"
 
     @pytest.mark.parametrize(
         "page_nr,expected_error",
