@@ -1,4 +1,4 @@
-from typing import Iterable, Optional
+from typing import Optional
 
 from pagexml.model.physical_document_model import PageXMLScan, PageXMLTextRegion
 
@@ -29,7 +29,7 @@ class PageXML:
             None,
         )
 
-    def document_type(self) -> Iterable[str]:
+    def document_type(self) -> list[str]:
         """Yield one or multiple document types found in the first paragraph/header of the page."""
 
         # TODO: account for multi-word keywords? -> work on line level
@@ -37,11 +37,11 @@ class PageXML:
         first_paragraph = self.top_paragraph()
 
         if first_paragraph:
-            for line in first_paragraph.get_lines():
-                if line.text:
-                    yield from {
-                        document_type
-                        for document_type, keywords in DOCUMENT_TYPES.items()
-                        for keyword in keywords
-                        if keyword.casefold() in line.text.casefold()
-                    }
+            return [
+                document_type
+                for line in first_paragraph.get_lines()
+                if line.text
+                for document_type, keywords in DOCUMENT_TYPES.items()
+                for keyword in keywords
+                if keyword.casefold() in line.text.casefold()
+            ]

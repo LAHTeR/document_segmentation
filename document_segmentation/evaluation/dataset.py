@@ -55,7 +55,7 @@ class TestSet:
                 inventory = Inventory(str(inv_nr))
                 document_begin_page = inventory.pagexml(begin_page)
 
-                document_types = list(document_begin_page.document_type())
+                document_types = document_begin_page.document_type()
                 if document_types:
                     print(f"{index}: {document_types}")
                 recalled += bool(document_types)
