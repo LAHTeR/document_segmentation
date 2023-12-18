@@ -32,8 +32,6 @@ class PageXML:
     def document_type(self) -> list[str]:
         """Yield one or multiple document types found in the first paragraph/header of the page."""
 
-        # TODO: account for multi-word keywords? -> work on line level
-
         first_paragraph = self.top_paragraph()
 
         if first_paragraph:

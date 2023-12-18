@@ -3,22 +3,25 @@ import os
 from pathlib import Path
 from typing import Mapping
 
-CWD = Path(__file__).parent.absolute()
+CWD: Path = Path(__file__).parent.absolute()
 
-DATA_DIR = CWD / "data"
-TEST_SHEET = DATA_DIR / "Spreadsheet Renate Revised.xlsx"
+DATA_DIR: Path = CWD / "data"
+TEST_SHEET: Path = DATA_DIR / "Spreadsheet Renate Revised.xlsx"
+GENERALE_MISSIVEN_SHEET: Path = (
+    DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
+)
 
 PAGEXML_CACHE_DIRECTORY: Path = DATA_DIR / "pagexml_cache"
 """Directory that contains the downloaded PageXML files."""
 
-DEFAULT_SERVER = "https://hucdrive.huc.knaw.nl/"
-DEFAULT_BASE_PATH = "HTR/obp-v2-pagexml-leon-metadata-trimmed-2023-11/"
+DEFAULT_SERVER: str = "https://hucdrive.huc.knaw.nl/"
+DEFAULT_BASE_PATH: str = "HTR/obp-v2-pagexml-leon-metadata-trimmed-2023-11/"
 
-SERVER_USERNAME = os.getenv("HUC_USERNAME", "")
+SERVER_USERNAME: str = os.getenv("HUC_USERNAME", "")
 if not SERVER_USERNAME:
     logging.error("No username set for accessing the HUC server.")
 
-SERVER_PASSWORD = os.getenv("HUC_PASSWORD", "")
+SERVER_PASSWORD: str = os.getenv("HUC_PASSWORD", "")
 if not SERVER_PASSWORD:
     logging.error("No password set for accessing the HUC server.")
 
