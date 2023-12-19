@@ -12,15 +12,12 @@ pagexml-tools = "^0.4.2"
 openpyxl = "^3.1.2"
 
 
-[tool.poetry.group.test.dependencies]
-pytest = "^7.4.3"
-
-
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.7"
 pre-commit = "^3.6.0"
 pytest-cov = "^4.1.0"
 requests-mock = "^1.11.0"
+pytest = "^7.4.3"
 
 [build-system]
 requires = ["poetry-core"]
