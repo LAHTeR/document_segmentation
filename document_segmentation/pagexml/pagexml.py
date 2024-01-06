@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from pagexml.model.physical_document_model import PageXMLScan, PageXMLTextRegion
@@ -9,6 +10,9 @@ class PageXML:
     """A Wrapper around the PageXMLScan class from the pagexml library"""
 
     def __init__(self, pagexml_scan: PageXMLScan) -> None:
+        logging.warning(
+            f"The {self.__class__.__name__} class is deprecated. Use PageXMLScan directly instead."
+        )
         self._scan = pagexml_scan
 
     def get_regions_from_top(self) -> list[PageXMLTextRegion]:
