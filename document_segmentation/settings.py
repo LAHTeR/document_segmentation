@@ -15,16 +15,21 @@ PAGEXML_CACHE_DIRECTORY: Path = DATA_DIR / "pagexml_cache"
 """Directory that contains the downloaded PageXML files."""
 
 DEFAULT_SERVER: str = "https://hucdrive.huc.knaw.nl/"
+"""The default server URL."""
 DEFAULT_BASE_PATH: str = "HTR/obp-v2-pagexml-leon-metadata-trimmed-2023-11/"
+"""The default base path for the server directory that contains the inventory files."""
 
 SERVER_USERNAME: str = os.getenv("HUC_USERNAME", "")
+"""The username for accessing the HUC server."""
 if not SERVER_USERNAME:
-    logging.error("No username set for accessing the HUC server.")
+    logging.warning("No username set for accessing the HUC server.")
 
 SERVER_PASSWORD: str = os.getenv("HUC_PASSWORD", "")
+"""The password for accessing the HUC server."""
 if not SERVER_PASSWORD:
-    logging.error("No password set for accessing the HUC server.")
+    logging.warning("No password set for accessing the HUC server.")
 
+LANGUAGE_MODEL: str = os.getenv("LANGUAGE_MODEL", "emanjavacas/GysBERT-v2")
 
 # TODO: list all document types and their spelling variants
 DOCUMENT_TYPES: Mapping[str, set[str]] = {
@@ -36,3 +41,16 @@ DOCUMENT_TYPES: Mapping[str, set[str]] = {
     "Monsterrol": {"Monsterrol", "Monsterrolle", "Monster Rolle"},
 }
 """A mapping from document types to all spelling variants of that type."""
+
+REGION_TYPES: list[str] = [
+    "catch-word",
+    "header",
+    "marginalia",
+    "page-number",
+    "pagexml_doc",
+    "paragraph",
+    "physical_structure_doc",
+    "signature-mark",
+    "text_region",
+]
+"""The types of regions that are used for the page sequence tagger."""

@@ -2,9 +2,9 @@ from contextlib import nullcontext as does_not_raise
 
 import pytest
 import requests_mock
+from pagexml.model.physical_document_model import PageXMLScan
 
 from document_segmentation.pagexml.inventory import Inventory
-from document_segmentation.pagexml.pagexml import PageXML
 
 from ..conftest import DATA_DIR
 
@@ -40,4 +40,4 @@ class TestInventory:
     )
     def test_pagexml(self, inventory, page_nr, expected_error):
         with expected_error:
-            assert isinstance(inventory.pagexml(page_nr), PageXML)
+            assert isinstance(inventory.pagexml(page_nr), PageXMLScan)

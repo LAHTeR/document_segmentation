@@ -12,3 +12,4 @@ def inventory():
 
 CWD = Path(__file__).parent.absolute()
 DATA_DIR = CWD / "data"
+GENERALE_MISSIVEN_CSV = DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
