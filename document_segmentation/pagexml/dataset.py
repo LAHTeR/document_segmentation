@@ -110,6 +110,16 @@ class PageXmlDataset(Dataset):
         """
         return (label for _, _, label in self._page_xmls)
 
+    def page_ids(self) -> Iterable[str]:
+        """Get all page IDs in this dataset.
+
+        This requires downloading and parsing the Inventory/PageXML files.
+
+        Returns:
+            Iterable[str]: all page IDs in the dataset.
+        """
+        return (page_xml.id for page_xml in self.page_xmls())
+
     def label_counts(self) -> Counter[Label, int]:
         """Get the number of occurrences of each label in this dataset.
 

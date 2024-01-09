@@ -1,9 +1,8 @@
 import pytest
-import requests_mock
 
 from document_segmentation.pagexml import GeneraleMissivenDataset, Label
 
-from ..conftest import DATA_DIR, GENERALE_MISSIVEN_CSV
+from ..conftest import GENERALE_MISSIVEN_CSV, TEST_SHEET_SIZE
 
 
 @pytest.fixture
@@ -14,28 +13,28 @@ def dataset(tmp_path):
 
 
 class TestGeneraleMissivenDataset:
-    TEST_SHEET_SIZE = 192681
-    TEST_INV_NR = "1201"
+    def test_from_csv(self, dataset, mock_request):
+        assert len(dataset) == TEST_SHEET_SIZE
 
-    def test_from_csv(self, dataset):
-        assert len(dataset) == self.TEST_SHEET_SIZE
-
-        url = f"https://hucdrive.huc.knaw.nl/HTR/obp-v2-pagexml-leon-metadata-trimmed-2023-11/{self.TEST_INV_NR}.zip"
-        with requests_mock.Mocker() as m:
-            test_file = (DATA_DIR / self.TEST_INV_NR).with_suffix(".zip")
-            m.get(url, content=test_file.open("rb").read())
-
-            assert dataset[17247][1] == Label.BEGIN
-            assert dataset[17248][1] == Label.IN
-            assert dataset[17595][1] == Label.END
-
-            assert m.called, "Request was not made."
-            assert m.request_history[0].url == url, "Request URL does not match."
+        assert dataset[17247][1] == Label.BEGIN
+        assert dataset[17248][1] == Label.IN
+        assert dataset[17595][1] == Label.END
 
     def test_label_tensor(self, dataset):
         labels = dataset.label_tensor()
         assert labels.shape == (len(dataset), 3), f"Bad shape: {labels.shape}"
         assert labels.sum() == len(dataset)
+
+    @pytest.mark.parametrize(
+        "start_index,expected",
+        [
+            (17247, ["NL-HaNA_1.04.02_1201_0016.jpg", "NL-HaNA_1.04.02_1201_0017.jpg"]),
+            (17249, ["NL-HaNA_1.04.02_1201_0018.jpg", "NL-HaNA_1.04.02_1201_0019.jpg"]),
+            # (TEST_SHEET_SIZE + 1, []),    # Test fails because mock request is not called
+        ],
+    )
+    def test_page_ids(self, dataset, mock_request, start_index, expected):
+        assert list(dataset[start_index : start_index + 2].page_ids()) == expected
 
     def test_segments(self, dataset):
         assert len(list(dataset.segments())) == 914
