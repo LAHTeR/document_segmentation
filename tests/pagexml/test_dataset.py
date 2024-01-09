@@ -22,6 +22,20 @@ class TestGeneraleMissivenDataset:
         assert dataset[17248][1] == Label.IN
         assert dataset[17595][1] == Label.END
 
+    @pytest.mark.parametrize(
+        "batch_size,expected_batches", [(1, TEST_SHEET_SIZE), (2, 96341), (32, 6022)]
+    )
+    def test_batches(self, dataset, batch_size: int, expected_batches: int):
+        assert len(list(dataset.batches(batch_size))) == expected_batches
+
+        batches = dataset.batches(batch_size)
+        for i in range(0, expected_batches - 1):
+            assert len(next(batches)) == batch_size
+        assert len(next(batches)) <= batch_size
+
+        with pytest.raises(StopIteration):
+            next(batches)
+
     def test_label_tensor(self, dataset):
         labels = dataset.label_tensor()
         assert labels.shape == (len(dataset), 3), f"Bad shape: {labels.shape}"
