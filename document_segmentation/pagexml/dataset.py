@@ -20,6 +20,21 @@ class Label(Enum):
     END = auto()
     # OUT = auto()
 
+    @staticmethod
+    def map_scores(scores: Iterable[float]) -> dict[str, float]:
+        """Map a list of scores to a dictionary of label names and scores.
+
+        Args:
+            scores (Iterable[float]): List of scores with the same length as Label.
+        Returns:
+            dict[str, float]: Dictionary mapping label names to scores.
+        """
+        if len(scores) != len(Label):
+            raise ValueError(
+                f"Expected {len(Label)} scores, got {len(scores)}: {scores}"
+            )
+        return {label.name: score for label, score in zip(Label, scores)}
+
 
 class PageXmlDataset(Dataset):
     """Dataset of PageXML files with labels."""
@@ -48,6 +63,17 @@ class PageXmlDataset(Dataset):
         else:
             inventory, page_number, label = self._page_xmls[idx]
             return inventory.pagexml(page_number), label
+
+    def batches(self, batch_size: int) -> Iterable["PageXmlDataset"]:
+        """Return a generator over batches of the given size.
+
+        Args:
+            batch_size (int): The batch size.
+        Returns:
+            Iterable[tuple[PageXMLScan, Label]]: A generator over batches of the given size.
+        """
+        for i in range(0, len(self), batch_size):
+            yield self[i : i + batch_size]
 
     def segments(self) -> Iterable["PageXmlDataset"]:
         """Return a iterable over sub-datasets each containing one complete segment."""
@@ -120,14 +146,6 @@ class PageXmlDataset(Dataset):
         """
         return (page_xml.id for page_xml in self.page_xmls())
 
-    def label_counts(self) -> Counter[Label, int]:
-        """Get the number of occurrences of each label in this dataset.
-
-        Returns:
-            Counter[Label, int]: a Counter mapping each label to the number of occurrences.
-        """
-        return dict(Counter(self.labels()))
-
     def label_tensor(self) -> torch.Tensor:
         """Get a tensor over all labels in this dataset.
 
@@ -139,6 +157,15 @@ class PageXmlDataset(Dataset):
             t[idx, label.value - 1] = 1
         assert t.sum() == len(self)
         return t
+
+    def inverse_frequencies(self) -> list[float]:
+        """Get the inverse frequency of each label in this dataset.
+
+        Returns:
+            list[float]: List of frequency of each label in dataset dividied by dataset length.
+        """
+        counts = Counter(self.labels())
+        return [len(self) / counts[label] for label in Label]
 
     @classmethod
     def from_csv(cls, input_file, cache_directory=PAGEXML_CACHE_DIRECTORY):

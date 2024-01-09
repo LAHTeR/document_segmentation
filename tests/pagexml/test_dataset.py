@@ -1,3 +1,5 @@
+from contextlib import nullcontext as does_not_raise
+
 import pytest
 
 from document_segmentation.pagexml import GeneraleMissivenDataset, Label
@@ -19,6 +21,20 @@ class TestGeneraleMissivenDataset:
         assert dataset[17247][1] == Label.BEGIN
         assert dataset[17248][1] == Label.IN
         assert dataset[17595][1] == Label.END
+
+    @pytest.mark.parametrize(
+        "batch_size,expected_batches", [(1, TEST_SHEET_SIZE), (2, 96341), (32, 6022)]
+    )
+    def test_batches(self, dataset, batch_size: int, expected_batches: int):
+        assert len(list(dataset.batches(batch_size))) == expected_batches
+
+        batches = dataset.batches(batch_size)
+        for i in range(0, expected_batches - 1):
+            assert len(next(batches)) == batch_size
+        assert len(next(batches)) <= batch_size
+
+        with pytest.raises(StopIteration):
+            next(batches)
 
     def test_label_tensor(self, dataset):
         labels = dataset.label_tensor()
@@ -44,14 +60,21 @@ class TestGeneraleMissivenDataset:
             assert all(label == Label.IN for label in labels[1:-1])
             assert labels[-1] == Label.END
 
-    def test_label_count(self, dataset):
-        counts = dataset.label_counts()
-        assert counts[Label.BEGIN] == 914
-        assert counts[Label.IN] == 190853
-        assert counts[Label.END] == 914
+    def test_inverse_frequency(self, dataset):
+        assert dataset.inverse_frequencies() == pytest.approx(
+            [210.81072210065645, 1.0095780522181994, 210.81072210065645]
+        )
 
-    def test_segment_label_count(self, dataset):
-        for segment in dataset.segments():
-            counts = segment.label_counts()
-            assert counts[Label.BEGIN] == 1
-            assert counts[Label.END] == 1
+
+class TestLabel:
+    @pytest.mark.parametrize(
+        "scores,expected,expected_exception",
+        [
+            ([0.9, 0.1, 0], {"BEGIN": 0.9, "IN": 0.1, "END": 0}, does_not_raise()),
+            ([0.1] * 5, None, pytest.raises(ValueError)),
+            ([0.1] * 2, None, pytest.raises(ValueError)),
+        ],
+    )
+    def test_map_scores(self, scores, expected, expected_exception):
+        with expected_exception:
+            assert Label.map_scores(scores) == expected
