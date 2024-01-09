@@ -1,3 +1,5 @@
+from contextlib import nullcontext as does_not_raise
+
 import pytest
 
 from document_segmentation.pagexml import GeneraleMissivenDataset, Label
@@ -44,14 +46,21 @@ class TestGeneraleMissivenDataset:
             assert all(label == Label.IN for label in labels[1:-1])
             assert labels[-1] == Label.END
 
-    def test_label_count(self, dataset):
-        counts = dataset.label_counts()
-        assert counts[Label.BEGIN] == 914
-        assert counts[Label.IN] == 190853
-        assert counts[Label.END] == 914
+    def test_inverse_frequency(self, dataset):
+        assert dataset.inverse_frequencies() == pytest.approx(
+            [210.81072210065645, 1.0095780522181994, 210.81072210065645]
+        )
 
-    def test_segment_label_count(self, dataset):
-        for segment in dataset.segments():
-            counts = segment.label_counts()
-            assert counts[Label.BEGIN] == 1
-            assert counts[Label.END] == 1
+
+class TestLabel:
+    @pytest.mark.parametrize(
+        "scores,expected,expected_exception",
+        [
+            ([0.9, 0.1, 0], {"BEGIN": 0.9, "IN": 0.1, "END": 0}, does_not_raise()),
+            ([0.1] * 5, None, pytest.raises(ValueError)),
+            ([0.1] * 2, None, pytest.raises(ValueError)),
+        ],
+    )
+    def test_map_scores(self, scores, expected, expected_exception):
+        with expected_exception:
+            assert Label.map_scores(scores) == expected
