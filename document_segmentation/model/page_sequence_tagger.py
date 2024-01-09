@@ -88,7 +88,7 @@ class PageSequenceTagger(nn.Module):
 
         for epoch in tqdm(range(epochs), unit="epoch"):
             for batch in tqdm(
-                pages.batches(batch_size), unit="batch", total=len(pages) // batch_size
+                pages.batches(batch_size), unit="batch", total=len(pages) / batch_size
             ):
                 optimizer.zero_grad()
                 outputs = self(batch)
@@ -100,17 +100,19 @@ class PageSequenceTagger(nn.Module):
     def _evaluate(self, dataset: PageXmlDataset, metric: Metric, batch_size: int):
         self.eval()
 
+        metric_name = metric.__class__.__name__
         for batch in tqdm(
             dataset.batches(batch_size),
-            desc=metric.__class__.__name__,
+            desc=metric_name,
             unit="batch",
             total=len(dataset) / batch_size,
         ):
             outputs = self(batch)
 
             true_labels = [label.value - 1 for label in batch.labels()]
-            metric.update(outputs, torch.tensor(true_labels, dtype=torch.int64))
-            tqdm.write(f"[F1 Score:\t{Label.map_scores(metric.compute().tolist())}]")
+            metric.update(outputs, torch.tensor(true_labels))
+            scores = Label.map_scores(metric.compute().tolist())
+            tqdm.write(f"[{metric_name}: {scores}]")
 
         return metric.compute()
 
