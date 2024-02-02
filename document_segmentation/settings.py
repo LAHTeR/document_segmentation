@@ -7,12 +7,11 @@ CWD: Path = Path(__file__).parent.absolute()
 
 DATA_DIR: Path = CWD / "data"
 TEST_SHEET: Path = DATA_DIR / "Spreadsheet Renate Revised.xlsx"
+
 GENERALE_MISSIVEN_SHEET: Path = (
     DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
 )
-
-PAGEXML_CACHE_DIRECTORY: Path = DATA_DIR / "pagexml_cache"
-"""Directory that contains the downloaded PageXML files."""
+GENERALE_MISSIVEN_DOCUMENT_DIR: Path = DATA_DIR / "generale_missiven"
 
 DEFAULT_SERVER: str = "https://hucdrive.huc.knaw.nl/"
 """The default server URL."""
@@ -41,16 +40,3 @@ DOCUMENT_TYPES: Mapping[str, set[str]] = {
     "Monsterrol": {"Monsterrol", "Monsterrolle", "Monster Rolle"},
 }
 """A mapping from document types to all spelling variants of that type."""
-
-REGION_TYPES: list[str] = [
-    "catch-word",
-    "header",
-    "marginalia",
-    "page-number",
-    "pagexml_doc",
-    "paragraph",
-    "physical_structure_doc",
-    "signature-mark",
-    "text_region",
-]
-"""The types of regions that are used for the page sequence tagger."""

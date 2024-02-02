@@ -1,10 +1,9 @@
 import logging
 
-from pagexml.model.physical_document_model import PageXMLScan, PageXMLTextRegion
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
-from ..settings import REGION_TYPES
+from ..pagexml.datamodel import Page, Region, RegionType
 from .region_embedding import RegionEmbedding
 
 
@@ -28,7 +27,7 @@ class PageEmbedding(nn.Module):
         # GRU over the regions on a page
         self.gru = nn.GRU(
             # text embeddings + region types + region coordinates
-            input_size=self._transformer_dim + len(REGION_TYPES),  # + 2,
+            input_size=self._transformer_dim + len(RegionType),  # + 2,
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout,
@@ -38,7 +37,7 @@ class PageEmbedding(nn.Module):
 
         self._linear = nn.Linear(hidden_size * 2, output_size)
 
-    def forward(self, pages: list[PageXMLScan]):
+    def forward(self, pages: list[Page]):
         """Embed the pages using a Transformer model and a GRU over the regions on a page.
 
         Args:
@@ -48,32 +47,17 @@ class PageEmbedding(nn.Module):
             logging.warning(f"Expected a list of pages, got {pages}")
             pages = [pages]
 
-        regions_batch: list[list[PageXMLTextRegion]] = [
-            page.get_text_regions_in_reading_order() for page in pages
-        ]
-        max_regions: int = max(len(regions) for regions in regions_batch)
+        regions_batch: list[list[Region]] = [page.regions for page in pages]
 
         region_inputs = pad_sequence(
             [self._region_model(regions) for regions in regions_batch],
             batch_first=True,
             padding_value=0.0,
         )
-        _expected_size = (
-            len(pages),
-            max_regions,
-            self._region_model.embedding_size + len(REGION_TYPES),  # + 2,
-        )
-        assert (
-            region_inputs.size() == _expected_size
-        ), f"Bad region input shape: {region_inputs.size()}. Expected: {_expected_size}"
 
         gru_out, hidden = self.gru(region_inputs)
 
         out = self._linear(gru_out)
-        _expected_size = (len(pages), max_regions, self.output_size)
-        assert (
-            out.size() == _expected_size
-        ), f"Bad output shape: {out.size()}. Expected: {_expected_size}"
 
         final_step_output_batch = out[:, -1, :]
         _expected_size = (len(pages), self.output_size)

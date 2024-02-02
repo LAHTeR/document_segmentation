@@ -10,7 +10,8 @@ from torcheval.metrics import (
 from torcheval.metrics.metric import Metric
 from tqdm import tqdm
 
-from ..pagexml.dataset import Label, PageXmlDataset
+from ..pagexml.datamodel import Label
+from .dataset import PageDataset
 from .page_embedding import PageEmbedding
 
 # TODO: move to device
@@ -38,8 +39,8 @@ class PageSequenceTagger(nn.Module):
 
         self._eval_args = {"average": None, "num_classes": len(Label)}
 
-    def forward(self, pages: PageXmlDataset):
-        page_embeddings = self._page_embedding(list(pages.page_xmls()))
+    def forward(self, pages: PageDataset):
+        page_embeddings = self._page_embedding(pages.pages)
 
         assert page_embeddings.size() == (
             len(pages),
@@ -62,7 +63,7 @@ class PageSequenceTagger(nn.Module):
 
     def train_(
         self,
-        pages: PageXmlDataset,
+        pages: PageDataset,
         epochs: int = 3,
         batch_size: int = _DEFAULT_BATCH_SIZE,
         weights: list[float] = None,
@@ -79,7 +80,7 @@ class PageSequenceTagger(nn.Module):
         self.train()
 
         if weights is None:
-            weights = pages.inverse_frequencies()
+            weights = pages.class_weights()
         if len(weights) != len(Label):
             raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
 
@@ -97,7 +98,7 @@ class PageSequenceTagger(nn.Module):
                 optimizer.step()
             tqdm.write(f"[Loss:\t{loss:.3f}]")
 
-    def _evaluate(self, dataset: PageXmlDataset, metric: Metric, batch_size: int):
+    def _evaluate(self, dataset: PageDataset, metric: Metric, batch_size: int):
         self.eval()
 
         metric_name = metric.__class__.__name__
@@ -117,7 +118,7 @@ class PageSequenceTagger(nn.Module):
         return metric.compute()
 
     def precision(
-        self, dataset: PageXmlDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
+        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
     ) -> dict[str, float]:
         metric = MulticlassPrecision(**self._eval_args)
         scores = self._evaluate(dataset, metric, batch_size=batch_size)
@@ -125,7 +126,7 @@ class PageSequenceTagger(nn.Module):
         return Label.map_scores(scores.tolist())
 
     def recall(
-        self, dataset: PageXmlDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
+        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
     ) -> dict[str, float]:
         metric = MulticlassRecall(**self._eval_args)
         scores = self._evaluate(dataset, metric, batch_size=batch_size)
@@ -133,7 +134,7 @@ class PageSequenceTagger(nn.Module):
         return Label.map_scores(scores.tolist())
 
     def f1_score(
-        self, dataset: PageXmlDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
+        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
     ) -> dict[str, float]:
         metric = MulticlassF1Score(**self._eval_args)
         scores = self._evaluate(dataset, metric, batch_size=batch_size)
@@ -141,7 +142,7 @@ class PageSequenceTagger(nn.Module):
         return Label.map_scores(scores.tolist())
 
     def accuracy(
-        self, dataset: PageXmlDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
+        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
     ) -> float:
         metric = MulticlassAccuracy(**self._eval_args)
         scores = self._evaluate(dataset, metric, batch_size=batch_size)

@@ -97,3 +97,4 @@ __pypackages__/
 
 # Local PageXML cache
 document_segmentation/data/pagexml_cache
+document_segmentation/data/generale_missiven
