@@ -3,12 +3,12 @@ from functools import lru_cache
 
 import numpy as np
 import torch
-from pagexml.model.physical_document_model import PageXMLTextRegion
 from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
-from ..settings import LANGUAGE_MODEL, REGION_TYPES
+from ..pagexml.datamodel import Region, RegionType
+from ..settings import LANGUAGE_MODEL
 
 
 class RegionEmbedding(nn.Module):
@@ -36,50 +36,53 @@ class RegionEmbedding(nn.Module):
 
     @lru_cache(maxsize=256)
     @torch.no_grad()
-    def _text_embeddings(self, region_batch: tuple[PageXMLTextRegion]) -> torch.Tensor:
+    def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
         """Embed the text of a page using a Transformers model.
 
+        Args:
+            region_batch: The regions to embed.
+                If empty, return a zero tensor of embeddings dimensionality
         Returns:
             A tensor of shape (1, embedding_size).
         """
         # TODO: process input batches
 
-        region_texts: list[str] = [
-            self._line_separator.join(
-                [line.text or str() for line in region.get_lines()]
+        if region_batch:
+            region_texts: list[str] = [
+                self._line_separator.join(region.lines) for region in region_batch
+            ]
+
+            text_inputs = self.tokenizer(
+                region_texts,
+                return_tensors="pt",
+                padding="max_length",
+                truncation=True,
+                max_length=self._max_length,
             )
-            for region in region_batch
-        ]
 
-        text_inputs = self.tokenizer(
-            region_texts,
-            return_tensors="pt",
-            padding="max_length",
-            truncation=True,
-            max_length=self._max_length,
-        )
+            out = self.transformer_model(**text_inputs).last_hidden_state
+            cls_tokens = out[:, 0, :]  # CLS token is first token of sequence
+        else:
+            logging.debug("Empty region batch.")
+            cls_tokens = torch.zeros(0, self.embedding_size)
 
-        out = self.transformer_model(**text_inputs).last_hidden_state
-        cls_tokens = out[:, 0, :]  # CLS token is first token of sequence
-        assert cls_tokens.size() == (
-            len(region_batch),
-            self.embedding_size,
-        ), f"Output shape: {cls_tokens.size()}."
+        expected_size = (len(region_batch), self.embedding_size)
+        assert (
+            cls_tokens.size() == expected_size
+        ), f"Output shape was {cls_tokens.size()}, but should be {expected_size}."
 
         return cls_tokens
 
-    def _region_types_tensor(
-        self, region_batch: list[PageXMLTextRegion]
-    ) -> torch.Tensor:
-        types = torch.zeros(len(region_batch), len(REGION_TYPES))
-
+    def _region_types_tensor(self, region_batch: list[Region]) -> torch.Tensor:
+        # FIXME: populate the types tensor more efficiently
+        types = torch.zeros(len(region_batch), len(RegionType))
         for i, region in enumerate(region_batch):
-            for region_type in region.type:
-                types[i, REGION_TYPES.index(region_type)] = 1
+            for region_type in region.types:
+                types[i, region_type.index()] = 1
 
         assert types.size() == (
             len(region_batch),
-            len(REGION_TYPES),
+            len(RegionType),
         ), f"Output shape: {types.size()}."
 
         return types
@@ -106,11 +109,11 @@ class RegionEmbedding(nn.Module):
             ).reshape(coordinates.shape)
         )
 
-    def forward(self, regions: list[PageXMLTextRegion]):
+    def forward(self, regions: list[Region]):
         """Embed a sequence of regions.
 
         Args:
-            regions (list[PageXMLTextRegion]): The regions to embed. This must be a tuple for caching.
+            regions (list[Region]): The regions to embed. This must be a tuple for caching.
         """
         if not isinstance(regions, list):
             logging.warning(
@@ -134,7 +137,7 @@ class RegionEmbedding(nn.Module):
 
         assert region_inputs.size() == (
             len(regions),
-            self.embedding_size + len(REGION_TYPES),
+            self.embedding_size + len(RegionType),
         ), f"Bad output shape: {region_inputs.size()}."
 
         return region_inputs

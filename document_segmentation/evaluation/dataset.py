@@ -5,7 +5,7 @@ from typing import Union
 import pandas as pd
 from tqdm import tqdm
 
-from document_segmentation.pagexml.inventory import Inventory
+from document_segmentation.pagexml.inventory import InventoryReader
 
 from ..settings import TEST_SHEET
 
@@ -52,7 +52,7 @@ class TestSet:
                 )
             else:
                 total += 1
-                inventory = Inventory(str(inv_nr))
+                inventory = InventoryReader(str(inv_nr))
                 document_begin_page = inventory.pagexml(begin_page)
 
                 document_types = document_begin_page.document_type()
