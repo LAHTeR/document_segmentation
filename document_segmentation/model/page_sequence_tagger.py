@@ -1,3 +1,6 @@
+import logging
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,8 +16,7 @@ from tqdm import tqdm
 from ..pagexml.datamodel import Label
 from .dataset import PageDataset
 from .page_embedding import PageEmbedding
-
-# TODO: move to device
+from .util import get_device
 
 
 class PageSequenceTagger(nn.Module):
@@ -22,7 +24,7 @@ class PageSequenceTagger(nn.Module):
 
     _DEFAULT_BATCH_SIZE: int = 32
 
-    def __init__(self) -> None:
+    def __init__(self, *, device: Optional[str] = None) -> None:
         super().__init__()
 
         # TODO pass arguments to PageEmbedding
@@ -34,10 +36,24 @@ class PageSequenceTagger(nn.Module):
             batch_first=True,
             bidirectional=True,
         )
-        self._linear = nn.Linear(64 * 2, len(Label))
+        self._linear = nn.Linear(64 * 2, len(Label))  # FIXME: use parameter for size
         self._softmax = nn.Softmax(dim=1)
 
         self._eval_args = {"average": None, "num_classes": len(Label)}
+
+        self.to(device or get_device())
+
+    def to(self, device: str):
+        logging.info(f"Using device: {device}")
+
+        self._page_embedding.to(device)
+        self._gru.to(device)
+        self._linear.to(device)
+        self._softmax.to(device)
+
+        self._device = device
+
+        return self
 
     def forward(self, pages: PageDataset):
         page_embeddings = self._page_embedding(pages.pages)
@@ -84,7 +100,7 @@ class PageSequenceTagger(nn.Module):
         if len(weights) != len(Label):
             raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
 
-        criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights))
+        criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights)).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
         for epoch in tqdm(range(epochs), unit="epoch"):
@@ -92,8 +108,10 @@ class PageSequenceTagger(nn.Module):
                 pages.batches(batch_size), unit="batch", total=len(pages) / batch_size
             ):
                 optimizer.zero_grad()
-                outputs = self(batch)
-                loss = criterion(outputs, batch.label_tensor())
+                outputs = self(batch).to(self._device)
+                loss = criterion(outputs, batch.label_tensor().to(self._device)).to(
+                    self._device
+                )
                 loss.backward()
                 optimizer.step()
             tqdm.write(f"[Loss:\t{loss:.3f}]")
