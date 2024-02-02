@@ -5,11 +5,11 @@ from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
 from ..pagexml.datamodel import Page, Region, RegionType
+from .device_module import DeviceModule
 from .region_embedding import RegionEmbedding
-from .util import get_device
 
 
-class PageEmbedding(nn.Module):
+class PageEmbedding(nn.Module, DeviceModule):
     """Embeds a page using a Transformer model and a GRU over the regions on a page."""
 
     def __init__(
@@ -41,18 +41,7 @@ class PageEmbedding(nn.Module):
 
         self._linear = nn.Linear(hidden_size * 2, output_size)
 
-        self.to(device or get_device())
-
-    def to(self, device: str):
-        logging.info(f"Using device: {device}")
-
-        self._region_model.to(device)
-        self.gru.to(device)
-        self._linear.to(device)
-
-        self._device = device
-
-        return self
+        self.to_device(device)
 
     def forward(self, pages: list[Page]):
         """Embed the pages using a Transformer model and a GRU over the regions on a page.

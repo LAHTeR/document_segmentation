@@ -10,10 +10,10 @@ from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
 from ..pagexml.datamodel import Region, RegionType
 from ..settings import LANGUAGE_MODEL
-from .util import get_device
+from .device_module import DeviceModule
 
 
-class RegionEmbedding(nn.Module):
+class RegionEmbedding(nn.Module, DeviceModule):
     def __init__(
         self,
         hidden_size: int = 64,
@@ -37,17 +37,7 @@ class RegionEmbedding(nn.Module):
         self._max_length = self.transformer_model.config.max_position_embeddings
         self._linear = nn.Linear(hidden_size * 2, 128)
 
-        self.to(device or get_device())
-
-    def to(self, device: str):
-        logging.info(f"Using device: {device}")
-
-        self.transformer_model.to(device)
-        self._linear.to(device)
-
-        self._device = device
-
-        return self
+        self.to_device(device)
 
     @lru_cache(maxsize=256)
     @torch.no_grad()

@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 
 import torch
@@ -15,11 +14,11 @@ from tqdm import tqdm
 
 from ..pagexml.datamodel import Label
 from .dataset import PageDataset
+from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
-from .util import get_device
 
 
-class PageSequenceTagger(nn.Module):
+class PageSequenceTagger(nn.Module, DeviceModule):
     """A page sequence tagger that uses a GRU over the regions on a page."""
 
     _DEFAULT_BATCH_SIZE: int = 32
@@ -41,19 +40,7 @@ class PageSequenceTagger(nn.Module):
 
         self._eval_args = {"average": None, "num_classes": len(Label)}
 
-        self.to(device or get_device())
-
-    def to(self, device: str):
-        logging.info(f"Using device: {device}")
-
-        self._page_embedding.to(device)
-        self._gru.to(device)
-        self._linear.to(device)
-        self._softmax.to(device)
-
-        self._device = device
-
-        return self
+        self.to_device(device)
 
     def forward(self, pages: PageDataset):
         page_embeddings = self._page_embedding(pages.pages)
