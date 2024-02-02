@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 
 import torch
-from torch import nn
 
 
 class DeviceModule(abc.ABC):
@@ -13,32 +12,58 @@ class DeviceModule(abc.ABC):
     def to_device(self, device: Optional[str] = None):
         """Move the module and all its Torch modules to a device.
 
+        Sets self._device to the device used.
+
         Args:
-            device: The device to move to.
+            device: The device to move to. If not given, auto-detect available devices.
         Returns:
             self
         """
 
-        if device is None:
-            device = DeviceModule.get_device()
-        self._device = device
+        self._device = device or DeviceModule.get_device()
 
         logging.info(f"Using device: {self._device}")
 
-        for name, module in inspect.getmembers(
-            self, lambda x: isinstance(x, nn.Module)
-        ):
-            module.to(self._device)
+        for name, module in inspect.getmembers(self):
+            try:
+                module.to_device(self._device)
+                logging.info(
+                    "Moving sub-modules of '%s' to device '%s'",
+                    self.__class__.__name__,
+                    self._device,
+                )
+            except AttributeError:
+                pass
+
+            try:
+                module.to(self._device)
+                logging.info(
+                    "Moving module '%s' to device '%s'",
+                    ".".join((self.__class__.__name__, name)),
+                    self._device,
+                )
+            except AttributeError:
+                pass
 
         return self
 
     @staticmethod
-    def get_device() -> str:
-        """Get the device to use for Torch."""
+    def get_device(
+        backends=[torch.cuda, torch.backends.mps], fallback: str = "cpu"
+    ) -> str:
+        """Get the device to use for Torch. Returns the name of the backend that is available.
 
-        if torch.cuda.is_available():
-            return "cuda"
-        elif torch.backends.mps.is_available():
-            return "mps"
-        else:
-            return "cpu"
+        Args:
+            backends: A list of modules to check for availability. Defaults to (torch.cuda, torch.backends.mps).
+            fallback: The device to use if no other is available.
+        """
+
+        # TODO: this does not work for multiple CUDA devices ("cuda" vs "cuda:0")
+        return next(
+            (
+                backend.__name__.split(".")[-1]
+                for backend in backends
+                if backend.is_available()
+            ),
+            fallback,
+        )
