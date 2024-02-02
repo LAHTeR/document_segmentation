@@ -1,5 +1,6 @@
 import logging
 from functools import lru_cache
+from typing import Optional
 
 import numpy as np
 import torch
@@ -9,14 +10,16 @@ from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
 from ..pagexml.datamodel import Region, RegionType
 from ..settings import LANGUAGE_MODEL
+from .device_module import DeviceModule
 
 
-class RegionEmbedding(nn.Module):
+class RegionEmbedding(nn.Module, DeviceModule):
     def __init__(
         self,
         hidden_size: int = 64,
         transformer_model_name: str = LANGUAGE_MODEL,
         line_separator: str = "\n",
+        device: Optional[str] = None,
     ):
         super().__init__()
 
@@ -33,6 +36,8 @@ class RegionEmbedding(nn.Module):
         self.embedding_size = self.transformer_model.config.hidden_size
         self._max_length = self.transformer_model.config.max_position_embeddings
         self._linear = nn.Linear(hidden_size * 2, 128)
+
+        self.to_device(device)
 
     @lru_cache(maxsize=256)
     @torch.no_grad()
@@ -60,7 +65,9 @@ class RegionEmbedding(nn.Module):
                 max_length=self._max_length,
             )
 
-            out = self.transformer_model(**text_inputs).last_hidden_state
+            out = self.transformer_model(
+                **text_inputs.to(self._device)
+            ).last_hidden_state
             cls_tokens = out[:, 0, :]  # CLS token is first token of sequence
         else:
             logging.debug("Empty region batch.")
@@ -75,7 +82,7 @@ class RegionEmbedding(nn.Module):
 
     def _region_types_tensor(self, region_batch: list[Region]) -> torch.Tensor:
         # FIXME: populate the types tensor more efficiently
-        types = torch.zeros(len(region_batch), len(RegionType))
+        types = torch.zeros(len(region_batch), len(RegionType)).to(self._device)
         for i, region in enumerate(region_batch):
             for region_type in region.types:
                 types[i, region_type.index()] = 1
