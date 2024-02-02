@@ -1,30 +1,40 @@
-from contextlib import nullcontext as does_not_raise
+import random
 
 import pytest
 from pagexml.model.physical_document_model import PageXMLScan
 
-from document_segmentation.pagexml.inventory import Inventory
-
-from ..conftest import DATA_DIR
+from document_segmentation.pagexml.inventory import InventoryReader
 
 
 class TestInventory:
-    def test_local_file(self, inventory):
-        assert inventory.local_file == DATA_DIR / "1201.zip"
+    def test_pagexml(self, inventory, tmp_path):
+        inventory._pagexml_directory = tmp_path / inventory._inv_nr
 
-    def test_download(self, tmp_path, mock_request):
-        test_file = DATA_DIR / "1201.zip"
-        inventory = Inventory("1201", cache_directory=tmp_path)
+        inventory_size: int = 806
 
-        assert inventory.download() == tmp_path / "1201.zip"
-        assert (
-            tmp_path / "1201.zip"
-        ).read_bytes() == test_file.read_bytes(), "Downloaded file does not match."
+        assert all(
+            isinstance(inventory.pagexml(page_nr), PageXMLScan)
+            for page_nr in random.sample(range(1, inventory_size + 1), 10)
+        )
 
-    @pytest.mark.parametrize(
-        "page_nr,expected_error",
-        [(511, does_not_raise()), (10000, pytest.raises(ValueError))],
-    )
-    def test_pagexml(self, inventory, page_nr, expected_error):
-        with expected_error:
-            assert isinstance(inventory.pagexml(page_nr), PageXMLScan)
+        with pytest.raises(ValueError):
+            inventory.pagexml(inventory_size + 1)
+
+    def test_del(self, tmp_path, inventory):
+        inventory.pagexml(1)
+
+        assert inventory.local_zip_file.exists()
+        assert inventory._pagexml_directory.exists()
+
+        inventory.__del__()
+
+        assert not (tmp_path / "1201.zip").exists()
+        assert not (tmp_path / "1201").exists()
+
+    def test_context_manager(self, mock_request, tmp_path):
+        with InventoryReader("1201", cache_directory=tmp_path) as inventory:
+            assert inventory.local_zip_file.is_file()
+            assert inventory._pagexml_directory.is_dir()
+
+        assert not inventory.local_zip_file.exists()
+        assert not inventory._pagexml_directory.exists()
