@@ -1,6 +1,7 @@
 import abc
 import inspect
 import logging
+from types import ModuleType
 from typing import Optional
 
 import torch
@@ -49,21 +50,18 @@ class DeviceModule(abc.ABC):
 
     @staticmethod
     def get_device(
-        backends=[torch.cuda, torch.backends.mps], fallback: str = "cpu"
+        backends: list[ModuleType] = [torch.cuda, torch.backends.mps, torch.cpu],
     ) -> str:
-        """Get the device to use for Torch. Returns the name of the backend that is available.
+        """Get the device to use for Torch. Returns the name of the first backend that is available.
 
         Args:
-            backends: A list of modules to check for availability. Defaults to (torch.cuda, torch.backends.mps).
-            fallback: The device to use if no other is available.
+            backends: A list of modules to check for availability.
+                Defaults to [torch.cuda, torch.backends.mps, torch.cpu].
         """
 
         # TODO: this does not work for multiple CUDA devices ("cuda" vs "cuda:0")
         return next(
-            (
-                backend.__name__.split(".")[-1]
-                for backend in backends
-                if backend.is_available()
-            ),
-            fallback,
+            backend.__name__.split(".")[-1]
+            for backend in backends
+            if backend.is_available()
         )
