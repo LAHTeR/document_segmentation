@@ -19,7 +19,7 @@ from .page_embedding import PageEmbedding
 
 
 class PageSequenceTagger(nn.Module, DeviceModule):
-    """A page sequence tagger that uses a GRU over the regions on a page."""
+    """A page sequence tagger that uses an RNN over the regions on a page."""
 
     _DEFAULT_BATCH_SIZE: int = 32
 
@@ -28,8 +28,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         # TODO pass arguments to PageEmbedding
         self._page_embedding = PageEmbedding()
-        self._gru = nn.GRU(
-            input_size=self._page_embedding.gru.hidden_size * 2,
+
+        # LSTM, because GRU seems not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
+        self._rnn = nn.LSTM(
+            input_size=self._page_embedding._rnn.hidden_size * 2,
             hidden_size=64,
             num_layers=1,
             batch_first=True,
@@ -50,13 +52,13 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             self._page_embedding.output_size,
         ), "Bad shape: {pages.size()}"
 
-        gru_out, hidden = self._gru(page_embeddings)
-        assert gru_out.size() == (
+        rnn_out, hidden = self._rnn(page_embeddings)
+        assert rnn_out.size() == (
             len(pages),
             self._page_embedding.output_size,
-        ), f"Bad shape: {gru_out.size()}"
+        ), f"Bad shape: {rnn_out.size()}"
 
-        output = self._linear(gru_out)
+        output = self._linear(rnn_out)
         assert output.size() == (len(pages), len(Label)), f"Bad shape: {output.size()}"
 
         softmax = self._softmax(output)

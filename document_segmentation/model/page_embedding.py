@@ -28,8 +28,8 @@ class PageEmbedding(nn.Module, DeviceModule):
         self._transformer_dim = self._region_model.embedding_size
         self.output_size = output_size
 
-        # GRU over the regions on a page
-        self.gru = nn.GRU(
+        # LSTM, because GRU seems not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
+        self._rnn = nn.LSTM(
             # text embeddings + region types + region coordinates
             input_size=self._transformer_dim + len(RegionType),  # + 2,
             hidden_size=hidden_size,
@@ -38,7 +38,6 @@ class PageEmbedding(nn.Module, DeviceModule):
             bidirectional=True,
             batch_first=True,
         )
-
         self._linear = nn.Linear(hidden_size * 2, output_size)
 
         self.to_device(device)
@@ -61,9 +60,9 @@ class PageEmbedding(nn.Module, DeviceModule):
             padding_value=0.0,
         )
 
-        gru_out, hidden = self.gru(region_inputs)
+        rnn_out, hidden = self._rnn(region_inputs)
 
-        out = self._linear(gru_out)
+        out = self._linear(rnn_out)
 
         final_step_output_batch = out[:, -1, :]
         _expected_size = (len(pages), self.output_size)
