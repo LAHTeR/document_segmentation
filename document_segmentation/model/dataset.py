@@ -58,6 +58,14 @@ class PageDataset(Dataset):
         else:
             return self._pages[index]
 
+    def doc_ids(self) -> list[str]:
+        """Return the page IDs in this dataset.
+
+        Returns:
+            list[str]: The page IDs in this dataset.
+        """
+        return [page.doc_id for page in self._pages]
+
     def labels(self) -> list[Label]:
         """Return a list of labels for each page.
 
