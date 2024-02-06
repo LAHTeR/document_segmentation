@@ -105,7 +105,7 @@ class GeneraleMissiven:
                 inv_nr = row[self._INV_NR_COLUMN]
                 if row[self._STATUS_COLUMN] == self._SKIP_MESSAGE:
                     tqdm.write(
-                        f"Skipping row with inventory number {str(inv_nr)} due to status message: {row[self._STATUS_COLUMN]}"
+                        f"Skipping row with inventory number {str(inv_nr)} due to status message: '{row[self._STATUS_COLUMN]}'"
                     )
                     continue
 

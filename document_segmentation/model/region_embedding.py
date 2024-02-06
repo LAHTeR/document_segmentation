@@ -9,15 +9,23 @@ from torch import nn
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
 from ..pagexml.datamodel import Region, RegionType
-from ..settings import LANGUAGE_MODEL
+from ..settings import (
+    LANGUAGE_MODEL,
+    REGION_EMBEDDING_OUTPUT_SIZE,
+    REGION_TYPE_EMBEDDING_SIZE,
+)
 from .device_module import DeviceModule
 
 
 class RegionEmbedding(nn.Module, DeviceModule):
+    """A module to create a representation of a region using a Transformer model."""
+
     def __init__(
         self,
-        hidden_size: int = 64,
+        *,
         transformer_model_name: str = LANGUAGE_MODEL,
+        output_size: int = REGION_EMBEDDING_OUTPUT_SIZE,
+        region_type_embedding_size: int = REGION_TYPE_EMBEDDING_SIZE,
         line_separator: str = "\n",
         device: Optional[str] = None,
     ):
@@ -26,38 +34,47 @@ class RegionEmbedding(nn.Module, DeviceModule):
         self._line_separator = line_separator
 
         # Text embeddings from a Transformers model
-        self.transformer_model: AutoModel = AutoModel.from_pretrained(
+        self._transformer_model: AutoModel = AutoModel.from_pretrained(
             transformer_model_name
         )
-        self.tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
+        self._tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
             transformer_model_name
         )
 
-        self.embedding_size = self.transformer_model.config.hidden_size
-        self._max_length = self.transformer_model.config.max_position_embeddings
-        self._linear = nn.Linear(hidden_size * 2, 128)
+        self._region_embedding = nn.Embedding(
+            len(RegionType), region_type_embedding_size
+        )
+
+        self._max_length = self._transformer_model.config.max_position_embeddings
+
+        self._linear = nn.Linear(self.embedding_size, output_size)
 
         self.to_device(device)
 
-    @lru_cache(maxsize=256)
+    @property
+    def embedding_size(self) -> int:
+        """Return the size of the embeddings."""
+        return self._transformer_model.config.hidden_size
+
+    @lru_cache(maxsize=2**15)
     @torch.no_grad()
     def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
         """Embed the text of a page using a Transformers model.
 
         Args:
-            region_batch: The regions to embed.
+            region_batch: The regions to embed. Must not be mutable for caching (ie. not a list, but a tuple)
                 If empty, return a zero tensor of embeddings dimensionality
         Returns:
             A tensor of shape (1, embedding_size).
         """
-        # TODO: process input batches
+        # FIXME: caching only works on the batch level, individual regions are not cached
 
         if region_batch:
             region_texts: list[str] = [
                 self._line_separator.join(region.lines) for region in region_batch
             ]
 
-            text_inputs = self.tokenizer(
+            text_inputs = self._tokenizer(
                 region_texts,
                 return_tensors="pt",
                 padding="max_length",
@@ -65,7 +82,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
                 max_length=self._max_length,
             )
 
-            out = self.transformer_model(
+            out = self._transformer_model(
                 **text_inputs.to(self._device)
             ).last_hidden_state
             cls_tokens = out[:, 0, :]  # CLS token is first token of sequence
@@ -79,20 +96,6 @@ class RegionEmbedding(nn.Module, DeviceModule):
         ), f"Output shape was {cls_tokens.size()}, but should be {expected_size}."
 
         return cls_tokens
-
-    def _region_types_tensor(self, region_batch: list[Region]) -> torch.Tensor:
-        # FIXME: populate the types tensor more efficiently
-        types = torch.zeros(len(region_batch), len(RegionType)).to(self._device)
-        for i, region in enumerate(region_batch):
-            for region_type in region.types:
-                types[i, region_type.index()] = 1
-
-        assert types.size() == (
-            len(region_batch),
-            len(RegionType),
-        ), f"Output shape: {types.size()}."
-
-        return types
 
     # TODO
     def _coordinates_tensor(self, page) -> torch.Tensor:
@@ -120,7 +123,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
         """Embed a sequence of regions.
 
         Args:
-            regions (list[Region]): The regions to embed. This must be a tuple for caching.
+            regions (list[Region]): The regions to embed.
         """
         if not isinstance(regions, list):
             logging.warning(
@@ -129,10 +132,18 @@ class RegionEmbedding(nn.Module, DeviceModule):
             regions = list(regions)
 
         text_embeddings = self._text_embeddings(tuple(regions)).float()
-        region_types = self._region_types_tensor(regions).float()
-        # TODO region_coordinates = self._coordinates_tensor(region).float()
+        region_types = (
+            self._region_embedding(
+                torch.IntTensor(
+                    [RegionType.indices(set(region.types)) for region in regions]
+                ).to(self._device)
+            ).mean(dim=1)
+            if regions
+            else torch.zeros(0, self._region_embedding.embedding_dim)
+        )
 
-        # Combine input features
+        # region_coordinates = self._coordinates_tensor(region).float() TODO
+
         region_inputs = torch.cat(
             [
                 text_embeddings,
@@ -142,9 +153,6 @@ class RegionEmbedding(nn.Module, DeviceModule):
             dim=-1,
         )
 
-        assert region_inputs.size() == (
-            len(regions),
-            self.embedding_size + len(RegionType),
-        ), f"Bad output shape: {region_inputs.size()}."
+        # TODO: use the linear layer as a final step
 
         return region_inputs

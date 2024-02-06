@@ -1,7 +1,8 @@
 import logging
 import os
 from pathlib import Path
-from typing import Mapping
+from typing import Any
+
 
 CWD: Path = Path(__file__).parent.absolute()
 
@@ -31,7 +32,7 @@ if not SERVER_PASSWORD:
 LANGUAGE_MODEL: str = os.getenv("LANGUAGE_MODEL", "emanjavacas/GysBERT-v2")
 
 # TODO: list all document types and their spelling variants
-DOCUMENT_TYPES: Mapping[str, set[str]] = {
+DOCUMENT_TYPES: dict[str, set[str]] = {
     "Journaal": {"Journaal", "Journael"},
     "Resolutie": {"Resolutie", "resolutien"},
     "Dagregister": {"Daghregister", "Dagregister", "Dag Register", "dag-register"},
@@ -40,3 +41,31 @@ DOCUMENT_TYPES: Mapping[str, set[str]] = {
     "Monsterrol": {"Monsterrol", "Monsterrolle", "Monster Rolle"},
 }
 """A mapping from document types to all spelling variants of that type."""
+
+
+### Settings for the document segmentation model
+PAGE_SEQUENCE_TAGGER_CONFIG: dict[str, Any] = {
+    "hidden_size": 64,
+    "num_layers": 1,
+    "dropout": 0.1,
+    "bidirectional": True,
+}
+"""Default configuration for the RNN module in the PageSequenceTagger"""
+
+PAGE_EMBEDDING_CONFIG: dict[str, Any] = {
+    "hidden_size": 64,
+    "num_layers": 1,
+    "dropout": 0.1,
+    "bidirectional": True,
+}
+"""Default configuration for the RNN module in the PageEmbedding"""
+
+PAGE_EMBEDDING_OUTPUT_SIZE: int = 32
+"""Default output size for the PageEmbedding output layer"""
+
+
+REGION_EMBEDDING_OUTPUT_SIZE: int = 128
+"""Default output size for the RegionEmbedding output layer"""
+
+REGION_TYPE_EMBEDDING_SIZE: int = 16
+"""Output size for the RegionType embedding layer"""

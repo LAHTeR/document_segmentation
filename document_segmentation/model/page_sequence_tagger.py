@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 import torch.nn as nn
@@ -13,6 +13,7 @@ from torcheval.metrics.metric import Metric
 from tqdm import tqdm
 
 from ..pagexml.datamodel import Label
+from ..settings import PAGE_SEQUENCE_TAGGER_CONFIG
 from .dataset import PageDataset
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
@@ -23,21 +24,25 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
     _DEFAULT_BATCH_SIZE: int = 32
 
-    def __init__(self, *, device: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        *,
+        rnn_config: dict[str, Any] = PAGE_SEQUENCE_TAGGER_CONFIG,
+        device: Optional[str] = None,
+    ) -> None:
         super().__init__()
 
-        # TODO pass arguments to PageEmbedding
         self._page_embedding = PageEmbedding()
 
-        # LSTM, because GRU seems not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
-        self._rnn = nn.LSTM(
-            input_size=self._page_embedding._rnn.hidden_size * 2,
-            hidden_size=64,
-            num_layers=1,
-            batch_first=True,
-            bidirectional=True,
+        # LSTM, because GRU does not seem not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
+        input_size = self._page_embedding.rnn.hidden_size * (
+            self._page_embedding.rnn.bidirectional + 1
         )
-        self._linear = nn.Linear(64 * 2, len(Label))  # FIXME: use parameter for size
+        self._rnn = nn.LSTM(input_size=input_size, batch_first=True, **rnn_config)
+
+        self._linear = nn.Linear(
+            self._rnn.hidden_size * (self._rnn.bidirectional + 1), len(Label)
+        )
         self._softmax = nn.Softmax(dim=1)
 
         self._eval_args = {"average": None, "num_classes": len(Label)}

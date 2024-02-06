@@ -1,10 +1,11 @@
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
 from ..pagexml.datamodel import Page, Region, RegionType
+from ..settings import PAGE_EMBEDDING_CONFIG, PAGE_EMBEDDING_OUTPUT_SIZE
 from .device_module import DeviceModule
 from .region_embedding import RegionEmbedding
 
@@ -15,10 +16,8 @@ class PageEmbedding(nn.Module, DeviceModule):
     def __init__(
         self,
         *,
-        hidden_size: int = 64,
-        dropout: float = 0.1,
-        num_layers: int = 1,
-        output_size: int = 128,
+        rnn_config: dict[str, Any] = PAGE_EMBEDDING_CONFIG,
+        output_size: int = PAGE_EMBEDDING_OUTPUT_SIZE,
         device: Optional[str] = None,
     ):
         super().__init__()
@@ -28,19 +27,24 @@ class PageEmbedding(nn.Module, DeviceModule):
         self._transformer_dim = self._region_model.embedding_size
         self.output_size = output_size
 
-        # LSTM, because GRU seems not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
+        # LSTM, because GRU does not seem not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
         self._rnn = nn.LSTM(
-            # text embeddings + region types + region coordinates
-            input_size=self._transformer_dim + len(RegionType),  # + 2,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            dropout=dropout,
-            bidirectional=True,
+            # input_size: text embeddings + region types (+ region coordinates)
+            input_size=self._transformer_dim + len(RegionType),
             batch_first=True,
+            **rnn_config,
         )
-        self._linear = nn.Linear(hidden_size * 2, output_size)
+        self._linear = nn.Linear(
+            in_features=self._rnn.hidden_size * (self._rnn.bidirectional + 1),
+            out_features=output_size,
+        )
 
         self.to_device(device)
+
+    @property
+    def rnn(self) -> nn.LSTM:
+        """Return the RNN used for the page embedding."""
+        return self._rnn
 
     def forward(self, pages: list[Page]):
         """Embed the pages using a Transformer model and a GRU over the regions on a page.
