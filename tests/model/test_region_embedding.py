@@ -2,6 +2,7 @@ import pytest
 
 from document_segmentation.model.region_embedding import RegionEmbedding
 from document_segmentation.pagexml.datamodel import Region, RegionType
+from document_segmentation.settings import REGION_EMBEDDING_OUTPUT_SIZE
 
 
 @pytest.fixture
@@ -11,9 +12,9 @@ def region_embedding(scope="Session"):
 
 class TestRegionEmbedding:
     @pytest.mark.parametrize(
-        "regions,expected_size",
+        "regions",
         [
-            ([], (0, 784)),
+            ([]),
             (
                 [
                     Region(
@@ -22,8 +23,7 @@ class TestRegionEmbedding:
                         lines=["test_line"],
                         coordinates=[],
                     )
-                ],
-                (1, 784),
+                ]
             ),
             (
                 [
@@ -39,10 +39,12 @@ class TestRegionEmbedding:
                         lines=["test_line_2"],
                         coordinates=[],
                     ),
-                ],
-                (2, 784),
+                ]
             ),
         ],
     )
-    def test_forward(self, region_embedding, regions, expected_size):
-        assert region_embedding(regions).size() == expected_size
+    def test_forward(self, region_embedding, regions):
+        assert region_embedding(regions).size() == (
+            len(regions),
+            REGION_EMBEDDING_OUTPUT_SIZE,
+        )

@@ -5,7 +5,7 @@ from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
 from ..pagexml.datamodel import Page, Region
-from ..settings import PAGE_EMBEDDING_CONFIG, PAGE_EMBEDDING_OUTPUT_SIZE
+from ..settings import PAGE_EMBEDDING_OUTPUT_SIZE, PAGE_EMBEDDING_RNN_CONFIG
 from .device_module import DeviceModule
 from .region_embedding import RegionEmbedding
 
@@ -16,7 +16,7 @@ class PageEmbedding(nn.Module, DeviceModule):
     def __init__(
         self,
         *,
-        rnn_config: dict[str, Any] = PAGE_EMBEDDING_CONFIG,
+        rnn_config: dict[str, Any] = PAGE_EMBEDDING_RNN_CONFIG,
         output_size: int = PAGE_EMBEDDING_OUTPUT_SIZE,
         device: Optional[str] = None,
     ):
@@ -36,7 +36,7 @@ class PageEmbedding(nn.Module, DeviceModule):
             out_features=output_size,
         )
 
-        self.output_size = self._linear.out_features
+        self.output_size = output_size
 
         self.to_device(device)
 

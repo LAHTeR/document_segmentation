@@ -13,7 +13,7 @@ from torcheval.metrics.metric import Metric
 from tqdm import tqdm
 
 from ..pagexml.datamodel import Label
-from ..settings import PAGE_SEQUENCE_TAGGER_CONFIG
+from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .dataset import PageDataset
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
@@ -27,7 +27,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
     def __init__(
         self,
         *,
-        rnn_config: dict[str, Any] = PAGE_SEQUENCE_TAGGER_CONFIG,
+        rnn_config: dict[str, Any] = PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
         device: Optional[str] = None,
     ) -> None:
         super().__init__()
@@ -101,6 +101,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 loss = criterion(outputs, batch.label_tensor().to(self._device)).to(
                     self._device
                 )
+
                 loss.backward()
                 optimizer.step()
             tqdm.write(f"[Loss:\t{loss:.3f}]")

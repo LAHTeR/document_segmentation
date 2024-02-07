@@ -44,7 +44,7 @@ DOCUMENT_TYPES: dict[str, set[str]] = {
 
 
 ### Settings for the document segmentation model
-PAGE_SEQUENCE_TAGGER_CONFIG: dict[str, Any] = {
+PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
     "hidden_size": 64,
     "num_layers": 1,
     "dropout": 0.1,
@@ -52,7 +52,7 @@ PAGE_SEQUENCE_TAGGER_CONFIG: dict[str, Any] = {
 }
 """Default configuration for the RNN module in the PageSequenceTagger"""
 
-PAGE_EMBEDDING_CONFIG: dict[str, Any] = {
+PAGE_EMBEDDING_RNN_CONFIG: dict[str, Any] = {
     "hidden_size": 64,
     "num_layers": 1,
     "dropout": 0.1,
@@ -62,7 +62,6 @@ PAGE_EMBEDDING_CONFIG: dict[str, Any] = {
 
 PAGE_EMBEDDING_OUTPUT_SIZE: int = 32
 """Default output size for the PageEmbedding output layer"""
-
 
 REGION_EMBEDDING_OUTPUT_SIZE: int = 128
 """Default output size for the RegionEmbedding output layer"""

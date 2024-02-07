@@ -47,13 +47,12 @@ class RegionEmbedding(nn.Module, DeviceModule):
 
         self._max_length = self._transformer_model.config.max_position_embeddings
 
-        self._linear = nn.Linear(self.text_embedding_size, output_size)
-
-        self.output_size = (
-            self.text_embedding_size + self._region_embedding.embedding_dim
+        self._linear = nn.Linear(
+            in_features=self.text_embedding_size + region_type_embedding_size,
+            out_features=output_size,
         )
-        # TODO
-        # self.output_size = self._linear.out_features
+
+        self.output_size = output_size
 
         self.to_device(device)
 
@@ -159,6 +158,4 @@ class RegionEmbedding(nn.Module, DeviceModule):
             dim=-1,
         )
 
-        # TODO: use the linear layer as a final step
-
-        return region_inputs
+        return self._linear(region_inputs)
