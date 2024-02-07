@@ -32,13 +32,12 @@ class PageSequenceTagger(nn.Module, DeviceModule):
     ) -> None:
         super().__init__()
 
-        self._page_embedding = PageEmbedding()
+        self._page_embedding = PageEmbedding(device=device)
 
         # LSTM, because GRU does not seem not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
-        input_size = self._page_embedding.rnn.hidden_size * (
-            self._page_embedding.rnn.bidirectional + 1
+        self._rnn = nn.LSTM(
+            input_size=self._page_embedding.output_size, batch_first=True, **rnn_config
         )
-        self._rnn = nn.LSTM(input_size=input_size, batch_first=True, **rnn_config)
 
         self._linear = nn.Linear(
             self._rnn.hidden_size * (self._rnn.bidirectional + 1), len(Label)
@@ -58,10 +57,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         ), "Bad shape: {pages.size()}"
 
         rnn_out, hidden = self._rnn(page_embeddings)
-        assert rnn_out.size() == (
-            len(pages),
-            self._page_embedding.output_size,
-        ), f"Bad shape: {rnn_out.size()}"
 
         output = self._linear(rnn_out)
         assert output.size() == (len(pages), len(Label)), f"Bad shape: {output.size()}"

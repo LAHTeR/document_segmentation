@@ -4,6 +4,11 @@ from document_segmentation.model.region_embedding import RegionEmbedding
 from document_segmentation.pagexml.datamodel import Region, RegionType
 
 
+@pytest.fixture
+def region_embedding(scope="Session"):
+    return RegionEmbedding()
+
+
 class TestRegionEmbedding:
     @pytest.mark.parametrize(
         "regions,expected_size",
@@ -39,5 +44,5 @@ class TestRegionEmbedding:
             ),
         ],
     )
-    def test_forward(self, regions, expected_size):
-        assert RegionEmbedding()(regions).size() == expected_size
+    def test_forward(self, region_embedding, regions, expected_size):
+        assert region_embedding(regions).size() == expected_size

@@ -47,12 +47,18 @@ class RegionEmbedding(nn.Module, DeviceModule):
 
         self._max_length = self._transformer_model.config.max_position_embeddings
 
-        self._linear = nn.Linear(self.embedding_size, output_size)
+        self._linear = nn.Linear(self.text_embedding_size, output_size)
+
+        self.output_size = (
+            self.text_embedding_size + self._region_embedding.embedding_dim
+        )
+        # TODO
+        # self.output_size = self._linear.out_features
 
         self.to_device(device)
 
     @property
-    def embedding_size(self) -> int:
+    def text_embedding_size(self) -> int:
         """Return the size of the embeddings."""
         return self._transformer_model.config.hidden_size
 
@@ -88,9 +94,9 @@ class RegionEmbedding(nn.Module, DeviceModule):
             cls_tokens = out[:, 0, :]  # CLS token is first token of sequence
         else:
             logging.debug("Empty region batch.")
-            cls_tokens = torch.zeros(0, self.embedding_size)
+            cls_tokens = torch.zeros(0, self.text_embedding_size)
 
-        expected_size = (len(region_batch), self.embedding_size)
+        expected_size = (len(region_batch), self.text_embedding_size)
         assert (
             cls_tokens.size() == expected_size
         ), f"Output shape was {cls_tokens.size()}, but should be {expected_size}."

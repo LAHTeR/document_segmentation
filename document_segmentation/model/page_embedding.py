@@ -4,7 +4,7 @@ from typing import Any, Optional
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
-from ..pagexml.datamodel import Page, Region, RegionType
+from ..pagexml.datamodel import Page, Region
 from ..settings import PAGE_EMBEDDING_CONFIG, PAGE_EMBEDDING_OUTPUT_SIZE
 from .device_module import DeviceModule
 from .region_embedding import RegionEmbedding
@@ -22,22 +22,21 @@ class PageEmbedding(nn.Module, DeviceModule):
     ):
         super().__init__()
 
-        self._region_model = RegionEmbedding()
+        self._region_model = RegionEmbedding(device=device)
 
-        self._transformer_dim = self._region_model.embedding_size
+        self._transformer_dim = self._region_model.text_embedding_size
         self.output_size = output_size
 
         # LSTM, because GRU does not seem not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
         self._rnn = nn.LSTM(
-            # input_size: text embeddings + region types (+ region coordinates)
-            input_size=self._transformer_dim + len(RegionType),
-            batch_first=True,
-            **rnn_config,
+            input_size=self._region_model.output_size, batch_first=True, **rnn_config
         )
         self._linear = nn.Linear(
             in_features=self._rnn.hidden_size * (self._rnn.bidirectional + 1),
             out_features=output_size,
         )
+
+        self.output_size = self._linear.out_features
 
         self.to_device(device)
 

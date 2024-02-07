@@ -10,6 +10,7 @@ import torch
 class DeviceModule(abc.ABC):
     """A MixIn class for moving all Torch (sub-)modules to a device."""
 
+    # FIXME: only move to device if not already on the device
     def to_device(self, device: Optional[str] = None):
         """Move the module and all its Torch modules to a device.
 
