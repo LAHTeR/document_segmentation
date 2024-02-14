@@ -41,9 +41,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
             transformer_model_name
         )
 
-        self._region_embedding = nn.Embedding(
-            len(RegionType), region_type_embedding_size
-        )
+        self._region_type = nn.Embedding(len(RegionType), region_type_embedding_size)
 
         self._max_length = self._transformer_model.config.max_position_embeddings
 
@@ -131,20 +129,18 @@ class RegionEmbedding(nn.Module, DeviceModule):
             regions (list[Region]): The regions to embed.
         """
         if not isinstance(regions, list):
-            logging.warning(
-                f"Converting regions into a tuple (was: '{type(regions)}')."
-            )
+            logging.warning(f"Converting regions into a list (was: '{type(regions)}').")
             regions = list(regions)
 
         text_embeddings = self._text_embeddings(tuple(regions)).float()
         region_types = (
-            self._region_embedding(
+            self._region_type(
                 torch.IntTensor(
                     [RegionType.indices(set(region.types)) for region in regions]
                 ).to(self._device)
             ).mean(dim=1)
             if regions
-            else torch.zeros(0, self._region_embedding.embedding_dim).to(self._device)
+            else torch.zeros(0, self._region_type.embedding_dim).to(self._device)
         )
 
         # region_coordinates = self._coordinates_tensor(region).float() TODO
