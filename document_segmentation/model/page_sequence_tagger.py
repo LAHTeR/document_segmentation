@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 import torch.nn as nn
@@ -13,29 +13,35 @@ from torcheval.metrics.metric import Metric
 from tqdm import tqdm
 
 from ..pagexml.datamodel import Label
+from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .dataset import PageDataset
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
 
 class PageSequenceTagger(nn.Module, DeviceModule):
-    """A page sequence tagger that uses a GRU over the regions on a page."""
+    """A page sequence tagger that uses an RNN over the regions on a page."""
 
-    _DEFAULT_BATCH_SIZE: int = 32
+    _DEFAULT_BATCH_SIZE: int = 8
 
-    def __init__(self, *, device: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        *,
+        rnn_config: dict[str, Any] = PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
+        device: Optional[str] = None,
+    ) -> None:
         super().__init__()
 
-        # TODO pass arguments to PageEmbedding
-        self._page_embedding = PageEmbedding()
-        self._gru = nn.GRU(
-            input_size=self._page_embedding.gru.hidden_size * 2,
-            hidden_size=64,
-            num_layers=1,
-            batch_first=True,
-            bidirectional=True,
+        self._page_embedding = PageEmbedding(device=device)
+
+        # LSTM, because GRU does not seem not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
+        self._rnn = nn.LSTM(
+            input_size=self._page_embedding.output_size, batch_first=True, **rnn_config
         )
-        self._linear = nn.Linear(64 * 2, len(Label))  # FIXME: use parameter for size
+
+        self._linear = nn.Linear(
+            self._rnn.hidden_size * (self._rnn.bidirectional + 1), len(Label)
+        )
         self._softmax = nn.Softmax(dim=1)
 
         self._eval_args = {"average": None, "num_classes": len(Label)}
@@ -50,13 +56,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             self._page_embedding.output_size,
         ), "Bad shape: {pages.size()}"
 
-        gru_out, hidden = self._gru(page_embeddings)
-        assert gru_out.size() == (
-            len(pages),
-            self._page_embedding.output_size,
-        ), f"Bad shape: {gru_out.size()}"
+        rnn_out, hidden = self._rnn(page_embeddings)
 
-        output = self._linear(gru_out)
+        output = self._linear(rnn_out)
         assert output.size() == (len(pages), len(Label)), f"Bad shape: {output.size()}"
 
         softmax = self._softmax(output)
@@ -71,15 +73,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         batch_size: int = _DEFAULT_BATCH_SIZE,
         weights: list[float] = None,
     ):
-        """Train the model.
-
-        Args:
-            pages (PageXmlDataset): The dataset to train on.
-            epochs (int, optional): The number of epochs. Defaults to 3.
-            batch_size (int, optional): The batch size. Defaults to 1.
-            weights (list[float], optional): The weights for each label; can be of any type which can be converted into a tensor.
-                If not given, use the inverse frequency from the labels in the dataset. Defaults to None.
-        """
         self.train()
 
         if weights is None:
@@ -90,7 +83,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights)).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
-        for epoch in tqdm(range(epochs), unit="epoch"):
+        for _ in range(epochs):
             for batch in tqdm(
                 pages.batches(batch_size), unit="batch", total=len(pages) / batch_size
             ):
@@ -99,6 +92,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 loss = criterion(outputs, batch.label_tensor().to(self._device)).to(
                     self._device
                 )
+
                 loss.backward()
                 optimizer.step()
             tqdm.write(f"[Loss:\t{loss:.3f}]")

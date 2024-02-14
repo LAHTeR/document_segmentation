@@ -1,10 +1,15 @@
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
-from ..pagexml.datamodel import Page, Region, RegionType
+from ..pagexml.datamodel import Page, Region
+from ..settings import (
+    MAX_REGIONS_PER_PAGE,
+    PAGE_EMBEDDING_OUTPUT_SIZE,
+    PAGE_EMBEDDING_RNN_CONFIG,
+)
 from .device_module import DeviceModule
 from .region_embedding import RegionEmbedding
 
@@ -15,33 +20,36 @@ class PageEmbedding(nn.Module, DeviceModule):
     def __init__(
         self,
         *,
-        hidden_size: int = 64,
-        dropout: float = 0.1,
-        num_layers: int = 1,
-        output_size: int = 128,
+        rnn_config: dict[str, Any] = PAGE_EMBEDDING_RNN_CONFIG,
+        max_regions: int = MAX_REGIONS_PER_PAGE,
+        output_size: int = PAGE_EMBEDDING_OUTPUT_SIZE,
         device: Optional[str] = None,
     ):
         super().__init__()
 
-        self._region_model = RegionEmbedding()
+        self._region_model = RegionEmbedding(device=device)
+        self._max_regions = max_regions
 
-        self._transformer_dim = self._region_model.embedding_size
+        self._transformer_dim = self._region_model.text_embedding_size
         self.output_size = output_size
 
-        # GRU over the regions on a page
-        self.gru = nn.GRU(
-            # text embeddings + region types + region coordinates
-            input_size=self._transformer_dim + len(RegionType),  # + 2,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            dropout=dropout,
-            bidirectional=True,
-            batch_first=True,
+        # LSTM, because GRU does not seem not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
+        self._rnn = nn.LSTM(
+            input_size=self._region_model.output_size, batch_first=True, **rnn_config
+        )
+        self._linear = nn.Linear(
+            in_features=self._rnn.hidden_size * (self._rnn.bidirectional + 1),
+            out_features=output_size,
         )
 
-        self._linear = nn.Linear(hidden_size * 2, output_size)
+        self.output_size = output_size
 
         self.to_device(device)
+
+    @property
+    def rnn(self) -> nn.LSTM:
+        """Return the RNN used for the page embedding."""
+        return self._rnn
 
     def forward(self, pages: list[Page]):
         """Embed the pages using a Transformer model and a GRU over the regions on a page.
@@ -54,6 +62,14 @@ class PageEmbedding(nn.Module, DeviceModule):
             pages = [pages]
 
         regions_batch: list[list[Region]] = [page.regions for page in pages]
+        if len(regions_batch) > self._max_regions:
+            logging.warning(
+                f"Too many regions ({len(regions_batch)}), truncating to {self._max_regions}"
+            )
+            region_inputs = (
+                regions_batch[: self._max_regions // 2]
+                + regions_batch[-self._max_regions // 2 :]
+            )
 
         region_inputs = pad_sequence(
             [self._region_model(regions) for regions in regions_batch],
@@ -61,9 +77,9 @@ class PageEmbedding(nn.Module, DeviceModule):
             padding_value=0.0,
         )
 
-        gru_out, hidden = self.gru(region_inputs)
+        rnn_out, hidden = self._rnn(region_inputs)
 
-        out = self._linear(gru_out)
+        out = self._linear(rnn_out)
 
         final_step_output_batch = out[:, -1, :]
         _expected_size = (len(pages), self.output_size)

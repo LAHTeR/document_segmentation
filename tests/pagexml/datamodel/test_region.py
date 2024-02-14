@@ -37,3 +37,19 @@ class TestRegionType:
     )
     def test_index(self, region_type, expected):
         assert region_type.index() == expected
+
+    @pytest.mark.parametrize(
+        "region_types,expected",
+        [
+            ([], [0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            ([RegionType.CATCH_WORD], [1, 0, 0, 0, 0, 0, 0, 0, 0]),
+            ([RegionType.HEADER, RegionType.PAGE_NUMBER], [0, 1, 0, 1, 0, 0, 0, 0, 0]),
+            ({RegionType.HEADER, RegionType.PAGE_NUMBER}, [0, 1, 0, 1, 0, 0, 0, 0, 0]),
+            (
+                [RegionType.CATCH_WORD, RegionType.HEADER, RegionType.PAGE_NUMBER],
+                [1, 1, 0, 1, 0, 0, 0, 0, 0],
+            ),
+        ],
+    )
+    def test_indices(self, region_types, expected):
+        assert RegionType.indices(region_types) == expected

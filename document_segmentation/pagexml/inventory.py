@@ -87,20 +87,21 @@ class InventoryReader:
     def __delete_cache_dir(self):
         if self._remove_cache_on_exit:
             if self._pagexml_directory.exists():
-                if not all(
+                if all(
                     file.name.endswith(".xml") and file.name.startswith("NL-HaNA")
                     for file in self._pagexml_directory.rglob("*")
                     if file.is_file()
                 ):
+                    shutil.rmtree(self._pagexml_directory)
+                else:
                     raise RuntimeError(
                         f"Only files matching the pattern 'NL-HaNA*.xml' should be in the cache directory '{self._pagexml_directory}'."
                     )
-                shutil.rmtree(self._pagexml_directory)
-
             self.local_zip_file.unlink(missing_ok=True)
-            logging.info(f"Deleted cache directory '{self._pagexml_directory}'")
+
+            logging.debug(f"Deleted cache directory '{self._pagexml_directory}'")
         else:
-            logging.info(f"Cache directory '{self._pagexml_directory}' not deleted.")
+            logging.debug(f"Cache directory '{self._pagexml_directory}' not deleted.")
 
     @property
     def inv_nr(self) -> str:

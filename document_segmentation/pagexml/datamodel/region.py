@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Iterable
 
 from pagexml.model.physical_document_model import PageXMLTextRegion
 from pydantic import BaseModel
@@ -20,6 +21,11 @@ class RegionType(Enum):
     def index(self) -> int:
         """Return the index of the region type."""
         return list(RegionType).index(self)
+
+    @staticmethod
+    def indices(region_types: Iterable["RegionType"]) -> list[int]:
+        """Return the indices of the region types."""
+        return [int(region_type in region_types) for region_type in RegionType]
 
 
 class Region(BaseModel, frozen=True):
