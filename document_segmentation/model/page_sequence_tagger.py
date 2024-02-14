@@ -22,7 +22,7 @@ from .page_embedding import PageEmbedding
 class PageSequenceTagger(nn.Module, DeviceModule):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
-    _DEFAULT_BATCH_SIZE: int = 32
+    _DEFAULT_BATCH_SIZE: int = 8
 
     def __init__(
         self,
@@ -73,15 +73,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         batch_size: int = _DEFAULT_BATCH_SIZE,
         weights: list[float] = None,
     ):
-        """Train the model.
-
-        Args:
-            pages (PageXmlDataset): The dataset to train on.
-            epochs (int, optional): The number of epochs. Defaults to 3.
-            batch_size (int, optional): The batch size. Defaults to 1.
-            weights (list[float], optional): The weights for each label; can be of any type which can be converted into a tensor.
-                If not given, use the inverse frequency from the labels in the dataset. Defaults to None.
-        """
         self.train()
 
         if weights is None:
@@ -92,7 +83,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights)).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
-        for epoch in tqdm(range(epochs), unit="epoch"):
+        for _ in range(epochs):
             for batch in tqdm(
                 pages.batches(batch_size), unit="batch", total=len(pages) / batch_size
             ):

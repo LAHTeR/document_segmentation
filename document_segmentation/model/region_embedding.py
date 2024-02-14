@@ -144,7 +144,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
                 ).to(self._device)
             ).mean(dim=1)
             if regions
-            else torch.zeros(0, self._region_embedding.embedding_dim)
+            else torch.zeros(0, self._region_embedding.embedding_dim).to(self._device)
         )
 
         # region_coordinates = self._coordinates_tensor(region).float() TODO

@@ -1,3 +1,4 @@
+import logging
 from collections import Counter
 from pathlib import Path
 from typing import Iterable, Union
@@ -114,7 +115,14 @@ class PageDataset(Dataset):
         Args:
             documents (Iterable[Document]): A collection of Document objects.
         """
-        return cls([page for document in documents for page in document.pages])
+        pages = []
+        for document in documents:
+            if document.pages:
+                pages.extend(document.pages)
+            else:
+                logging.warning(f"No pages found in document {document}.")
+
+        return cls(pages)
 
     @classmethod
     def from_json_files(cls, files: Iterable[Path]):
