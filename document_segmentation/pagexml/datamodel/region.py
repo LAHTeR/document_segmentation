@@ -36,6 +36,10 @@ class Region(BaseModel, frozen=True):
     coordinates: tuple[tuple[int, int], ...]
     lines: tuple[str, ...]
 
+    def __len__(self) -> int:
+        """Return the number of characters added over all lines in the region."""
+        return sum(len(line) for line in self.lines)
+
     @classmethod
     def from_pagexml(cls, region: PageXMLTextRegion) -> "Region":
         """Create a Region object from a PageXML file.

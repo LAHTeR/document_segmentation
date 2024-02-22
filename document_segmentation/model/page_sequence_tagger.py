@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
+from torch import optim
 from torcheval.metrics import (
     MulticlassAccuracy,
     MulticlassF1Score,
@@ -12,7 +12,7 @@ from torcheval.metrics import (
 from torcheval.metrics.metric import Metric
 from tqdm import tqdm
 
-from ..pagexml.datamodel import Label
+from ..pagexml.datamodel.label import Label
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .dataset import PageDataset
 from .device_module import DeviceModule

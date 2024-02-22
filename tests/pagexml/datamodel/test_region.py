@@ -1,6 +1,6 @@
 import pytest
 
-from document_segmentation.pagexml.datamodel import Region, RegionType
+from document_segmentation.pagexml.datamodel.region import Region, RegionType
 
 
 class TestRegion:
@@ -53,3 +53,18 @@ class TestRegionType:
     )
     def test_indices(self, region_types, expected):
         assert RegionType.indices(region_types) == expected
+
+    @pytest.mark.parametrize(
+        "region,expected",
+        [
+            (Region(id="test_region", types=[], coordinates=[], lines=[]), 0),
+            (Region(id="test_region", types=[], coordinates=[], lines=[] * 10), 0),
+            (Region(id="test_region", types=[], coordinates=[], lines=["abc"]), 3),
+            (
+                Region(id="test_region", types=[], coordinates=[], lines=["abc"] * 10),
+                30,
+            ),
+        ],
+    )
+    def test_len(self, region, expected):
+        assert len(region) == expected

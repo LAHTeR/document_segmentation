@@ -5,26 +5,25 @@ from typing import Optional
 import numpy as np
 import torch
 from sklearn.preprocessing import MinMaxScaler
-from torch import nn
+from torch import nn, optim
+from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
-from ..pagexml.datamodel import Region, RegionType
-from ..settings import (
-    LANGUAGE_MODEL,
-    REGION_EMBEDDING_OUTPUT_SIZE,
-    REGION_TYPE_EMBEDDING_SIZE,
-)
+from ..pagexml.datamodel.label import Label
+from ..pagexml.datamodel.region import Region, RegionType
+from ..settings import LANGUAGE_MODEL, REGION_TYPE_EMBEDDING_SIZE
+from .dataset import RegionDataset
 from .device_module import DeviceModule
 
 
-class RegionEmbedding(nn.Module, DeviceModule):
+class RegionClassifier(nn.Module, DeviceModule):
     """A module to create a representation of a region using a Transformer model."""
 
     def __init__(
         self,
         *,
         transformer_model_name: str = LANGUAGE_MODEL,
-        output_size: int = REGION_EMBEDDING_OUTPUT_SIZE,
+        output_size: int = len(Label),
         region_type_embedding_size: int = REGION_TYPE_EMBEDDING_SIZE,
         line_separator: str = "\n",
         device: Optional[str] = None,
@@ -43,12 +42,15 @@ class RegionEmbedding(nn.Module, DeviceModule):
 
         self._region_type = nn.Embedding(len(RegionType), region_type_embedding_size)
 
+        # TODO self._position = nn.Linear(1, 1)
+
         self._max_length = self._transformer_model.config.max_position_embeddings
 
         self._linear = nn.Linear(
             in_features=self.text_embedding_size + region_type_embedding_size,
             out_features=output_size,
         )
+        self._softmax = nn.Softmax(dim=1)
 
         self.output_size = output_size
 
@@ -128,11 +130,11 @@ class RegionEmbedding(nn.Module, DeviceModule):
         Args:
             regions (list[Region]): The regions to embed.
         """
-        if not isinstance(regions, list):
-            logging.warning(f"Converting regions into a list (was: '{type(regions)}').")
-            regions = list(regions)
+        if not isinstance(regions, tuple):
+            logging.debug(f"Converting regions into a tuple (was: '{type(regions)}').")
+            regions = tuple(regions)
 
-        text_embeddings = self._text_embeddings(tuple(regions)).float()
+        text_embeddings = self._text_embeddings(regions).float()
         region_types = (
             self._region_type(
                 torch.IntTensor(
@@ -153,5 +155,46 @@ class RegionEmbedding(nn.Module, DeviceModule):
             ],
             dim=-1,
         )
+        out = self._linear(region_inputs)
+        return self._softmax(out)
 
-        return self._linear(region_inputs)
+    def train_(
+        self,
+        dataset: RegionDataset,
+        epochs: int = 3,
+        batch_size: int = 32,
+        weights: list[float] = None,
+    ):
+        """Train the model on a dataset.
+
+        Args:
+            dataset (RegionDataset): The dataset to train on.
+            epochs (int): The number of epochs to train for.
+            batch_size (int): The batch size -- refers to the number of pages in a batch, and uses all of their regions.
+            weights (list[float]): The weights for each class.
+        """
+        self.train()
+
+        if weights is None:
+            weights = dataset.class_weights()
+        if len(weights) != len(Label):
+            raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
+
+        criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights)).to(self._device)
+        optimizer = optim.Adam(self.parameters(), lr=0.001)
+
+        for _ in range(epochs):
+            for batch in tqdm(
+                dataset.batches(batch_size),
+                unit="batch",
+                total=len(dataset) / batch_size,
+            ):
+                optimizer.zero_grad()
+                outputs = self(batch.regions()).to(self._device)
+                labels = batch.label_tensor()
+
+                loss = criterion(outputs, labels.to(self._device)).to(self._device)
+
+                loss.backward()
+                optimizer.step()
+            tqdm.write(f"[Loss:\t{loss:.3f}]")

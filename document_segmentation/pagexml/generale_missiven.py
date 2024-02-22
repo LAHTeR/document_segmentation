@@ -9,7 +9,8 @@ from requests import HTTPError
 from tqdm import tqdm
 
 from ..settings import GENERALE_MISSIVEN_SHEET, SERVER_PASSWORD, SERVER_USERNAME
-from .datamodel import Document, Label, Page
+from .datamodel import Document, Page
+from .datamodel.label import Label
 from .inventory import InventoryReader
 
 
