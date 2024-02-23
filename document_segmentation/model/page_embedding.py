@@ -4,7 +4,8 @@ from typing import Any, Optional
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
-from ..pagexml.datamodel import Page, Region
+from ..pagexml.datamodel.page import Page
+from ..pagexml.datamodel.region import Region
 from ..settings import (
     MAX_REGIONS_PER_PAGE,
     PAGE_EMBEDDING_OUTPUT_SIZE,
