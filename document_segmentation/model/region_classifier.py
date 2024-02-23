@@ -4,6 +4,7 @@ from typing import Optional
 
 import numpy as np
 import torch
+from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import MinMaxScaler
 from torch import nn, optim
 from tqdm import tqdm
@@ -32,19 +33,11 @@ class RegionClassifier(nn.Module, DeviceModule):
 
         self._line_separator = line_separator
 
-        # Text embeddings from a Transformers model
-        self._transformer_model: AutoModel = AutoModel.from_pretrained(
-            transformer_model_name
-        )
-        self._tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
-            transformer_model_name
-        )
+        self._init_transformer(transformer_model_name)
 
         self._region_type = nn.Embedding(len(RegionType), region_type_embedding_size)
 
         # TODO self._position = nn.Linear(1, 1)
-
-        self._max_length = self._transformer_model.config.max_position_embeddings
 
         self._linear = nn.Linear(
             in_features=self.text_embedding_size + region_type_embedding_size,
@@ -55,6 +48,15 @@ class RegionClassifier(nn.Module, DeviceModule):
         self.output_size = output_size
 
         self.to_device(device)
+
+    def _init_transformer(self, transformer_model_name):
+        self._transformer_model: AutoModel = AutoModel.from_pretrained(
+            transformer_model_name
+        )
+        self._tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
+            transformer_model_name
+        )
+        self._max_length = self._transformer_model.config.max_position_embeddings
 
     @property
     def text_embedding_size(self) -> int:
@@ -95,11 +97,6 @@ class RegionClassifier(nn.Module, DeviceModule):
             logging.debug("Empty region batch.")
             cls_tokens = torch.zeros(0, self.text_embedding_size)
 
-        expected_size = (len(region_batch), self.text_embedding_size)
-        assert (
-            cls_tokens.size() == expected_size
-        ), f"Output shape was {cls_tokens.size()}, but should be {expected_size}."
-
         return cls_tokens
 
     # TODO
@@ -135,6 +132,11 @@ class RegionClassifier(nn.Module, DeviceModule):
             regions = tuple(regions)
 
         text_embeddings = self._text_embeddings(regions).float()
+        expected_size = (len(regions), self.text_embedding_size)
+        assert (
+            text_embeddings.size() == expected_size
+        ), f"Output shape was {text_embeddings.size()}, but should be {expected_size}."
+
         region_types = (
             self._region_type(
                 torch.IntTensor(
@@ -198,3 +200,22 @@ class RegionClassifier(nn.Module, DeviceModule):
                 loss.backward()
                 optimizer.step()
             tqdm.write(f"[Loss:\t{loss:.3f}]")
+
+
+class RegionClassifierSentenceTransformer(RegionClassifier):
+    @property
+    def text_embedding_size(self) -> int:
+        """Return the size of the embeddings."""
+        return self._transformer_model.get_sentence_embedding_dimension()
+
+    def _init_transformer(self, transformer_model_name):
+        self._transformer_model = SentenceTransformer(transformer_model_name)
+
+    @lru_cache(maxsize=2**15)
+    @torch.no_grad()
+    def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
+        region_texts: list[str] = [
+            self._line_separator.join(region.lines) for region in region_batch
+        ]
+
+        return self._transformer_model.encode(region_texts, convert_to_tensor=True)

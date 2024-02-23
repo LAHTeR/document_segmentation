@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-
 CWD: Path = Path(__file__).parent.absolute()
 
 DATA_DIR: Path = CWD / "data"
@@ -29,7 +28,16 @@ SERVER_PASSWORD: str = os.getenv("HUC_PASSWORD", "")
 if not SERVER_PASSWORD:
     logging.warning("No password set for accessing the HUC server.")
 
-LANGUAGE_MODEL: str = os.getenv("LANGUAGE_MODEL", "emanjavacas/GysBERT-v2")
+LANGUAGE_MODEL: str = os.getenv(
+    "LANGUAGE_MODEL",
+    "NetherlandsForensicInstitute/robbert-2022-dutch-sentence-transformers",
+)
+"""The name of the language model to use for the region classifier.
+
+The type of model needs to be with the RegionClassifier class:
+- use RegionClassifier for standard transformer models
+- use RegionClassifierSentenceTransformer for SentenceTransformer models
+"""
 
 # TODO: list all document types and their spelling variants
 DOCUMENT_TYPES: dict[str, set[str]] = {
