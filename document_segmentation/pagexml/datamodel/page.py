@@ -24,6 +24,14 @@ class Page(BaseModel):
                 raise ValidationError from e
         return value
 
+    def text(self, delimiter: str = "\n") -> str:
+        """Return the text of the page.
+
+        Args:
+            delimiter (str, optional): The delimiter to use between lines. Defaults to "\n".
+        """
+        return delimiter.join(line for region in self.regions for line in region.lines)
+
     def filter_short_regions(self, min_chars: int = 1) -> "Page":
         """Remove regions with fewer than `min_chars` characters.
 

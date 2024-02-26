@@ -1,3 +1,4 @@
+import abc
 import logging
 import random
 from collections import Counter
@@ -16,12 +17,27 @@ from ..pagexml.datamodel.region import Region
 from ..settings import MAX_REGIONS_PER_PAGE
 
 
-class AbstractDataset(Dataset):
+class AbstractDataset(Dataset, abc.ABC):
     def __repr__(self) -> str:
         return super().__repr__() + f"({len(self)} samples)"
 
     def _class_counts(self) -> dict[Label, int]:
         return Counter(self.labels())
+
+    @abc.abstractmethod
+    def labels(self) -> list[Label]:
+        return NotImplemented
+
+    @abc.abstractmethod
+    def balance(self, max_size: Optional[int] = None) -> "AbstractDataset":
+        return NotImplemented
+
+    @abc.abstractmethod
+    def shuffle(self) -> "AbstractDataset":
+        return NotImplemented
+
+    def _indices(self, label: Label) -> list[int]:
+        return [i for i, _label in enumerate(self.labels()) if _label == label]
 
     def class_weights(self) -> list[float]:
         """Get the inverse frequency of each label in this dataset.
@@ -146,6 +162,41 @@ class PageDataset(AbstractDataset):
             ]
         )
 
+    def balance(self, max_size: Optional[int] = None) -> "RegionDataset":
+        """Balance the dataset by keeping a maximum number of sample per class.
+
+        If a class has fewer samples than `max_size`, all samples are kept.
+        Empty classes are ignored.
+
+        Args:
+            max_size (Optional[int], optional): The maximum number of samples to take from each class.
+                If None (default), take the minimum non-zero number of samples from any class.
+        Returns:
+            RegionDataset: A new dataset with balanced classes.
+                The samples are added per class, so the new dataset should be shuffled.
+        """
+        if max_size is None:
+            counts = self._class_counts()
+            if counts:
+                max_size = min([value for value in counts.values() if value > 0])
+            else:
+                max_size = 0
+
+        new_pages = []
+
+        for label in Label:
+            sample: list[int] = self._indices(label)
+            if len(sample) > max_size:
+                sample = random.sample(sample, max_size)
+            new_pages.extend([self._pages[i] for i in sample])
+
+        return self.__class__(new_pages)
+
+    def shuffle(self) -> "PageDataset":
+        indices = list(range(len(self)))
+        random.shuffle(indices)
+        return self.__class__([self._pages[index] for index in indices])
+
     @classmethod
     def from_documents(cls, documents: Iterable[Document]):
         """Create a dataset from a collection of documents.
@@ -220,8 +271,8 @@ class RegionDataset(AbstractDataset):
         else:
             return self._regions[index]
 
-    def _indices(self, label: Label) -> list[int]:
-        return [i for i, _label in enumerate(self._labels) if _label == label]
+    def labels(self) -> list[Label]:
+        return self._labels
 
     def balance(self, max_size: Optional[int] = None) -> "RegionDataset":
         """Balance the dataset by keeping a maximum number of sample per class.
@@ -254,9 +305,6 @@ class RegionDataset(AbstractDataset):
             new_labels.extend([self._labels[i] for i in sample])
 
         return self.__class__(new_regions, new_labels)
-
-    def labels(self) -> list[Label]:
-        return self._labels
 
     def regions(self) -> list[Region]:
         return self._regions

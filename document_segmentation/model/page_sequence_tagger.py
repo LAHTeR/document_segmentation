@@ -95,6 +95,14 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
                 loss.backward()
                 optimizer.step()
+            if self._device == "mps":
+                tqdm.write(
+                    f"Current allocated memory (MPS): {torch.mps.current_allocated_memory() / 1024 ** 2:.0f} MB"
+                )
+                tqdm.write(
+                    f"Driver allocated memory (MPS): {torch.mps.driver_allocated_memory() / 1024 ** 2:.0f} MB"
+                )
+
             tqdm.write(f"[Loss:\t{loss:.3f}]")
 
     def _evaluate(self, dataset: PageDataset, metric: Metric, batch_size: int):
