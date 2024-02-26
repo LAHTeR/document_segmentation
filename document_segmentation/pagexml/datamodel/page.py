@@ -24,6 +24,19 @@ class Page(BaseModel):
                 raise ValidationError from e
         return value
 
+    def filter_short_regions(self, min_chars: int = 1) -> "Page":
+        """Remove regions with fewer than `min_chars` characters.
+
+        Args:
+            min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
+        """
+        return Page(
+            label=self.label,
+            regions=[region for region in self.regions if len(region) >= min_chars],
+            scan_nr=self.scan_nr,
+            doc_id=self.doc_id,
+        )
+
     @classmethod
     def from_pagexml(cls, label: Label, scan_nr: int, pagexml: PageXMLScan):
         """Create a Page object from a PageXML object.

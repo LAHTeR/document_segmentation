@@ -133,19 +133,18 @@ class PageDataset(AbstractDataset):
         for page in self._pages:
             yield from [page.label] * len(page.regions)
 
-    # def region_labels(self) -> Iterable[Label]:
-    #     for page in self._pages:
-    #         if page.regions:
-    #             if page.label.name == Label.BEGIN.name:
-    #                 yield Label.BEGIN
-    #                 yield from [Label.IN] * (len(page.regions) - 1)
-    #             elif page.label.name == Label.IN.name:
-    #                 yield from [Label.IN] * len(page.regions)
-    #             elif page.label.name == Label.END.name:
-    #                 yield from [Label.IN] * (len(page.regions) - 1)
-    #                 yield Label.END
-    #             elif page.label.name == Label.OUT.name:
-    #                 yield from [Label.OUT] * len(page.regions)
+    def remove_short_regions(self, min_chars: int = 1) -> "PageDataset":
+        """Create a filtered dataset in which all page regions with fewer than `min_chars` characters are removed.
+
+        Args:
+            min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
+        """
+        return self.__class__(
+            [
+                page.filter_short_regions(min_chars=MAX_REGIONS_PER_PAGE)
+                for page in self._pages
+            ]
+        )
 
     @classmethod
     def from_documents(cls, documents: Iterable[Document]):
