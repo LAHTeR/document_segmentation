@@ -3,13 +3,6 @@ from typing import Any, Optional
 import torch
 import torch.nn as nn
 from torch import optim
-from torcheval.metrics import (
-    MulticlassAccuracy,
-    MulticlassF1Score,
-    MulticlassPrecision,
-    MulticlassRecall,
-)
-from torcheval.metrics.metric import Metric
 from tqdm import tqdm
 
 from ..pagexml.datamodel.label import Label
@@ -104,54 +97,3 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 )
 
             tqdm.write(f"[Loss:\t{loss:.3f}]")
-
-    def _evaluate(self, dataset: PageDataset, metric: Metric, batch_size: int):
-        self.eval()
-
-        metric_name = metric.__class__.__name__
-        for batch in tqdm(
-            dataset.batches(batch_size),
-            desc=metric_name,
-            unit="batch",
-            total=len(dataset) / batch_size,
-        ):
-            outputs = self(batch)
-
-            true_labels = [label.value - 1 for label in batch.labels()]
-            metric.update(outputs, torch.tensor(true_labels))
-            scores = Label.map_scores(metric.compute().tolist())
-            tqdm.write(f"[{metric_name}: {scores}]")
-
-        return metric.compute()
-
-    def precision(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> dict[str, float]:
-        metric = MulticlassPrecision(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return Label.map_scores(scores.tolist())
-
-    def recall(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> dict[str, float]:
-        metric = MulticlassRecall(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return Label.map_scores(scores.tolist())
-
-    def f1_score(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> dict[str, float]:
-        metric = MulticlassF1Score(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return Label.map_scores(scores.tolist())
-
-    def accuracy(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> float:
-        metric = MulticlassAccuracy(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return scores[Label.IN.value - 1]
