@@ -30,11 +30,18 @@ class RegionClassifier(nn.Module, DeviceModule):
             line_separator=line_separator,
             device=device,
         )
+
+        self._linear = nn.Linear(
+            in_features=self.text_embedding_size + region_type_embedding_size,
+            out_features=len(Label),
+        )
+
         self._softmax = nn.Softmax(dim=1)
         self.to_device(device)
 
     def forward(self, regions: List[Region]) -> torch.Tensor:
-        return self._softmax(self._region_embedding(regions))
+        region_embeddings = self._region_embedding(regions)
+        return self._softmax(self._linear(region_embeddings))
 
     def train_(
         self,
