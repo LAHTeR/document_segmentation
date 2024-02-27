@@ -6,7 +6,12 @@ from typing import Any
 CWD: Path = Path(__file__).parent.absolute()
 
 DATA_DIR: Path = CWD / "data"
-TEST_SHEET: Path = DATA_DIR / "Spreadsheet Renate Revised.xlsx"
+TEST_SHEET: Path = (
+    DATA_DIR
+    / "Appendix F - Spreadsheet concerning the TANAP document categorisation, Renate Smit, January 2024.xlsx"
+)
+
+RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(DATA_DIR.glob("Analysis Renate ????.xlsx"))
 
 GENERALE_MISSIVEN_SHEET: Path = (
     DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"

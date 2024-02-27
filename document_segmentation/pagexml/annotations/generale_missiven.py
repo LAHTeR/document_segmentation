@@ -16,6 +16,8 @@ class GeneraleMissiven(Sheet):
     _LAST_PAGE_COLUMN = "Eindscan"
     _DEEL_VAN_INVENTARIS_COL = "Deel v. inventarisnummer"
     _STATUS_COLUMN = "Problemen gevonden tijdens handmatige check:"
+    _SKIP_MESSAGE = "Niet gedigitaliseerd."
+
     _SEPARATOR = ";"
 
     def __init__(self, sheet_file: Path = GENERALE_MISSIVEN_SHEET) -> None:
@@ -24,30 +26,14 @@ class GeneraleMissiven(Sheet):
         Args:
             sheet_file (Path, optional): Path to the spreadsheet. Defaults to settings.GENERALE_MISSIVEN_SHEET.
         """
+        super().__init__()
+
         self._data = pd.read_csv(
             sheet_file,
             sep=self._SEPARATOR,
             index_col=self._INDEX_COLUMN,
-            dtype={
-                self._INDEX_COLUMN: str,
-                self._INV_NR_COLUMN: pd.Int64Dtype(),
-                self._DEEL_VAN_INVENTARIS_COL: str,
-                self._START_PAGE_COLUMN: pd.Int64Dtype(),
-                self._LAST_PAGE_COLUMN: pd.Int64Dtype(),
-            },
-        ).dropna(
-            subset={
-                self._INV_NR_COLUMN,
-                self._START_PAGE_COLUMN,
-                self._LAST_PAGE_COLUMN,
-            }
-        )
-
-    def _filter_row(self, row: pd.Series) -> tuple[bool, str]:
-        return (
-            row[self._STATUS_COLUMN] != self._SKIP_MESSAGE,
-            row[self._STATUS_COLUMN],
-        )
+            dtype=self._dtypes,
+        ).dropna(subset=self._dropna)
 
     def _pagexml(self, id, page):
         logging.warning(

@@ -18,29 +18,33 @@ from ..inventory import InventoryReader
 class Sheet(abc.ABC):
     """Abstract class for sheet annotations."""
 
-    _INDEX_COLUMN = "Document_ID"
+    _INDEX_COLUMN = "Scan File_Name"
     _INV_NR_COLUMN = "Inv.nr. Nationaal Archief (1.04.02)"
     _START_PAGE_COLUMN = "Begin scan"
     _LAST_PAGE_COLUMN = "Eind scan"
     _DEEL_VAN_INVENTARIS_COL = "Part of the inv.nr."
-    _SEPARATOR = ";"
+    _SKIP_MESSAGE = ""
 
     _VALID_INVENTORY_PARTS = {"A", "B", "C"}
-    _SKIP_MESSAGE = "Niet gedigitaliseerd."
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self._dtypes = {
+            self._INDEX_COLUMN: str,
+            self._INV_NR_COLUMN: pd.Int64Dtype(),
+            self._DEEL_VAN_INVENTARIS_COL: str,
+            self._START_PAGE_COLUMN: pd.Int64Dtype(),
+            self._LAST_PAGE_COLUMN: pd.Int64Dtype(),
+        }
+        self._dropna = {
+            self._INV_NR_COLUMN,
+            self._START_PAGE_COLUMN,
+            self._LAST_PAGE_COLUMN,
+        }
 
     def __len__(self):
         return len(self._data)
-
-    def _filter_row(self, row: pd.Series) -> bool:
-        """Filter rows from the spreadsheet.
-
-        Args:
-            row: A row from the spreadsheet.
-
-        Returns:
-            bool: True if the row should be included, False otherwise.
-        """
-        return True
 
     def to_documents(
         self, *, skip_errors: bool = True, n: int = None, skip_ids: set[str] = None
@@ -65,17 +69,17 @@ class Sheet(abc.ABC):
                     continue
 
                 inv_nr = row[self._INV_NR_COLUMN]
-                filter, reason = self._filter_row(row)
-                if not filter:
+
+                if row.get(self._STATUS_COLUMN) == self._SKIP_MESSAGE:
                     tqdm.write(
-                        f"Skipping row with inventory number {str(inv_nr)} due to status message: '{reason}'"
+                        f"Skipping row with inventory number {str(inv_nr)} due to status message: '{row[self._STATUS_COLUMN]}'"
                     )
                     continue
 
                 begin_scan = row[self._START_PAGE_COLUMN]
                 end_scan = row[self._LAST_PAGE_COLUMN]
 
-                part = row[self._DEEL_VAN_INVENTARIS_COL]
+                part = row.get(self._DEEL_VAN_INVENTARIS_COL)
                 if pd.isna(part) or part not in self._VALID_INVENTORY_PARTS:
                     part = None
 
