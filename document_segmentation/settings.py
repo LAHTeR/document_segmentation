@@ -76,11 +76,6 @@ MIN_REGION_TEXT_LENGTH: int = 20
 
 Shorter regions are filtered out during training and inference."""
 
-MAX_REGIONS_PER_PAGE: int = 32
-"""
-The maximum number of regions per page.
-If a page has more regions, only the first and last regions are used.
-"""
 
 REGION_EMBEDDING_OUTPUT_SIZE: int = 128
 """Default output size for the RegionEmbedding output layer"""

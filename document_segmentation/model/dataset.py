@@ -14,7 +14,7 @@ from ..pagexml.datamodel.document import Document
 from ..pagexml.datamodel.label import Label
 from ..pagexml.datamodel.page import Page
 from ..pagexml.datamodel.region import Region
-from ..settings import MAX_REGIONS_PER_PAGE
+from ..settings import MIN_REGION_TEXT_LENGTH
 
 
 class AbstractDataset(Dataset, abc.ABC):
@@ -99,10 +99,6 @@ class PageDataset(AbstractDataset):
         """
         return self._pages
 
-    @property
-    def max_regions(self) -> int:
-        return len(self) * MAX_REGIONS_PER_PAGE
-
     def __len__(self) -> int:
         """Return the number of pages in this dataset.
 
@@ -149,17 +145,16 @@ class PageDataset(AbstractDataset):
         for page in self._pages:
             yield from [page.label] * len(page.regions)
 
-    def remove_short_regions(self, min_chars: int = 1) -> "PageDataset":
+    def remove_short_regions(
+        self, min_chars: int = MIN_REGION_TEXT_LENGTH
+    ) -> "PageDataset":
         """Create a filtered dataset in which all page regions with fewer than `min_chars` characters are removed.
 
         Args:
             min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
         """
         return self.__class__(
-            [
-                page.filter_short_regions(min_chars=MAX_REGIONS_PER_PAGE)
-                for page in self._pages
-            ]
+            [page.filter_short_regions(min_chars) for page in self._pages]
         )
 
     def balance(self, max_size: Optional[int] = None) -> "RegionDataset":

@@ -6,11 +6,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 from ..pagexml.datamodel.page import Page
 from ..pagexml.datamodel.region import Region
-from ..settings import (
-    MAX_REGIONS_PER_PAGE,
-    PAGE_EMBEDDING_OUTPUT_SIZE,
-    PAGE_EMBEDDING_RNN_CONFIG,
-)
+from ..settings import PAGE_EMBEDDING_OUTPUT_SIZE, PAGE_EMBEDDING_RNN_CONFIG
 from .device_module import DeviceModule
 from .region_embedding import RegionEmbeddingSentenceTransformer
 
@@ -22,14 +18,12 @@ class PageEmbedding(nn.Module, DeviceModule):
         self,
         *,
         rnn_config: dict[str, Any] = PAGE_EMBEDDING_RNN_CONFIG,
-        max_regions: int = MAX_REGIONS_PER_PAGE,
         output_size: int = PAGE_EMBEDDING_OUTPUT_SIZE,
         device: Optional[str] = None,
     ):
         super().__init__()
 
         self._region_model = RegionEmbeddingSentenceTransformer(device=device)
-        self._max_regions = max_regions
 
         self._transformer_dim = self._region_model.text_embedding_size
         self.output_size = output_size
@@ -63,14 +57,6 @@ class PageEmbedding(nn.Module, DeviceModule):
             pages = [pages]
 
         regions_batch: list[list[Region]] = [page.regions for page in pages]
-        if len(regions_batch) > self._max_regions:
-            logging.warning(
-                f"Too many regions ({len(regions_batch)}), truncating to {self._max_regions}"
-            )
-            region_inputs = (
-                regions_batch[: self._max_regions // 2]
-                + regions_batch[-self._max_regions // 2 :]
-            )
 
         region_inputs = pad_sequence(
             [self._region_model(regions) for regions in regions_batch],
