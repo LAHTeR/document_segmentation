@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-
 CWD: Path = Path(__file__).parent.absolute()
 
 DATA_DIR: Path = CWD / "data"
@@ -29,7 +28,16 @@ SERVER_PASSWORD: str = os.getenv("HUC_PASSWORD", "")
 if not SERVER_PASSWORD:
     logging.warning("No password set for accessing the HUC server.")
 
-LANGUAGE_MODEL: str = os.getenv("LANGUAGE_MODEL", "emanjavacas/GysBERT-v2")
+LANGUAGE_MODEL: str = os.getenv(
+    "LANGUAGE_MODEL",
+    "NetherlandsForensicInstitute/robbert-2022-dutch-sentence-transformers",
+)
+"""The name of the language model to use for the region classifier.
+
+The type of model needs to be with the RegionClassifier class:
+- use RegionClassifier for standard transformer models
+- use RegionClassifierSentenceTransformer for SentenceTransformer models
+"""
 
 # TODO: list all document types and their spelling variants
 DOCUMENT_TYPES: dict[str, set[str]] = {
@@ -63,7 +71,12 @@ PAGE_EMBEDDING_RNN_CONFIG: dict[str, Any] = {
 PAGE_EMBEDDING_OUTPUT_SIZE: int = 64
 """Default output size for the PageEmbedding output layer"""
 
-MAX_REGIONS_PER_PAGE: int = 16
+MIN_REGION_TEXT_LENGTH: int = 20
+"""The minimum number of characters of the text(s) in a region.
+
+Shorter regions are filtered out during training and inference."""
+
+MAX_REGIONS_PER_PAGE: int = 100
 """
 The maximum number of regions per page.
 If a page has more regions, only the first and last regions are used.

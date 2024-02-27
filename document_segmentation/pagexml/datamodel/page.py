@@ -1,42 +1,10 @@
-from enum import Enum, auto
-from typing import Iterable, Optional
+from typing import Optional
 
 from pagexml.model.physical_document_model import PageXMLScan
 from pydantic import BaseModel, PositiveInt, ValidationError, field_validator
 
+from .label import Label
 from .region import Region
-
-
-class Label(Enum):
-    """Labels for pages in a sequence."""
-
-    BEGIN = auto()
-    IN = auto()
-    END = auto()
-    # OUT = auto()
-
-    def to_list(self) -> list[int]:
-        """Convert the label to a list of integers.
-
-        Returns:
-            list[int]: A list of integers representing the label.
-        """
-        return [int(self == label) for label in Label]
-
-    @staticmethod
-    def map_scores(scores: Iterable[float]) -> dict[str, float]:
-        """Map a list of scores to a dictionary of label names and scores.
-
-        Args:
-            scores (Iterable[float]): List of scores with the same length as Label.
-        Returns:
-            dict[str, float]: Dictionary mapping label names to scores.
-        """
-        if len(scores) != len(Label):
-            raise ValueError(
-                f"Expected {len(Label)} scores, got {len(scores)}: {scores}"
-            )
-        return {label.name: score for label, score in zip(Label, scores)}
 
 
 class Page(BaseModel):
@@ -55,6 +23,27 @@ class Page(BaseModel):
             except ValueError as e:
                 raise ValidationError from e
         return value
+
+    def text(self, delimiter: str = "\n") -> str:
+        """Return the text of the page.
+
+        Args:
+            delimiter (str, optional): The delimiter to use between lines. Defaults to "\n".
+        """
+        return delimiter.join(line for region in self.regions for line in region.lines)
+
+    def filter_short_regions(self, min_chars: int = 1) -> "Page":
+        """Remove regions with fewer than `min_chars` characters.
+
+        Args:
+            min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
+        """
+        return Page(
+            label=self.label,
+            regions=[region for region in self.regions if len(region) >= min_chars],
+            scan_nr=self.scan_nr,
+            doc_id=self.doc_id,
+        )
 
     @classmethod
     def from_pagexml(cls, label: Label, scan_nr: int, pagexml: PageXMLScan):

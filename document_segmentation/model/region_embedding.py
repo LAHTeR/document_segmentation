@@ -4,16 +4,14 @@ from typing import Optional
 
 import numpy as np
 import torch
+from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
-from ..pagexml.datamodel import Region, RegionType
-from ..settings import (
-    LANGUAGE_MODEL,
-    REGION_EMBEDDING_OUTPUT_SIZE,
-    REGION_TYPE_EMBEDDING_SIZE,
-)
+from ..pagexml.datamodel.label import Label
+from ..pagexml.datamodel.region import Region, RegionType
+from ..settings import LANGUAGE_MODEL, REGION_TYPE_EMBEDDING_SIZE
 from .device_module import DeviceModule
 
 
@@ -24,7 +22,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
         self,
         *,
         transformer_model_name: str = LANGUAGE_MODEL,
-        output_size: int = REGION_EMBEDDING_OUTPUT_SIZE,
+        output_size: int = len(Label),
         region_type_embedding_size: int = REGION_TYPE_EMBEDDING_SIZE,
         line_separator: str = "\n",
         device: Optional[str] = None,
@@ -33,17 +31,11 @@ class RegionEmbedding(nn.Module, DeviceModule):
 
         self._line_separator = line_separator
 
-        # Text embeddings from a Transformers model
-        self._transformer_model: AutoModel = AutoModel.from_pretrained(
-            transformer_model_name
-        )
-        self._tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
-            transformer_model_name
-        )
+        self._init_transformer(transformer_model_name)
 
         self._region_type = nn.Embedding(len(RegionType), region_type_embedding_size)
 
-        self._max_length = self._transformer_model.config.max_position_embeddings
+        # TODO self._position = nn.Linear(1, 1)
 
         self._linear = nn.Linear(
             in_features=self.text_embedding_size + region_type_embedding_size,
@@ -53,6 +45,15 @@ class RegionEmbedding(nn.Module, DeviceModule):
         self.output_size = output_size
 
         self.to_device(device)
+
+    def _init_transformer(self, transformer_model_name):
+        self._transformer_model: AutoModel = AutoModel.from_pretrained(
+            transformer_model_name
+        )
+        self._tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
+            transformer_model_name
+        )
+        self._max_length = self._transformer_model.config.max_position_embeddings
 
     @property
     def text_embedding_size(self) -> int:
@@ -93,11 +94,6 @@ class RegionEmbedding(nn.Module, DeviceModule):
             logging.debug("Empty region batch.")
             cls_tokens = torch.zeros(0, self.text_embedding_size)
 
-        expected_size = (len(region_batch), self.text_embedding_size)
-        assert (
-            cls_tokens.size() == expected_size
-        ), f"Output shape was {cls_tokens.size()}, but should be {expected_size}."
-
         return cls_tokens
 
     # TODO
@@ -128,11 +124,16 @@ class RegionEmbedding(nn.Module, DeviceModule):
         Args:
             regions (list[Region]): The regions to embed.
         """
-        if not isinstance(regions, list):
-            logging.warning(f"Converting regions into a list (was: '{type(regions)}').")
-            regions = list(regions)
+        if not isinstance(regions, tuple):
+            logging.debug(f"Converting regions into a tuple (was: '{type(regions)}').")
+            regions = tuple(regions)
 
-        text_embeddings = self._text_embeddings(tuple(regions)).float()
+        text_embeddings = self._text_embeddings(regions).float()
+        expected_size = (len(regions), self.text_embedding_size)
+        assert (
+            text_embeddings.size() == expected_size
+        ), f"Output shape was {text_embeddings.size()}, but should be {expected_size}."
+
         region_types = (
             self._region_type(
                 torch.IntTensor(
@@ -153,5 +154,23 @@ class RegionEmbedding(nn.Module, DeviceModule):
             ],
             dim=-1,
         )
-
         return self._linear(region_inputs)
+
+
+class RegionEmbeddingSentenceTransformer(RegionEmbedding):
+    @property
+    def text_embedding_size(self) -> int:
+        """Return the size of the embeddings."""
+        return self._transformer_model.get_sentence_embedding_dimension()
+
+    def _init_transformer(self, transformer_model_name):
+        self._transformer_model = SentenceTransformer(transformer_model_name)
+
+    @lru_cache(maxsize=2**15)
+    @torch.no_grad()
+    def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
+        region_texts: list[str] = [
+            self._line_separator.join(region.lines) for region in region_batch
+        ]
+
+        return self._transformer_model.encode(region_texts, convert_to_tensor=True)

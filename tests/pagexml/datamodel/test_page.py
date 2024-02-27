@@ -1,4 +1,5 @@
-from document_segmentation.pagexml.datamodel import Label, Page
+from document_segmentation.pagexml.datamodel.label import Label
+from document_segmentation.pagexml.datamodel.page import Page
 
 
 class TestPage:

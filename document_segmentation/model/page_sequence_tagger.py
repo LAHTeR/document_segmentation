@@ -2,17 +2,10 @@ from typing import Any, Optional
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torcheval.metrics import (
-    MulticlassAccuracy,
-    MulticlassF1Score,
-    MulticlassPrecision,
-    MulticlassRecall,
-)
-from torcheval.metrics.metric import Metric
+from torch import optim
 from tqdm import tqdm
 
-from ..pagexml.datamodel import Label
+from ..pagexml.datamodel.label import Label
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .dataset import PageDataset
 from .device_module import DeviceModule
@@ -64,14 +57,14 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         softmax = self._softmax(output)
         assert softmax.size() == (len(pages), len(Label)), f"Bad shape: {output.size()}"
 
-        return softmax  # output of last timestep
+        return softmax
 
     def train_(
         self,
         pages: PageDataset,
         epochs: int = 3,
         batch_size: int = _DEFAULT_BATCH_SIZE,
-        weights: list[float] = None,
+        weights: Optional[torch.Tensor] = None,
     ):
         self.train()
 
@@ -80,7 +73,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         if len(weights) != len(Label):
             raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
 
-        criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights)).to(self._device)
+        criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
         for _ in range(epochs):
@@ -95,55 +88,12 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
                 loss.backward()
                 optimizer.step()
+            if self._device == "mps":
+                tqdm.write(
+                    f"Current allocated memory (MPS): {torch.mps.current_allocated_memory() / 1024 ** 2:.0f} MB"
+                )
+                tqdm.write(
+                    f"Driver allocated memory (MPS): {torch.mps.driver_allocated_memory() / 1024 ** 2:.0f} MB"
+                )
+
             tqdm.write(f"[Loss:\t{loss:.3f}]")
-
-    def _evaluate(self, dataset: PageDataset, metric: Metric, batch_size: int):
-        self.eval()
-
-        metric_name = metric.__class__.__name__
-        for batch in tqdm(
-            dataset.batches(batch_size),
-            desc=metric_name,
-            unit="batch",
-            total=len(dataset) / batch_size,
-        ):
-            outputs = self(batch)
-
-            true_labels = [label.value - 1 for label in batch.labels()]
-            metric.update(outputs, torch.tensor(true_labels))
-            scores = Label.map_scores(metric.compute().tolist())
-            tqdm.write(f"[{metric_name}: {scores}]")
-
-        return metric.compute()
-
-    def precision(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> dict[str, float]:
-        metric = MulticlassPrecision(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return Label.map_scores(scores.tolist())
-
-    def recall(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> dict[str, float]:
-        metric = MulticlassRecall(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return Label.map_scores(scores.tolist())
-
-    def f1_score(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> dict[str, float]:
-        metric = MulticlassF1Score(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return Label.map_scores(scores.tolist())
-
-    def accuracy(
-        self, dataset: PageDataset, *, batch_size: int = _DEFAULT_BATCH_SIZE
-    ) -> float:
-        metric = MulticlassAccuracy(**self._eval_args)
-        scores = self._evaluate(dataset, metric, batch_size=batch_size)
-
-        return scores[Label.IN.value - 1]

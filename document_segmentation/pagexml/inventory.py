@@ -1,10 +1,10 @@
 import logging
 import shutil
-from tempfile import TemporaryDirectory
-from typing import Optional
 import zipfile
 from functools import lru_cache
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Optional
 
 import requests
 from pagexml.model.physical_document_model import PageXMLScan
