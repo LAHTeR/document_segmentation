@@ -64,7 +64,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         softmax = self._softmax(output)
         assert softmax.size() == (len(pages), len(Label)), f"Bad shape: {output.size()}"
 
-        return softmax  # output of last timestep
+        return softmax
 
     def train_(
         self,
