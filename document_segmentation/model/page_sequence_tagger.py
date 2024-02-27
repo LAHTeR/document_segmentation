@@ -71,7 +71,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         pages: PageDataset,
         epochs: int = 3,
         batch_size: int = _DEFAULT_BATCH_SIZE,
-        weights: list[float] = None,
+        weights: Optional[torch.Tensor] = None,
     ):
         self.train()
 
@@ -80,7 +80,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         if len(weights) != len(Label):
             raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
 
-        criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights)).to(self._device)
+        criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
         for _ in range(epochs):
