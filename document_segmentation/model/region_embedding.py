@@ -9,9 +9,12 @@ from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
-from ..pagexml.datamodel.label import Label
 from ..pagexml.datamodel.region import Region, RegionType
-from ..settings import LANGUAGE_MODEL, REGION_TYPE_EMBEDDING_SIZE
+from ..settings import (
+    LANGUAGE_MODEL,
+    REGION_EMBEDDING_OUTPUT_SIZE,
+    REGION_TYPE_EMBEDDING_SIZE,
+)
 from .device_module import DeviceModule
 
 
@@ -22,7 +25,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
         self,
         *,
         transformer_model_name: str = LANGUAGE_MODEL,
-        output_size: int = len(Label),
+        output_size: int = REGION_EMBEDDING_OUTPUT_SIZE,
         region_type_embedding_size: int = REGION_TYPE_EMBEDDING_SIZE,
         line_separator: str = "\n",
         device: Optional[str] = None,
@@ -92,7 +95,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
             cls_tokens = out[:, 0, :]  # CLS token is first token of sequence
         else:
             logging.debug("Empty region batch.")
-            cls_tokens = torch.zeros(0, self.text_embedding_size)
+            cls_tokens = torch.zeros(0, self.text_embedding_size).to(self._device)
 
         return cls_tokens
 
@@ -169,8 +172,14 @@ class RegionEmbeddingSentenceTransformer(RegionEmbedding):
     @lru_cache(maxsize=2**15)
     @torch.no_grad()
     def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
-        region_texts: list[str] = [
-            self._line_separator.join(region.lines) for region in region_batch
-        ]
+        if region_batch:
+            region_texts: list[str] = [
+                self._line_separator.join(region.lines) for region in region_batch
+            ]
 
-        return self._transformer_model.encode(region_texts, convert_to_tensor=True)
+            embedding = self._transformer_model.encode(
+                region_texts, convert_to_tensor=True
+            )
+        else:
+            embedding = torch.zeros(0, self.text_embedding_size).to(self._device)
+        return embedding

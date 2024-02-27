@@ -51,9 +51,12 @@ DOCUMENT_TYPES: dict[str, set[str]] = {
 """A mapping from document types to all spelling variants of that type."""
 
 
+PAGE_EMBEDDING_OUTPUT_SIZE: int = 128
+"""Default output size for the PageEmbedding output layer"""
+
 ### Settings for the document segmentation model
 PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
-    "hidden_size": 128,
+    "hidden_size": PAGE_EMBEDDING_OUTPUT_SIZE // 2,
     "num_layers": 1,
     "dropout": 0.1,
     "bidirectional": True,
@@ -68,19 +71,11 @@ PAGE_EMBEDDING_RNN_CONFIG: dict[str, Any] = {
 }
 """Default configuration for the RNN module in the PageEmbedding"""
 
-PAGE_EMBEDDING_OUTPUT_SIZE: int = 64
-"""Default output size for the PageEmbedding output layer"""
-
 MIN_REGION_TEXT_LENGTH: int = 20
 """The minimum number of characters of the text(s) in a region.
 
 Shorter regions are filtered out during training and inference."""
 
-MAX_REGIONS_PER_PAGE: int = 100
-"""
-The maximum number of regions per page.
-If a page has more regions, only the first and last regions are used.
-"""
 
 REGION_EMBEDDING_OUTPUT_SIZE: int = 128
 """Default output size for the RegionEmbedding output layer"""
