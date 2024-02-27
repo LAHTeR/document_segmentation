@@ -8,11 +8,11 @@ import requests
 from requests import HTTPError
 from tqdm import tqdm
 
-from ..settings import GENERALE_MISSIVEN_SHEET, SERVER_PASSWORD, SERVER_USERNAME
-from .datamodel.document import Document
-from .datamodel.label import Label
-from .datamodel.page import Page
-from .inventory import InventoryReader
+from ...settings import GENERALE_MISSIVEN_SHEET, SERVER_PASSWORD, SERVER_USERNAME
+from ..datamodel.document import Document
+from ..datamodel.label import Label
+from ..datamodel.page import Page
+from ..inventory import InventoryReader
 
 
 class GeneraleMissiven:
