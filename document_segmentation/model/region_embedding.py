@@ -9,9 +9,12 @@ from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
-from ..pagexml.datamodel.label import Label
 from ..pagexml.datamodel.region import Region, RegionType
-from ..settings import LANGUAGE_MODEL, REGION_TYPE_EMBEDDING_SIZE
+from ..settings import (
+    LANGUAGE_MODEL,
+    REGION_EMBEDDING_OUTPUT_SIZE,
+    REGION_TYPE_EMBEDDING_SIZE,
+)
 from .device_module import DeviceModule
 
 
@@ -22,7 +25,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
         self,
         *,
         transformer_model_name: str = LANGUAGE_MODEL,
-        output_size: int = len(Label),
+        output_size: int = REGION_EMBEDDING_OUTPUT_SIZE,
         region_type_embedding_size: int = REGION_TYPE_EMBEDDING_SIZE,
         line_separator: str = "\n",
         device: Optional[str] = None,
