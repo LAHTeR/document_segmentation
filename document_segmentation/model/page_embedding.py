@@ -12,7 +12,7 @@ from ..settings import (
     PAGE_EMBEDDING_RNN_CONFIG,
 )
 from .device_module import DeviceModule
-from .region_embedding import RegionEmbedding
+from .region_embedding import RegionEmbeddingSentenceTransformer
 
 
 class PageEmbedding(nn.Module, DeviceModule):
@@ -28,7 +28,7 @@ class PageEmbedding(nn.Module, DeviceModule):
     ):
         super().__init__()
 
-        self._region_model = RegionEmbedding(device=device)
+        self._region_model = RegionEmbeddingSentenceTransformer(device=device)
         self._max_regions = max_regions
 
         self._transformer_dim = self._region_model.text_embedding_size
