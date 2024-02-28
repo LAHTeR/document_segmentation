@@ -30,9 +30,13 @@ class TestSheet:
 
 
 class TestRenateAnalysisInv:
-    def test_init(self):
+    @pytest.fixture()
+    def test_sheet(self):
+        return settings.DATA_DIR / "Analysis Renate 1547.xlsx"
+
+    def test_init(self, test_sheet):
         """Test the initialization of the RenateAnalysisInv class."""
-        sheet = RenateAnalysisInv(settings.RENATE_ANALYSIS_SHEETS[0])
+        sheet = RenateAnalysisInv(test_sheet)
 
         for label in sheet._data[RenateAnalysisInv._LABEL_COLUMN]:
             assert label == "" or Label[label]
@@ -42,9 +46,9 @@ class TestRenateAnalysisInv:
         assert sheet._inv_nr == 1547
 
     @pytest.mark.skip("Mock the download of the correct inventory.")
-    def test_to_documents(self):
+    def test_to_documents(self, test_sheet):
         """Test the to_documents method."""
-        sheet = RenateAnalysisInv(settings.RENATE_ANALYSIS_SHEETS[0])
+        sheet = RenateAnalysisInv(test_sheet)
         documents = list(sheet.to_documents())
 
         assert len(documents) == 26
