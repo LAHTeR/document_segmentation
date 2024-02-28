@@ -18,7 +18,7 @@ from ..inventory import InventoryReader
 class Sheet(abc.ABC):
     """Abstract class for reading sheet annotations."""
 
-    _INDEX_COLUMN = "Scan File_Name"
+    _INDEX_COLUMN = "Document_ID"
     _INV_NR_COLUMN = "Inv.nr. Nationaal Archief (1.04.02)"
     _START_PAGE_COLUMN = "Begin scan"
     _LAST_PAGE_COLUMN = "End scan"
@@ -46,6 +46,9 @@ class Sheet(abc.ABC):
     def __len__(self):
         return len(self._data)
 
+    def _remove_row(self, row: pd.Series) -> bool:
+        return False, None
+
     def to_documents(
         self, *, skip_errors: bool = True, n: int = None, skip_ids: set[str] = None
     ) -> Iterable[Document]:
@@ -70,9 +73,10 @@ class Sheet(abc.ABC):
 
                 inv_nr = row[self._INV_NR_COLUMN]
 
-                if row.get(self._STATUS_COLUMN) == self._SKIP_MESSAGE:
+                remove, reason = self._remove_row(row)
+                if remove:
                     tqdm.write(
-                        f"Skipping row with inventory number {str(inv_nr)} due to status message: '{row[self._STATUS_COLUMN]}'"
+                        f"Skipping row with inventory number {str(inv_nr)} due to reason: '{reason}'"
                     )
                     continue
 
@@ -118,5 +122,5 @@ class Sheet(abc.ABC):
                     pages.append(Page.from_pagexml(label, page_number, page_xml))
 
                 yield Document(
-                    id=idx, inventory_nr=inv_nr, inventory_part=part, pages=pages
+                    id=str(idx), inventory_nr=inv_nr, inventory_part=part, pages=pages
                 )

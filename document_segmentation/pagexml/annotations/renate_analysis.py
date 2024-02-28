@@ -23,9 +23,9 @@ class RenateAnalysis(Sheet):
         """
         super().__init__()
 
-        self._data = pd.read_excel(sheet, dtype=self._dtypes).dropna(
-            subset=self._dropna
-        )
+        self._data = pd.read_excel(
+            sheet, dtype=self._dtypes, index_col=self._INDEX_COLUMN
+        ).dropna(subset=self._dropna)
 
 
 class RenateAnalysisInv(Sheet):
