@@ -7,11 +7,12 @@ from .sheet import Sheet
 
 
 class RenateAnalysis(Sheet):
-    def __init__(self, sheet: list[Path] = RENATE_TANAP_CATEGORISATION_SHEET) -> None:
-        """Load the spreadsheet into memory.
+    def __init__(self, sheet: Path = RENATE_TANAP_CATEGORISATION_SHEET) -> None:
+        """Helper class to handle the 'Renate Analysis' sheet.
 
         Args:
-            files (list[Path], optional): Paths to the spreadsheet. Defaults to settings.RENATE_ANALYSIS_SHEETS.
+            sheet (Path, optional): Paths to the spreadsheet.
+                Defaults to settings.RENATE_TANAP_CATEGORISATION_SHEET.
         """
         super().__init__()
 

@@ -16,12 +16,12 @@ from ..inventory import InventoryReader
 
 
 class Sheet(abc.ABC):
-    """Abstract class for sheet annotations."""
+    """Abstract class for reading sheet annotations."""
 
     _INDEX_COLUMN = "Scan File_Name"
     _INV_NR_COLUMN = "Inv.nr. Nationaal Archief (1.04.02)"
     _START_PAGE_COLUMN = "Begin scan"
-    _LAST_PAGE_COLUMN = "Eind scan"
+    _LAST_PAGE_COLUMN = "End scan"
     _DEEL_VAN_INVENTARIS_COL = "Part of the inv.nr."
     _SKIP_MESSAGE = ""
 

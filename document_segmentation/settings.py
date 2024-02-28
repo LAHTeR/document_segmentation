@@ -6,7 +6,8 @@ from typing import Any
 CWD: Path = Path(__file__).parent.absolute()
 
 DATA_DIR: Path = CWD / "data"
-TEST_SHEET: Path = (
+
+RENATE_TANAP_CATEGORISATION_SHEET: Path = (
     DATA_DIR
     / "Appendix F - Spreadsheet concerning the TANAP document categorisation, Renate Smit, January 2024.xlsx"
 )
