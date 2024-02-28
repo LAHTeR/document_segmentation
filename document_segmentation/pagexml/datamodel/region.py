@@ -37,8 +37,11 @@ class Region(BaseModel, frozen=True):
     lines: tuple[str, ...]
 
     def __len__(self) -> int:
-        """Return the number of characters added over all lines in the region."""
-        return sum(len(line) for line in self.lines)
+        """Return the number of characters added over all lines in the region.
+
+        Leading and trailing whitespace per line is not included in the count.
+        """
+        return sum(len(line.strip()) for line in self.lines)
 
     @classmethod
     def from_pagexml(cls, region: PageXMLTextRegion) -> "Region":
