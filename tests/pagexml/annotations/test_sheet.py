@@ -1,7 +1,13 @@
 import pytest
 
+from document_segmentation import settings
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
-from document_segmentation.pagexml.annotations.renate_analysis import RenateAnalysis
+from document_segmentation.pagexml.annotations.renate_analysis import (
+    RenateAnalysis,
+    RenateAnalysisInv,
+)
+from document_segmentation.pagexml.datamodel.document import Document
+from document_segmentation.pagexml.datamodel.label import Label
 
 
 class TestSheet:
@@ -19,3 +25,27 @@ class TestSheet:
         assert len(sheet) == length
         assert sheet._data[self.INV_COLUMN].min(skipna=False) == min_inv
         assert sheet._data[self.INV_COLUMN].max(skipna=False) == max_inv
+
+        assert not sheet._data[self.INV_COLUMN].hasnans
+
+
+class TestRenateAnalysisInv:
+    def test_init(self):
+        """Test the initialization of the RenateAnalysisInv class."""
+        sheet = RenateAnalysisInv(settings.RENATE_ANALYSIS_SHEETS[0])
+
+        for label in sheet._data[RenateAnalysisInv._LABEL_COLUMN]:
+            assert label == "" or Label[label]
+
+        assert len(sheet) == 690
+        assert sheet._id == "Analysis Renate 1547"
+        assert sheet._inv_nr == 1547
+
+    @pytest.mark.skip("Mock the download of the correct inventory.")
+    def test_to_documents(self):
+        """Test the to_documents method."""
+        sheet = RenateAnalysisInv(settings.RENATE_ANALYSIS_SHEETS[0])
+        documents = list(sheet.to_documents())
+
+        assert len(documents) == 26
+        assert all(isinstance(doc, Document) for doc in documents)
