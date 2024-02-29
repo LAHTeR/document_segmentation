@@ -48,6 +48,11 @@ REGION3 = Region.model_validate(
 )
 
 
+def page(doc_id):
+    """Create a page with the given document ID."""
+    return Page(label=Label.BEGIN, regions=[], scan_nr=1, doc_id=doc_id)
+
+
 class TestLabel:
     @pytest.mark.parametrize(
         "scores,expected,expected_exception",
@@ -67,10 +72,6 @@ class TestLabel:
 
 
 class TestPageDataset:
-    @staticmethod
-    def page(doc_id):
-        return Page(label=Label.BEGIN, regions=[], scan_nr=1, doc_id=doc_id)
-
     @pytest.mark.parametrize(
         "dataset,batch_size,expected",
         [
