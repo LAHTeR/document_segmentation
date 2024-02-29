@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Optional
 
+import torch
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
@@ -58,11 +59,17 @@ class PageEmbedding(nn.Module, DeviceModule):
 
         regions_batch: list[list[Region]] = [page.regions for page in pages]
 
-        region_inputs = pad_sequence(
-            [self._region_model(regions) for regions in regions_batch],
-            batch_first=True,
-            padding_value=0.0,
-        )
+        if any(regions for regions in regions_batch):
+            region_inputs = pad_sequence(
+                [self._region_model(regions) for regions in regions_batch],
+                batch_first=True,
+                padding_value=0.0,
+            )
+        else:
+            logging.warning("No regions found in the batch, using zero tensor")
+            region_inputs = torch.zeros(
+                1, len(pages), self._region_model.output_size
+            ).to(self._device)
 
         rnn_out, hidden = self._rnn(region_inputs)
 
