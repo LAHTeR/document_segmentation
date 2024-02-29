@@ -82,8 +82,10 @@ class DocumentDataset(AbstractDataset):
 
         self._page_datasets: list[PageDataset] = page_datasets
 
-    def balance(self, max_size: int | None = None) -> AbstractDataset:
-        # FIXME: max_size is applied per document, not in total
+    def balance(self, max_size: Optional[int] = None) -> AbstractDataset:
+        # FIXME:
+        logging.warning("max_size is applied per document, not in total.")
+
         return self.__class__(
             [page_dataset.balance(max_size) for page_dataset in self._page_datasets]
         )
