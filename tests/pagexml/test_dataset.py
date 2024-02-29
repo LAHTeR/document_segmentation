@@ -67,6 +67,47 @@ class TestLabel:
 
 
 class TestPageDataset:
+    @staticmethod
+    def page(doc_id):
+        return Page(label=Label.BEGIN, regions=[], scan_nr=1, doc_id=doc_id)
+
+    @pytest.mark.parametrize(
+        "dataset,batch_size,expected",
+        [
+            (
+                PageDataset([page("test doc 1")] * 2),
+                2,
+                [PageDataset([page("test doc 1")] * 2)],
+            ),
+            (
+                PageDataset([page("test doc 1")] * 4),
+                2,
+                [
+                    PageDataset([page("test doc 1")] * 2),
+                    PageDataset([page("test doc 1")] * 2),
+                ],
+            ),
+            (
+                PageDataset([page("test doc 1"), page("test doc 2")]),
+                1,
+                [PageDataset([page("test doc 1")]), PageDataset([page("test doc 2")])],
+            ),
+            (
+                PageDataset(
+                    [page("test doc 1"), page("test doc 1"), page("test doc 2")]
+                ),
+                4,
+                [
+                    PageDataset(
+                        [page("test doc 1"), page("test doc 1"), page("test doc 2")]
+                    )
+                ],
+            ),
+        ],
+    )
+    def test_batches(self, dataset, batch_size, expected):
+        assert list(dataset.batches(batch_size)) == expected
+
     @pytest.mark.parametrize(
         "pages, expected",
         [
