@@ -39,7 +39,10 @@ class TestRenateAnalysisInv:
         sheet = RenateAnalysisInv(test_sheet)
 
         for label in sheet._data[RenateAnalysisInv._LABEL_COLUMN]:
-            assert label == "" or Label[label]
+            try:
+                Label[label]
+            except KeyError:
+                assert label == ""
 
         assert len(sheet) == 690
         assert sheet._id == "Analysis Renate 1547"
