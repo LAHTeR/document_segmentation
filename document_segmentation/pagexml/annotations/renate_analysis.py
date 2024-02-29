@@ -51,12 +51,15 @@ class RenateAnalysisInv(Sheet):
             raise NotImplementedError(
                 f"'skip_errors' is not implemented yet for the '{self.__class__.__name__}' class."
             )
+        if skip_ids:
+            raise NotImplementedError(
+                f"'skip_ids' is not implemented yet for the '{self.__class__.__name__}' class."
+            )
 
         with TemporaryDirectory() as cache_directory:
             inventory = InventoryReader(
                 self._inv_nr, cache_directory=Path(cache_directory)
             )
-
             fallback_label = "OUT"
             pages = []
 
