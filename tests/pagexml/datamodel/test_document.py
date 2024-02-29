@@ -11,7 +11,7 @@ class TestDocument:
             "inventory_nr": 1068,
             "inventory_part": null,
             "pages": [
-                { "label": 1, "regions": [], "scan_nr": 617 }
+                { "label": 0, "regions": [], "scan_nr": 617 }
             ]
         }
         """

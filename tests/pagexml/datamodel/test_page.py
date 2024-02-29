@@ -4,7 +4,7 @@ from document_segmentation.pagexml.datamodel.page import Page
 
 class TestPage:
     def test_enum_from_int(self):
-        json = '{ "label": 1, "regions": [], "scan_nr": 617 }'
+        json = '{ "label": 0, "regions": [], "scan_nr": 617 }'
 
         expected_page = Page(label=Label.BEGIN, regions=[], scan_nr=617)
         page = Page.model_validate_json(json)

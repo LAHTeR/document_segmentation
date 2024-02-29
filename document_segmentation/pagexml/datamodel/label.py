@@ -1,14 +1,14 @@
-from enum import Enum, auto
+from enum import IntEnum
 from typing import Iterable
 
 
-class Label(Enum):
+class Label(IntEnum):
     """Labels for pages in a sequence."""
 
-    BEGIN = auto()
-    IN = auto()
-    END = auto()
-    OUT = auto()
+    BEGIN = 0
+    IN = 1
+    END = 2
+    OUT = 3
 
     def to_list(self) -> list[int]:
         """Convert the label to a list of integers.
