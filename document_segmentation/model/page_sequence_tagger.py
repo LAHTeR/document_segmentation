@@ -1,9 +1,17 @@
+import csv
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, TextIO
 
 import torch
 import torch.nn as nn
 from torch import optim
+from torcheval.metrics import (
+    Metric,
+    MulticlassAccuracy,
+    MulticlassF1Score,
+    MulticlassPrecision,
+    MulticlassRecall,
+)
 from tqdm import tqdm
 
 from ..pagexml.datamodel.label import Label
@@ -65,12 +73,14 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         dataset: DocumentDataset,
         epochs: int = 3,
         batch_size: int = _DEFAULT_BATCH_SIZE,
-        weights: Optional[torch.Tensor] = None,
+        weights: Optional[list[float]] = None,
     ):
         self.train()
 
-        if len(weights) != len(Label):
-            raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
+        if weights is not None:
+            if len(weights) != len(Label):
+                raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
+            weights = torch.Tensor(weights).to(self._device)
 
         criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
@@ -78,6 +88,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         for _ in range(epochs):
             for batch in tqdm(
                 dataset.batches(batch_size),
+                desc="Training",
                 unit="batch",
                 total=dataset.n_batches(batch_size),
             ):
@@ -98,3 +109,50 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 )
 
             tqdm.write(f"[Loss:\t{loss:.3f}]")
+
+    def eval_(
+        self, dataset: DocumentDataset, batch_size: int, results_out: TextIO
+    ) -> list[Metric]:
+        metrics: list[Metric] = [
+            metric(average=None, num_classes=len(Label))
+            for metric in (
+                MulticlassPrecision,
+                MulticlassRecall,
+                MulticlassF1Score,
+            )
+        ] + [MulticlassAccuracy()]
+
+        writer = csv.DictWriter(
+            results_out,
+            fieldnames=("Predicted", "Actual", "Page ID", "Text", "Scores"),
+            delimiter="\t",
+        )
+
+        self.eval()
+
+        for batch in tqdm(
+            dataset.batches(batch_size),
+            desc="Evaluating",
+            total=dataset.n_batches(batch_size),
+            unit="batch",
+        ):
+            predicted = self(batch)
+            labels = batch.labels()
+
+            _labels = torch.Tensor([label.value for label in labels]).to(int)
+
+            for metric in metrics:
+                metric.update(predicted, _labels)
+
+            for page, pred, label in zip(batch.pages, predicted, labels):
+                writer.writerow(
+                    {
+                        "Predicted": Label(pred.argmax().item()).name,
+                        "Actual": label.name,
+                        "Page ID": page.doc_id,
+                        "Text": page.text(delimiter="; ")[:50],
+                        "Scores": str(pred.tolist()),
+                    }
+                )
+
+        return metrics
