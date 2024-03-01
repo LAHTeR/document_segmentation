@@ -78,7 +78,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             for batch in tqdm(
                 dataset.batches(batch_size),
                 unit="batch",
-                total=len(dataset) / batch_size,  # FIXME
+                total=dataset.n_batches(batch_size),
             ):
                 optimizer.zero_grad()
                 outputs = self(batch).to(self._device)

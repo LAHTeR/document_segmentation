@@ -2,7 +2,11 @@ from contextlib import nullcontext as does_not_raise
 
 import pytest
 
-from document_segmentation.model.dataset import PageDataset, RegionDataset
+from document_segmentation.model.dataset import (
+    DocumentDataset,
+    PageDataset,
+    RegionDataset,
+)
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.pagexml.datamodel.page import Page
 from document_segmentation.pagexml.datamodel.region import Region
@@ -48,7 +52,7 @@ REGION3 = Region.model_validate(
 )
 
 
-def page(doc_id):
+def page(doc_id: str = "test doc"):
     """Create a page with the given document ID."""
     return Page(label=Label.BEGIN, regions=[], scan_nr=1, doc_id=doc_id)
 
@@ -69,6 +73,21 @@ class TestLabel:
     def test_map_scores(self, scores, expected, expected_exception):
         with expected_exception:
             assert Label.map_scores(scores) == expected
+
+
+class TestDocumentDataset:
+    @pytest.mark.parametrize(
+        "dataset,batch_size,expected",
+        [
+            (DocumentDataset([]), 2, 0),
+            (DocumentDataset([PageDataset([])]), 2, 0),
+            (DocumentDataset([PageDataset([page()])]), 2, 1),
+            (DocumentDataset([PageDataset([page()] * 5)]), 2, 3),
+            (DocumentDataset([PageDataset([page()] * 5)] * 2), 2, 6),
+        ],
+    )
+    def test_n_batches(self, dataset, batch_size, expected):
+        assert dataset.n_batches(batch_size) == expected
 
 
 class TestPageDataset:

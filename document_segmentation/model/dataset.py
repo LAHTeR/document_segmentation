@@ -3,6 +3,7 @@ import logging
 import random
 from collections import Counter
 from itertools import islice
+from math import ceil
 from pathlib import Path
 from typing import Iterable, Optional, Union
 
@@ -120,7 +121,12 @@ class DocumentDataset(AbstractDataset):
             )
 
     def __len__(self) -> int:
-        return sum(len(page_dataset) for page_dataset in self._page_datasets)
+        return len(self._page_datasets)
+
+    def n_batches(self, batch_size: int) -> int:
+        return sum(
+            ceil(len(page_dataset) / batch_size) for page_dataset in self._page_datasets
+        )
 
     def __getitem__(self, index) -> Page:
         i = 0
