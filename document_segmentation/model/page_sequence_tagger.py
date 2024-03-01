@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Optional
 
 import torch
@@ -89,10 +90,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 loss.backward()
                 optimizer.step()
             if self._device == "mps":
-                tqdm.write(
+                logging.debug(
                     f"Current allocated memory (MPS): {torch.mps.current_allocated_memory() / 1024 ** 2:.0f} MB"
                 )
-                tqdm.write(
+                logging.debug(
                     f"Driver allocated memory (MPS): {torch.mps.driver_allocated_memory() / 1024 ** 2:.0f} MB"
                 )
 
