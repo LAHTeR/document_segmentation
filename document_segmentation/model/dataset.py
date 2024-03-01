@@ -78,10 +78,10 @@ class AbstractDataset(Dataset, abc.ABC):
 class DocumentDataset(AbstractDataset):
     """A dataset that wraps PageDatasets from different documents."""
 
-    def __init__(self, page_datasets: list["PageDataset"]) -> None:
+    def __init__(self, page_datasets: list["PageDataset"] = None) -> None:
         super().__init__()
 
-        self._page_datasets: list[PageDataset] = page_datasets
+        self._page_datasets: list[PageDataset] = page_datasets or []
 
     def __len__(self) -> int:
         return len(self._page_datasets)
@@ -182,7 +182,7 @@ class PageDataset(AbstractDataset):
     This Dataset implementation follows the logic of the models defined in document_segmentation.pagexml.model.
     """
 
-    def __init__(self, pages: list[Page]) -> None:
+    def __init__(self, pages: list[Page] = None) -> None:
         """Create a dataset from a list of pages.
 
         Args:
@@ -190,10 +190,13 @@ class PageDataset(AbstractDataset):
         """
         super().__init__()
 
-        self._pages = pages
+        self._pages = pages or []
 
     def __eq__(self, other):
         return self._pages == other._pages
+
+    def __add__(self, other: Dataset) -> "PageDataset":
+        return self.__class__(self._pages + other._pages)
 
     @property
     def pages(self) -> list[Page]:
