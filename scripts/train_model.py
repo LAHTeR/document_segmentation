@@ -94,7 +94,9 @@ if __name__ == "__main__":
     else:
         logging.info("Training model from scratch")
 
-        model = PageSequenceTagger()
+        model = PageSequenceTagger(device=args.device)
+        if args.device is not None:
+            assert model.to_device(args.device)
         model.train_(
             training_data,
             epochs=args.epochs,
