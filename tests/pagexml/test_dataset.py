@@ -89,6 +89,30 @@ class TestDocumentDataset:
     def test_n_batches(self, dataset, batch_size, expected):
         assert dataset.n_batches(batch_size) == expected
 
+    @pytest.mark.parametrize(
+        "dataset,portion,expected_training,expected_test",
+        [
+            (DocumentDataset([]), 0.8, DocumentDataset([]), DocumentDataset([])),
+            (
+                DocumentDataset([page()] * 10),
+                0.8,
+                DocumentDataset([page()] * 8),
+                DocumentDataset([page()] * 2),
+            ),
+            (
+                DocumentDataset([page()] * 9),
+                0.8,
+                DocumentDataset([page()] * 7),
+                DocumentDataset([page()] * 2),
+            ),
+        ],
+    )
+    def test_split(self, dataset, portion, expected_training, expected_test):
+        training, test = dataset.split(portion)
+
+        assert training == expected_training, "Training dataset is not as expected"
+        assert test == expected_test, "Test dataset is not as expected"
+
 
 class TestPageDataset:
     @pytest.mark.parametrize(

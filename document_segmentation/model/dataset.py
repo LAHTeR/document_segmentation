@@ -83,6 +83,15 @@ class DocumentDataset(AbstractDataset):
 
         self._page_datasets: list[PageDataset] = page_datasets
 
+    def __len__(self) -> int:
+        return len(self._page_datasets)
+
+    def __eq__(self, other) -> bool:
+        return (
+            isinstance(other, self.__class__)
+            and self._page_datasets == other._page_datasets
+        )
+
     def balance(self, max_size: Optional[int] = None) -> AbstractDataset:
         # FIXME:
         logging.warning("max_size is applied per document, not in total.")
@@ -119,9 +128,6 @@ class DocumentDataset(AbstractDataset):
             yield from dataset.remove_short_regions(min_region_length).batches(
                 batch_size
             )
-
-    def __len__(self) -> int:
-        return len(self._page_datasets)
 
     def n_batches(self, batch_size: int) -> int:
         return sum(
