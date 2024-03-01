@@ -92,6 +92,12 @@ class DocumentDataset(AbstractDataset):
             and self._page_datasets == other._page_datasets
         )
 
+    def __getitem__(self, index) -> Page:
+        if isinstance(index, slice):
+            return self.__class__(self._page_datasets[index])
+        else:
+            return self._page_datasets[index]
+
     def balance(self, max_size: Optional[int] = None) -> AbstractDataset:
         # FIXME:
         logging.warning("max_size is applied per document, not in total.")
@@ -133,15 +139,6 @@ class DocumentDataset(AbstractDataset):
         return sum(
             ceil(len(page_dataset) / batch_size) for page_dataset in self._page_datasets
         )
-
-    def __getitem__(self, index) -> Page:
-        i = 0
-        for page_dataset in self._page_datasets:
-            if i + len(page_dataset) > index:
-                return page_dataset[index - i]
-            i += len(page_dataset)
-
-        raise IndexError(f"Index {index} out of range.")
 
     def split(self, portion: float) -> tuple["DocumentDataset", "DocumentDataset"]:
         split = int(len(self._page_datasets) * portion)
