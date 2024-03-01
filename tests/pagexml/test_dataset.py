@@ -52,9 +52,9 @@ REGION3 = Region.model_validate(
 )
 
 
-def page(doc_id: str = "test doc"):
+def page(scan_nr: int = 1, doc_id: str = "test doc"):
     """Create a page with the given document ID."""
-    return Page(label=Label.BEGIN, regions=[], scan_nr=1, doc_id=doc_id)
+    return Page(label=Label.BEGIN, regions=[], scan_nr=scan_nr, doc_id=doc_id)
 
 
 class TestLabel:
@@ -119,31 +119,42 @@ class TestPageDataset:
         "dataset,batch_size,expected",
         [
             (
-                PageDataset([page("test doc 1")] * 2),
+                PageDataset([page(doc_id="test doc 1")] * 2),
                 2,
-                [PageDataset([page("test doc 1")] * 2)],
+                [PageDataset([page(doc_id="test doc 1")] * 2)],
             ),
             (
-                PageDataset([page("test doc 1")] * 4),
+                PageDataset([page(doc_id="test doc 1")] * 4),
                 2,
                 [
-                    PageDataset([page("test doc 1")] * 2),
-                    PageDataset([page("test doc 1")] * 2),
+                    PageDataset([page(doc_id="test doc 1")] * 2),
+                    PageDataset([page(doc_id="test doc 1")] * 2),
                 ],
             ),
             (
-                PageDataset([page("test doc 1"), page("test doc 2")]),
+                PageDataset([page(doc_id="test doc 1"), page(doc_id="test doc 2")]),
                 1,
-                [PageDataset([page("test doc 1")]), PageDataset([page("test doc 2")])],
+                [
+                    PageDataset([page(doc_id="test doc 1")]),
+                    PageDataset([page(doc_id="test doc 2")]),
+                ],
             ),
             (
                 PageDataset(
-                    [page("test doc 1"), page("test doc 1"), page("test doc 2")]
+                    [
+                        page(doc_id="test doc 1"),
+                        page(doc_id="test doc 1"),
+                        page(doc_id="test doc 2"),
+                    ]
                 ),
                 4,
                 [
                     PageDataset(
-                        [page("test doc 1"), page("test doc 1"), page("test doc 2")]
+                        [
+                            page(doc_id="test doc 1"),
+                            page(doc_id="test doc 1"),
+                            page(doc_id="test doc 2"),
+                        ]
                     )
                 ],
             ),
