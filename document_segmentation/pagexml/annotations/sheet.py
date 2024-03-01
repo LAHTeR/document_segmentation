@@ -124,3 +124,30 @@ class Sheet(abc.ABC):
                 yield Document(
                     id=str(idx), inventory_nr=inv_nr, inventory_part=part, pages=pages
                 )
+
+
+def download(self, sheet: Sheet, target_dir: Path, n: int = None) -> None:
+    """Download the data annotated in the sheet.
+
+    Args:
+        sheet (Sheet): The sheet object that provides the annotation.
+        target_dir (Path): The directory to store the downloaded data.
+        n (int): The maximum number of documents to download.
+            Defaults to None (all documents).
+    """
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    existing_docs = {path.stem for path in target_dir.glob("*.json") if path.is_file()}
+
+    for document in tqdm(
+        sheet.to_documents(n=n, skip_ids=existing_docs),
+        total=(n or len(sheet)) - len(existing_docs),
+        desc="Writing documents",
+        unit="doc",
+    ):
+        document_file = target_dir / f"{document.id}.json"
+
+        with document_file.open("xt") as f:
+            f.write(document.model_dump_json())
+            f.write("\n")
