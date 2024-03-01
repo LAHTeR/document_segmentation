@@ -107,9 +107,11 @@ class DocumentDataset(AbstractDataset):
         )
 
     def shuffle(self) -> "DocumentDataset":
+        """Shuffle the order of the sub-datasets in place."""
         random.shuffle(self._page_datasets)
 
     def labels(self) -> list[Label]:
+        """All labels for all sub-datasets."""
         return sum(
             [page_dataset.labels() for page_dataset in self._page_datasets], start=[]
         )
@@ -120,14 +122,18 @@ class DocumentDataset(AbstractDataset):
         """
         Return a generator over batches of the given size.
 
+        Regions with fewer than `min_region_length` characters are removed on-the-fly.
+
         All pages in a batch belong to the same document.
+        For documents shorter than the batch size, the batch consists of all pages of that document.
 
         Args:
-            batch_size (int): The batch size.
+            batch_size (int): The maximum batch size.
+                Batches are based on documents, so they may be smaller.
             min_region_length (int, optional): The minimum number of characters in a region.
                 Defaults to MIN_REGION_TEXT_LENGTH.
         Returns:
-            Iterable[PageDataset]: A generator over batches of the given size.
+            Iterable[PageDataset]: A generator over PageDatasets of the given size (maximum).
         """
 
         for dataset in self._page_datasets:
@@ -136,11 +142,19 @@ class DocumentDataset(AbstractDataset):
             )
 
     def n_batches(self, batch_size: int) -> int:
+        """Compute the number of batches of the given size."""
         return sum(
             ceil(len(page_dataset) / batch_size) for page_dataset in self._page_datasets
         )
 
     def split(self, portion: float) -> tuple["DocumentDataset", "DocumentDataset"]:
+        """Split the dataset into two parts.
+
+        Args:
+            portion (float): The portion of the dataset to take in the first part (e.g. 0.8).
+        Returns:
+            tuple[DocumentDataset, DocumentDataset]: The two parts of the dataset.
+        """
         split = int(len(self._page_datasets) * portion)
         return self.__class__(self._page_datasets[:split]), self.__class__(
             self._page_datasets[split:]
@@ -148,11 +162,14 @@ class DocumentDataset(AbstractDataset):
 
     @classmethod
     def from_documents(cls, documents: Iterable[Document]) -> "DocumentDataset":
+        """Create a dataset from a collection of documents."""
         return cls([PageDataset(document.pages) for document in documents])
 
     @classmethod
     def from_json_files(cls, files: Iterable[Path]):
         """Create a dataset from a list of JSON files.
+
+        The Json files are supposed to contain a list of documents as defined in the `Document` class.
 
         Args:
             files (Iterable[Path]): A collection of JSON files.
@@ -164,7 +181,7 @@ class DocumentDataset(AbstractDataset):
 
     @classmethod
     def from_dir(cls, data_dir: Path, *, glob="*.json", n: int = None):
-        """Create a dataset from a directory of JSON files.
+        """Create a dataset from a directory that contains JSON files.
 
         Args:
             data_dir (Path): The directory containing the JSON files.
@@ -190,9 +207,10 @@ class PageDataset(AbstractDataset):
         self._pages = pages or []
 
     def __eq__(self, other):
-        return self._pages == other._pages
+        return isinstance(other, self.__class__) and self._pages == other._pages
 
     def __add__(self, other: Dataset) -> "PageDataset":
+        """Concatenate two datasets."""
         return self.__class__(self._pages + other._pages)
 
     @property
@@ -242,6 +260,7 @@ class PageDataset(AbstractDataset):
         return [page.label for page in self._pages]
 
     def regions(self) -> Iterable[Region]:
+        """Return a generator over all regions in this dataset."""
         for page in self._pages:
             yield from page.regions
 
@@ -256,14 +275,15 @@ class PageDataset(AbstractDataset):
         """Create a filtered dataset in which all page regions with fewer than `min_chars` characters are removed.
 
         Args:
-            min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
+            min_chars (int, optional): The minimum number of characters in a region.
+                Defaults to settings.MIN_REGION_TEXT_LENGTH.
         """
         return self.__class__(
             [page.filter_short_regions(min_chars) for page in self._pages]
         )
 
     def balance(self, max_size: Optional[int] = None) -> "RegionDataset":
-        """Balance the dataset by keeping a maximum number of sample per class.
+        """Balance the dataset by keeping a maximum number of samples per class.
 
         If a class has fewer samples than `max_size`, all samples are kept.
         Empty classes are ignored.
