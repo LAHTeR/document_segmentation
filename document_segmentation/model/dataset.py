@@ -3,6 +3,7 @@ import logging
 import random
 from collections import Counter
 from itertools import islice
+from math import ceil
 from pathlib import Path
 from typing import Iterable, Optional, Union
 
@@ -52,14 +53,14 @@ class AbstractDataset(Dataset, abc.ABC):
 
     def batches(
         self, batch_size: int, *, shuffle: bool = False
-    ) -> Iterable["PageDataset"]:
+    ) -> Iterable["AbstractDataset"]:
         """Return a generator over batches of the given size.
 
         Args:
             batch_size (int): The batch size.
             shuffle (bool, optional): Whether to shuffle the dataset before batching. Defaults to False.
         Returns:
-            Iterable[PageDataset]: A generator over batches of the given size.
+            Iterable[AbstractDataset]: A generator over batches of the given size.
         """
         for i in range(0, len(self), batch_size):
             yield self[i : i + batch_size]
@@ -74,13 +75,128 @@ class AbstractDataset(Dataset, abc.ABC):
         return torch.Tensor([label.to_list() for label in self.labels()])
 
 
+class DocumentDataset(AbstractDataset):
+    """A dataset that wraps PageDatasets from different documents."""
+
+    def __init__(self, page_datasets: list["PageDataset"] = None) -> None:
+        super().__init__()
+
+        self._page_datasets: list[PageDataset] = page_datasets or []
+
+    def __len__(self) -> int:
+        return len(self._page_datasets)
+
+    def __eq__(self, other) -> bool:
+        return (
+            isinstance(other, self.__class__)
+            and self._page_datasets == other._page_datasets
+        )
+
+    def __getitem__(self, index) -> Page:
+        if isinstance(index, slice):
+            return self.__class__(self._page_datasets[index])
+        else:
+            return self._page_datasets[index]
+
+    def balance(self, max_size: Optional[int] = None) -> AbstractDataset:
+        # FIXME:
+        logging.warning("max_size is applied per document, not in total.")
+
+        return self.__class__(
+            [page_dataset.balance(max_size) for page_dataset in self._page_datasets]
+        )
+
+    def shuffle(self) -> "DocumentDataset":
+        """Shuffle the order of the sub-datasets in place."""
+        random.shuffle(self._page_datasets)
+
+    def labels(self) -> list[Label]:
+        """All labels for all sub-datasets."""
+        return sum(
+            [page_dataset.labels() for page_dataset in self._page_datasets], start=[]
+        )
+
+    def batches(
+        self, batch_size: int, *, min_region_length: int = MIN_REGION_TEXT_LENGTH
+    ) -> Iterable["PageDataset"]:
+        """
+        Return a generator over batches of the given size.
+
+        Regions with fewer than `min_region_length` characters are removed on-the-fly.
+
+        All pages in a batch belong to the same document.
+        For documents shorter than the batch size, the batch consists of all pages of that document.
+
+        Args:
+            batch_size (int): The maximum batch size.
+                Batches are based on documents, so they may be smaller.
+            min_region_length (int, optional): The minimum number of characters in a region.
+                Defaults to MIN_REGION_TEXT_LENGTH.
+        Returns:
+            Iterable[PageDataset]: A generator over PageDatasets of the given size (maximum).
+        """
+
+        for dataset in self._page_datasets:
+            yield from dataset.remove_short_regions(min_region_length).batches(
+                batch_size
+            )
+
+    def n_batches(self, batch_size: int) -> int:
+        """Compute the number of batches of the given size."""
+        return sum(
+            ceil(len(page_dataset) / batch_size) for page_dataset in self._page_datasets
+        )
+
+    def split(self, portion: float) -> tuple["DocumentDataset", "DocumentDataset"]:
+        """Split the dataset into two parts.
+
+        Args:
+            portion (float): The portion of the dataset to take in the first part (e.g. 0.8).
+        Returns:
+            tuple[DocumentDataset, DocumentDataset]: The two parts of the dataset.
+        """
+        split = int(len(self._page_datasets) * portion)
+        return self.__class__(self._page_datasets[:split]), self.__class__(
+            self._page_datasets[split:]
+        )
+
+    @classmethod
+    def from_documents(cls, documents: Iterable[Document]) -> "DocumentDataset":
+        """Create a dataset from a collection of documents."""
+        return cls([PageDataset(document.pages) for document in documents])
+
+    @classmethod
+    def from_json_files(cls, files: Iterable[Path]):
+        """Create a dataset from a list of JSON files.
+
+        The Json files are supposed to contain a list of documents as defined in the `Document` class.
+
+        Args:
+            files (Iterable[Path]): A collection of JSON files.
+        """
+        return cls.from_documents(
+            Document.model_validate_json(file.open("rt").read())
+            for file in tqdm(list(files), unit="file", desc="Reading JSON files")
+        )
+
+    @classmethod
+    def from_dir(cls, data_dir: Path, *, glob="*.json", n: int = None):
+        """Create a dataset from a directory that contains JSON files.
+
+        Args:
+            data_dir (Path): The directory containing the JSON files.
+            glob (str, optional): The glob pattern to match the files. Defaults to "*.json".
+        """
+        return cls.from_json_files(islice(data_dir.glob(glob), n))
+
+
 class PageDataset(AbstractDataset):
     """Dataset of documents and pages.
 
     This Dataset implementation follows the logic of the models defined in document_segmentation.pagexml.model.
     """
 
-    def __init__(self, pages: list[Page]) -> None:
+    def __init__(self, pages: list[Page] = None) -> None:
         """Create a dataset from a list of pages.
 
         Args:
@@ -88,7 +204,14 @@ class PageDataset(AbstractDataset):
         """
         super().__init__()
 
-        self._pages = pages
+        self._pages = pages or []
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self._pages == other._pages
+
+    def __add__(self, other: Dataset) -> "PageDataset":
+        """Concatenate two datasets."""
+        return self.__class__(self._pages + other._pages)
 
     @property
     def pages(self) -> list[Page]:
@@ -137,6 +260,7 @@ class PageDataset(AbstractDataset):
         return [page.label for page in self._pages]
 
     def regions(self) -> Iterable[Region]:
+        """Return a generator over all regions in this dataset."""
         for page in self._pages:
             yield from page.regions
 
@@ -151,14 +275,15 @@ class PageDataset(AbstractDataset):
         """Create a filtered dataset in which all page regions with fewer than `min_chars` characters are removed.
 
         Args:
-            min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
+            min_chars (int, optional): The minimum number of characters in a region.
+                Defaults to settings.MIN_REGION_TEXT_LENGTH.
         """
         return self.__class__(
             [page.filter_short_regions(min_chars) for page in self._pages]
         )
 
     def balance(self, max_size: Optional[int] = None) -> "RegionDataset":
-        """Balance the dataset by keeping a maximum number of sample per class.
+        """Balance the dataset by keeping a maximum number of samples per class.
 
         If a class has fewer samples than `max_size`, all samples are kept.
         Empty classes are ignored.
@@ -207,28 +332,6 @@ class PageDataset(AbstractDataset):
                 logging.warning(f"No pages found in document {document}.")
 
         return cls(pages)
-
-    @classmethod
-    def from_json_files(cls, files: Iterable[Path]):
-        """Create a dataset from a list of JSON files.
-
-        Args:
-            files (Iterable[Path]): A collection of JSON files.
-        """
-        return cls.from_documents(
-            Document.model_validate_json(file.open("rt").read())
-            for file in tqdm(list(files), unit="file", desc="Reading JSON files")
-        )
-
-    @classmethod
-    def from_dir(cls, data_dir: Path, *, glob="*.json", n: int = None):
-        """Create a dataset from a directory of JSON files.
-
-        Args:
-            data_dir (Path): The directory containing the JSON files.
-            glob (str, optional): The glob pattern to match the files. Defaults to "*.json".
-        """
-        return cls.from_json_files(islice(data_dir.glob(glob), n))
 
 
 class RegionDataset(AbstractDataset):

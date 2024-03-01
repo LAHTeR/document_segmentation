@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Optional
 
 import torch
@@ -7,7 +8,7 @@ from tqdm import tqdm
 
 from ..pagexml.datamodel.label import Label
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
-from .dataset import PageDataset
+from .dataset import DocumentDataset, PageDataset
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
@@ -61,15 +62,13 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
     def train_(
         self,
-        pages: PageDataset,
+        dataset: DocumentDataset,
         epochs: int = 3,
         batch_size: int = _DEFAULT_BATCH_SIZE,
         weights: Optional[torch.Tensor] = None,
     ):
         self.train()
 
-        if weights is None:
-            weights = pages.class_weights()
         if len(weights) != len(Label):
             raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
 
@@ -78,7 +77,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         for _ in range(epochs):
             for batch in tqdm(
-                pages.batches(batch_size), unit="batch", total=len(pages) / batch_size
+                dataset.batches(batch_size),
+                unit="batch",
+                total=dataset.n_batches(batch_size),
             ):
                 optimizer.zero_grad()
                 outputs = self(batch).to(self._device)
@@ -89,10 +90,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 loss.backward()
                 optimizer.step()
             if self._device == "mps":
-                tqdm.write(
+                logging.debug(
                     f"Current allocated memory (MPS): {torch.mps.current_allocated_memory() / 1024 ** 2:.0f} MB"
                 )
-                tqdm.write(
+                logging.debug(
                     f"Driver allocated memory (MPS): {torch.mps.driver_allocated_memory() / 1024 ** 2:.0f} MB"
                 )
 

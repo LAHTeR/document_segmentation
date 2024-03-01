@@ -2,7 +2,11 @@ from contextlib import nullcontext as does_not_raise
 
 import pytest
 
-from document_segmentation.model.dataset import PageDataset, RegionDataset
+from document_segmentation.model.dataset import (
+    DocumentDataset,
+    PageDataset,
+    RegionDataset,
+)
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.pagexml.datamodel.page import Page
 from document_segmentation.pagexml.datamodel.region import Region
@@ -48,6 +52,11 @@ REGION3 = Region.model_validate(
 )
 
 
+def page(scan_nr: int = 1, doc_id: str = "test doc"):
+    """Create a page with the given document ID."""
+    return Page(label=Label.BEGIN, regions=[], scan_nr=scan_nr, doc_id=doc_id)
+
+
 class TestLabel:
     @pytest.mark.parametrize(
         "scores,expected,expected_exception",
@@ -66,7 +75,94 @@ class TestLabel:
             assert Label.map_scores(scores) == expected
 
 
+class TestDocumentDataset:
+    @pytest.mark.parametrize(
+        "dataset,batch_size,expected",
+        [
+            (DocumentDataset([]), 2, 0),
+            (DocumentDataset([PageDataset([])]), 2, 0),
+            (DocumentDataset([PageDataset([page()])]), 2, 1),
+            (DocumentDataset([PageDataset([page()] * 5)]), 2, 3),
+            (DocumentDataset([PageDataset([page()] * 5)] * 2), 2, 6),
+        ],
+    )
+    def test_n_batches(self, dataset, batch_size, expected):
+        assert dataset.n_batches(batch_size) == expected
+
+    @pytest.mark.parametrize(
+        "dataset,portion,expected_training,expected_test",
+        [
+            (DocumentDataset([]), 0.8, DocumentDataset([]), DocumentDataset([])),
+            (
+                DocumentDataset([page()] * 10),
+                0.8,
+                DocumentDataset([page()] * 8),
+                DocumentDataset([page()] * 2),
+            ),
+            (
+                DocumentDataset([page()] * 9),
+                0.8,
+                DocumentDataset([page()] * 7),
+                DocumentDataset([page()] * 2),
+            ),
+        ],
+    )
+    def test_split(self, dataset, portion, expected_training, expected_test):
+        training, test = dataset.split(portion)
+
+        assert training == expected_training, "Training dataset is not as expected"
+        assert test == expected_test, "Test dataset is not as expected"
+
+
 class TestPageDataset:
+    @pytest.mark.parametrize(
+        "dataset,batch_size,expected",
+        [
+            (
+                PageDataset([page(doc_id="test doc 1")] * 2),
+                2,
+                [PageDataset([page(doc_id="test doc 1")] * 2)],
+            ),
+            (
+                PageDataset([page(doc_id="test doc 1")] * 4),
+                2,
+                [
+                    PageDataset([page(doc_id="test doc 1")] * 2),
+                    PageDataset([page(doc_id="test doc 1")] * 2),
+                ],
+            ),
+            (
+                PageDataset([page(doc_id="test doc 1"), page(doc_id="test doc 2")]),
+                1,
+                [
+                    PageDataset([page(doc_id="test doc 1")]),
+                    PageDataset([page(doc_id="test doc 2")]),
+                ],
+            ),
+            (
+                PageDataset(
+                    [
+                        page(doc_id="test doc 1"),
+                        page(doc_id="test doc 1"),
+                        page(doc_id="test doc 2"),
+                    ]
+                ),
+                4,
+                [
+                    PageDataset(
+                        [
+                            page(doc_id="test doc 1"),
+                            page(doc_id="test doc 1"),
+                            page(doc_id="test doc 2"),
+                        ]
+                    )
+                ],
+            ),
+        ],
+    )
+    def test_batches(self, dataset, batch_size, expected):
+        assert list(dataset.batches(batch_size)) == expected
+
     @pytest.mark.parametrize(
         "pages, expected",
         [
