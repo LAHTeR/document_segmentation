@@ -126,7 +126,7 @@ class Sheet(abc.ABC):
                 )
 
 
-def download(self, sheet: Sheet, target_dir: Path, n: int = None) -> None:
+def download(sheet: Sheet, target_dir: Path, n: int = None) -> None:
     """Download the data annotated in the sheet.
 
     Args:

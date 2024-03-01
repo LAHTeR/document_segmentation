@@ -11,6 +11,7 @@ import torch
 from document_segmentation.model.dataset import DocumentDataset
 from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
+from document_segmentation.pagexml.annotations.sheet import download
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.settings import (
     GENERALE_MISSIVEN_DOCUMENT_DIR,
@@ -77,6 +78,7 @@ if __name__ == "__main__":
 
     # TODO: allow for more sheets
     sheet = GeneraleMissiven(sheet_file=args.gm_sheet)
+    download(sheet, GENERALE_MISSIVEN_DOCUMENT_DIR, n=args.n)
 
     dataset = DocumentDataset.from_dir(GENERALE_MISSIVEN_DOCUMENT_DIR, n=args.n)
     dataset.shuffle()
