@@ -122,6 +122,8 @@ if __name__ == "__main__":
                 fieldnames=["Metric"] + [label.name for label in Label],
                 delimiter="\t",
             )
+            writer.writeheader()
+
             for metric in metrics_group:
                 scores: list[float] = metric.compute().tolist()
 
