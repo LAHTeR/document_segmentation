@@ -127,6 +127,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             fieldnames=("Predicted", "Actual", "Page ID", "Text", "Scores"),
             delimiter="\t",
         )
+        writer.writeheader()
 
         self.eval()
 
