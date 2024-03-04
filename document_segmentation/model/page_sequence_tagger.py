@@ -112,15 +112,15 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
     def eval_(
         self, dataset: DocumentDataset, batch_size: int, results_out: TextIO
-    ) -> list[Metric]:
-        metrics: list[Metric] = [
+    ) -> tuple[Metric, Metric, Metric, Metric]:
+        metrics: tuple[Metric] = tuple(
             metric(average=None, num_classes=len(Label))
             for metric in (
                 MulticlassPrecision,
                 MulticlassRecall,
                 MulticlassF1Score,
             )
-        ] + [MulticlassAccuracy()]
+        ) + (MulticlassAccuracy(),)
 
         writer = csv.DictWriter(
             results_out,
