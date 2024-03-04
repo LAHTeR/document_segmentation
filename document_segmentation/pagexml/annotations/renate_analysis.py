@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from typing import Iterable
 
 import pandas as pd
+from tqdm import tqdm
 
 from ...settings import RENATE_TANAP_CATEGORISATION_SHEET
 from ..datamodel.document import Document
@@ -88,3 +89,16 @@ class RenateAnalysisInv(Sheet):
 
                     pages = []
                     fallback_label = "OUT"
+
+    def download(self, target_dir: Path, n: int = None, total: int = 26) -> None:
+        for document in tqdm(
+            self.to_documents(n=n), desc="Writing documents", unit="doc", total=total
+        ):
+            document_file = target_dir / f"{document.id}.json"
+
+            if document_file.exists():
+                logging.info(f"Document {document.id} already exists, skipping")
+            else:
+                with document_file.open("xt") as f:
+                    f.write(document.model_dump_json())
+                    f.write("\n")
