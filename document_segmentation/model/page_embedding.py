@@ -7,9 +7,13 @@ from torch.nn.utils.rnn import pad_sequence
 
 from ..pagexml.datamodel.page import Page
 from ..pagexml.datamodel.region import Region
-from ..settings import PAGE_EMBEDDING_OUTPUT_SIZE, PAGE_EMBEDDING_RNN_CONFIG
+from ..settings import (
+    LANGUAGE_MODEL_IS_SENTENCETRANSFORMER,
+    PAGE_EMBEDDING_OUTPUT_SIZE,
+    PAGE_EMBEDDING_RNN_CONFIG,
+)
 from .device_module import DeviceModule
-from .region_embedding import RegionEmbeddingSentenceTransformer
+from .region_embedding import RegionEmbedding, RegionEmbeddingSentenceTransformer
 
 
 class PageEmbedding(nn.Module, DeviceModule):
@@ -21,10 +25,15 @@ class PageEmbedding(nn.Module, DeviceModule):
         rnn_config: dict[str, Any] = PAGE_EMBEDDING_RNN_CONFIG,
         output_size: int = PAGE_EMBEDDING_OUTPUT_SIZE,
         device: Optional[str] = None,
+        is_sentencetransformer: bool = LANGUAGE_MODEL_IS_SENTENCETRANSFORMER,
     ):
         super().__init__()
 
-        self._region_model = RegionEmbeddingSentenceTransformer(device=device)
+        self._region_model = (
+            RegionEmbeddingSentenceTransformer(device=device)
+            if is_sentencetransformer
+            else RegionEmbedding(device=device)
+        )
 
         self._transformer_dim = self._region_model.text_embedding_size
         self.output_size = output_size

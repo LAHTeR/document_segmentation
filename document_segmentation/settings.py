@@ -39,12 +39,10 @@ LANGUAGE_MODEL: str = os.getenv(
     "LANGUAGE_MODEL",
     "NetherlandsForensicInstitute/robbert-2022-dutch-sentence-transformers",
 )
-"""The name of the language model to use for the region classifier.
+"""The name of the language model to use for the region classifier."""
 
-The type of model needs to be with the RegionClassifier class:
-- use RegionClassifier for standard transformer models
-- use RegionClassifierSentenceTransformer for SentenceTransformer models
-"""
+LANGUAGE_MODEL_IS_SENTENCETRANSFORMER: bool = True
+"""Defines the RegionEmbedding sub-class to be used for the RegionEmbedding."""
 
 # TODO: list all document types and their spelling variants
 DOCUMENT_TYPES: dict[str, set[str]] = {
