@@ -13,6 +13,10 @@ from .region_embedding import RegionEmbeddingSentenceTransformer
 
 
 class RegionClassifier(nn.Module, DeviceModule):
+    """Classifier for regions.
+
+    For testing purposes only, not used in PageSequenceTagger model."""
+
     def __init__(
         self,
         *,
