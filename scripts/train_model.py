@@ -2,7 +2,6 @@ import argparse
 import csv
 import logging
 import random
-import sys
 from itertools import groupby
 from pathlib import Path
 from typing import Iterable
@@ -68,17 +67,19 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--eval-output",
         type=argparse.FileType("xt"),
-        default=sys.stdout,
+        default=Path("eval.csv").open("xt"),
         help="Output file for the evaluation.",
     )
     arg_parser.add_argument(
         "--test-output",
         type=argparse.FileType("xt"),
-        default=sys.stdout,
+        default=Path("test.out.txt").open("xt"),
         help="Output file for the evaluation.",
     )
-    arg_parser.add_argument("--epochs", type=int, default=3, help="Number of epochs")
-    arg_parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
+
+    training_args = arg_parser.add_argument_group("Training Arguments")
+    training_args.add_argument("--epochs", type=int, default=3, help="Number of epochs")
+    training_args.add_argument("--batch-size", type=int, default=64, help="Batch size")
 
     arg_parser.add_argument(
         "--device",
