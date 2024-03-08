@@ -83,6 +83,9 @@ class DocumentDataset(AbstractDataset):
 
         self._page_datasets: list[PageDataset] = page_datasets or []
 
+    def __add__(self, other: Dataset) -> "DocumentDataset":
+        return self.__class__(self._page_datasets + other._page_datasets)
+
     def __len__(self) -> int:
         return len(self._page_datasets)
 
