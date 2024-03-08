@@ -1,6 +1,6 @@
 # Document Segmentation
 
-## Preparation
+## Prerequsites
 
 ### Install Poetry
 
@@ -28,7 +28,6 @@ To train a model run the [`scripts/train_model.py`](scripts/train_model.py) scri
 It downloads the necessary data from the HUC server into the local temporary directory.
 
 Set your HUC credentials in the `HUC_USER` and `HUC_PASSWORD` environment variables or in [`settings.py`](document_segmentation/settings.py), and run the script.
-For instance:
 
 ```console
 HUC_USER=... HUC_PASSWORD=... poetry run python scripts/train_model.py
