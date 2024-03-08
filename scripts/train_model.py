@@ -100,12 +100,16 @@ if __name__ == "__main__":
     ########################################################################################
 
     sheets: list[Sheet] = []
+    sheet_paths: list[Path] = []
 
     if args.gm_sheet:
         sheets.append(GeneraleMissiven(args.gm_sheet))
+        sheet_paths.append(args.gm_sheet)
     if args.renate_categorisation_sheet:
         sheets.append(RenateAnalysis(args.renate_categorisation_sheet))
+        sheet_paths.append(args.renate_categorisation_sheet)
     sheets.extend([RenateAnalysisInv(sheet) for sheet in args.renate_analysis_sheet])
+    sheet_paths.extend(args.renate_analysis_sheet)
 
     training_sets: list[AbstractDataset] = []
     test_sets: list[AbstractDataset] = []
@@ -155,11 +159,14 @@ if __name__ == "__main__":
     ########################################################################################
     # EVALUATE MODEL
     ########################################################################################
-    for test_set in test_sets:
+    for test_set, sheet_path in zip(test_sets, sheet_paths, strict=True):
+        print(f"Sheet: {sheet_path}", file=args.eval_output, flush=True)
+        print(f"Sheet: {sheet_path}", file=args.test_output, flush=True)
+
         metrics = model.eval_(test_set, args.batch_size, args.test_output)
 
-        for average, metrics_group in groupby(
-            sorted(metrics, key=lambda m: (m.average is None, m.average)),
+        for average, _metrics in groupby(
+            sorted(metrics, key=lambda metric: metric.average is None),
             key=lambda m: m.average,
         ):
             if average is None:
@@ -170,21 +177,23 @@ if __name__ == "__main__":
                 )
                 writer.writeheader()
 
-                for metric in metrics_group:
-                    scores: list[float] = metric.compute().tolist()
-
+                for metric in _metrics:
                     writer.writerow(
                         {"Metric": metric.__class__.__name__}
                         | {
                             label.name: f"{score:.4f}"
-                            for label, score in zip(Label, scores)
+                            for label, score in zip(Label, metric.compute().tolist())
                         }
                     )
-                args.eval_output.flush()
             else:
-                for metric in metrics_group:
+                for metric in _metrics:
                     score: float = metric.compute().item()
                     print(
                         f"{metric.__class__.__name__} ({average} average):\t{score:.4f}",
                         file=args.eval_output,
+                        flush=True,
                     )
+            args.eval_output.flush()
+
+        print("=" * 80, file=args.eval_output, flush=True)
+        print("=" * 80, file=args.test_output, flush=True)
