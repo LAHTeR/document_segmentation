@@ -14,7 +14,7 @@ Or:
 pipx install poetry
 ```
 
-Als see [Poetry documentation](https://python-poetry.org/docs/master/#installation).
+Als see [Poetry documentation](https://python-poetry.org/docs/#installation).
 
 ### Install the dependencies
 
