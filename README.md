@@ -43,6 +43,7 @@ This project uses
 - [Poetry](https://python-poetry.org/) for package management
 - [PyTest](https://docs.pytest.org) for unit testing
 - [Ruff](https://github.com/astral-sh/ruff) for linting and formatting
+- [Pre-commit](https://pre-commit.com/) for managing pre-commit hooks
 
 ### Install Development Dependencies
 
@@ -51,8 +52,6 @@ poetry install --with=dev
 ```
 
 ### Set up pre-commit hooks
-
-Install pre-commit:
 
 ```console
 poetry run pre-commit install
