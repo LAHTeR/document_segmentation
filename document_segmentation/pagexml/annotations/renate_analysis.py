@@ -69,7 +69,7 @@ class RenateAnalysisInv(Sheet):
                 page_xml = inventory.pagexml(page)
 
                 try:
-                    label = Label[row[self._LABEL_COLUMN] or fallback_label]
+                    label = Label[row[self._LABEL_COLUMN].strip() or fallback_label]
                 except KeyError as e:
                     raise ValueError(
                         f"Invalid label '{row[self._LABEL_COLUMN]}' in inventory '{self._id}' for page '{idx}'."
