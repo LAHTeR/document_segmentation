@@ -25,7 +25,7 @@ ruff = "^0.3.0"
 pre-commit = "^3.6.0"
 pytest-cov = "^4.1.0"
 requests-mock = "^1.11.0"
-pytest = "^8.0.2"
+pytest = "^8.1.1"
 ipykernel = "^6.29.3"
 
 [build-system]
