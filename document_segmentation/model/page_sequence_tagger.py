@@ -74,7 +74,17 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         epochs: int = 3,
         batch_size: int = _DEFAULT_BATCH_SIZE,
         weights: Optional[list[float]] = None,
+        shuffle: bool = True,
     ):
+        """Train the model on the given dataset.
+
+        Args:
+            dataset (DocumentDataset): The dataset to train on.
+            epochs (int, optional): The number of epochs to train. Defaults to 3.
+            batch_size (int, optional): The batch size. Defaults to 8.
+            weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
+            shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
+        """
         self.train()
 
         if weights is not None:
@@ -86,6 +96,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
         for _ in range(epochs):
+            if shuffle:
+                dataset.shuffle()
+
             for batch in tqdm(
                 dataset.batches(batch_size),
                 desc="Training",
