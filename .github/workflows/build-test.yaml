@@ -24,6 +24,8 @@ jobs:
           cache: "poetry"
       - name: Ruff linting
         uses: chartboost/ruff-action@v1
+        with:
+          version: "0.3.2"
       - name: Setup a local Poetry virtual environment
         run: |
           poetry config virtualenvs.create true --local
