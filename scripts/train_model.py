@@ -67,13 +67,13 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--eval-output",
         type=argparse.FileType("xt"),
-        default=Path("eval.csv").open("xt"),
+        default="eval.csv",
         help="Output file for the evaluation.",
     )
     arg_parser.add_argument(
         "--test-output",
         type=argparse.FileType("xt"),
-        default=Path("test.out.txt").open("xt"),
+        default="test.out.txt",
         help="Output file for the evaluation.",
     )
 

@@ -1,5 +1,6 @@
 import csv
 import logging
+import sys
 from typing import Any, Optional, TextIO
 
 import torch
@@ -13,6 +14,8 @@ from torcheval.metrics import (
     MulticlassRecall,
 )
 from tqdm import tqdm
+
+import wandb
 
 from ..pagexml.datamodel.label import Label
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
@@ -95,6 +98,27 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
+        _wandb = wandb.login()
+        if _wandb:
+            wandb.init(
+                project=self.__class__.__name__,
+                config={
+                    "training size": len(dataset),
+                    "epochs": epochs,
+                    "batch_size": batch_size,
+                    "weights": weights,
+                    "shuffle": shuffle,
+                    "optimizer": optimizer.__class__.__name__,
+                    "criterion": criterion.__class__.__name__,
+                    # TODO: convert to nested dict
+                    "_modules": self.__dict__["_modules"],
+                },
+            )
+        else:
+            logging.warning(
+                "Weights & Biases not available. Set the WANDB_API_KEY environment variable for logging in."
+            )
+
         for _ in range(epochs):
             if shuffle:
                 dataset.shuffle()
@@ -107,25 +131,51 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             ):
                 optimizer.zero_grad()
                 outputs = self(batch).to(self._device)
+
                 loss = criterion(outputs, batch.label_tensor().to(self._device)).to(
                     self._device
                 )
 
                 loss.backward()
                 optimizer.step()
-            if self._device == "mps":
-                logging.debug(
-                    f"Current allocated memory (MPS): {torch.mps.current_allocated_memory() / 1024 ** 2:.0f} MB"
-                )
-                logging.debug(
-                    f"Driver allocated memory (MPS): {torch.mps.driver_allocated_memory() / 1024 ** 2:.0f} MB"
-                )
 
-            tqdm.write(f"[Loss:\t{loss:.3f}]")
+                if _wandb:
+                    wandb.log({"loss": loss.item(), "batch_size": len(batch)})
+
+            if _wandb:
+                results = {}
+                for metric in self.eval_(dataset, batch_size, None):
+                    if metric.average is None:
+                        results[metric.__class__.__name__] = {
+                            label.name: score
+                            for label, score in zip(Label, metric.compute().tolist())
+                        }
+                    else:
+                        results[metric.__class__.__name__] = metric.compute().item()
+                wandb.log(results)
+                self.train()
+
+        if _wandb:
+            wandb.finish()
+            # TODO: save model to WandB or HuggingFace
 
     def eval_(
-        self, dataset: DocumentDataset, batch_size: int, results_out: TextIO
+        self,
+        dataset: DocumentDataset,
+        batch_size: int,
+        results_out: TextIO = sys.stdout,
     ) -> tuple[Metric, Metric, Metric, Metric]:
+        """Evaluate the model on the given dataset.
+
+        Args:
+            dataset (DocumentDataset): The dataset to evaluate on.
+            batch_size (int): The batch size.
+            results_out (TextIO): The file to write the output labels per sample.
+                If None (default), does not print the individual test labels.
+                Defaults to stdout.
+        Returns:
+            tuple[Metric, Metric, Metric, Metric]: The precision, recall, F1 score, and accuracy.
+        """
         metrics: tuple[Metric] = tuple(
             metric(average=None, num_classes=len(Label))
             for metric in (
@@ -135,12 +185,13 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             )
         ) + (MulticlassAccuracy(),)
 
-        writer = csv.DictWriter(
-            results_out,
-            fieldnames=("Predicted", "Actual", "Page ID", "Text", "Scores"),
-            delimiter="\t",
-        )
-        writer.writeheader()
+        if results_out is not None:
+            writer = csv.DictWriter(
+                results_out,
+                fieldnames=("Predicted", "Actual", "Page ID", "Text", "Scores"),
+                delimiter="\t",
+            )
+            writer.writeheader()
 
         self.eval()
 
@@ -158,15 +209,16 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             for metric in metrics:
                 metric.update(predicted, _labels)
 
-            for page, pred, label in zip(batch.pages, predicted, labels):
-                writer.writerow(
-                    {
-                        "Predicted": Label(pred.argmax().item()).name,
-                        "Actual": label.name,
-                        "Page ID": page.doc_id,
-                        "Text": page.text(delimiter="; ")[:50],
-                        "Scores": str(pred.tolist()),
-                    }
-                )
+            if results_out is not None:
+                for page, pred, label in zip(batch.pages, predicted, labels):
+                    writer.writerow(
+                        {
+                            "Predicted": Label(pred.argmax().item()).name,
+                            "Actual": label.name,
+                            "Page ID": page.doc_id,
+                            "Text": page.text(delimiter="; ")[:50],
+                            "Scores": str(pred.tolist()),
+                        }
+                    )
 
         return metrics
