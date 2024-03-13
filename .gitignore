@@ -99,3 +99,5 @@ __pypackages__/
 document_segmentation/data/pagexml_cache
 document_segmentation/data/generale_missiven
 document_segmentation/data/renate_analysis
+
+wandb/
