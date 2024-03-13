@@ -109,6 +109,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     "batch_size": batch_size,
                     "weights": weights,
                     "shuffle": shuffle,
+                    "optimizer": optimizer.__class__.__name__,
+                    "criterion": criterion.__class__.__name__,
+                    # TODO: convert to nested dict
+                    "_modules": self.__dict__["_modules"],
                 },
             )
         else:
