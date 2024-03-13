@@ -1,5 +1,5 @@
 import logging
-from functools import lru_cache
+from functools import cache
 from typing import Optional
 
 import numpy as np
@@ -63,7 +63,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
         """Return the size of the embeddings."""
         return self._transformer_model.config.hidden_size
 
-    @lru_cache(maxsize=2**15)
+    @cache
     @torch.no_grad()
     def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
         """Embed the text of a page using a Transformers model.
@@ -169,7 +169,7 @@ class RegionEmbeddingSentenceTransformer(RegionEmbedding):
     def _init_transformer(self, transformer_model_name):
         self._transformer_model = SentenceTransformer(transformer_model_name)
 
-    @lru_cache(maxsize=2**15)
+    @cache
     @torch.no_grad()
     def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
         if region_batch:
