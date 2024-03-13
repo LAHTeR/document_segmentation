@@ -111,7 +111,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     "optimizer": optimizer.__class__.__name__,
                     "criterion": criterion.__class__.__name__,
                     # TODO: convert to nested dict
-                    "_modules": self.__dict__["_modules"],
+                    "modules": self.__dict__["_modules"],
                 },
             )
         else:
@@ -140,19 +140,25 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 optimizer.step()
 
                 if _wandb:
-                    wandb.log({"loss": loss.item(), "batch_size": len(batch)})
+                    wandb.log(
+                        {
+                            "loss": loss.item(),
+                            "batch_size": len(batch),
+                            "cache": self._page_embedding._region_model._text_embeddings.cache_info()._asdict(),
+                        }
+                    )
 
             if _wandb:
-                results = {}
+                _eval = {}
                 for metric in self.eval_(dataset, batch_size, None):
                     if metric.average is None:
-                        results[metric.__class__.__name__] = {
+                        _eval[metric.__class__.__name__] = {
                             label.name: score
                             for label, score in zip(Label, metric.compute().tolist())
                         }
                     else:
-                        results[metric.__class__.__name__] = metric.compute().item()
-                wandb.log(results)
+                        _eval[metric.__class__.__name__] = metric.compute().item()
+                wandb.log(_eval)
                 self.train()
 
         if _wandb:
