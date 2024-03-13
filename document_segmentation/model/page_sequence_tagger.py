@@ -100,7 +100,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         _wandb = wandb.login()
         if _wandb:
-            # TODO: add model architecture (self.parameters()) to config?
             wandb.init(
                 project=self.__class__.__name__,
                 config={
@@ -120,17 +119,15 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 "Weights & Biases not available. Set the WANDB_API_KEY environment variable for logging in."
             )
 
-        for epoch in range(epochs):
+        for _ in range(epochs):
             if shuffle:
                 dataset.shuffle()
 
-            for batch_n, batch in enumerate(
-                tqdm(
-                    dataset.batches(batch_size),
-                    desc="Training",
-                    unit="batch",
-                    total=dataset.n_batches(batch_size),
-                )
+            for batch in tqdm(
+                dataset.batches(batch_size),
+                desc="Training",
+                unit="batch",
+                total=dataset.n_batches(batch_size),
             ):
                 optimizer.zero_grad()
                 outputs = self(batch).to(self._device)
@@ -160,7 +157,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         if _wandb:
             wandb.finish()
-            # TODO: save model to WandB
+            # TODO: save model to WandB or HuggingFace
 
     def eval_(
         self,
