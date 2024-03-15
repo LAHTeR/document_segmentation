@@ -38,7 +38,8 @@ class InventoryReader:
         Args:
             inv_nr (str): The inventory number of the inventory.
             inventory_part (str, optional): The part of the inventory. Defaults to None.
-            cache_directory (Path, optional): The directory in which to cache the inventory. Defaults to PAGEXML_CACHE_DIRECTORY.
+            cache_directory (Path, optional): The directory in which to cache the inventory.
+                If None (default), uses the system's temporary directory.
             pagexml_directory (Path, optional): The directory in which to cache the PageXML files.
                 Defaults to a temporary directory.
             server_url (str, optional): The URL of the HUC server. Defaults to DEFAULT_SERVER.
