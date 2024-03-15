@@ -93,6 +93,9 @@ if __name__ == "__main__":
 
     args = arg_parser.parse_args()
 
+    if args.model_file.exists():
+        arg_parser.error(f"Model file {args.model_file} already exists.")
+
     random.seed(args.seed)
 
     ########################################################################################
@@ -133,25 +136,17 @@ if __name__ == "__main__":
     training_data.shuffle()
 
     ########################################################################################
-    # LOAD OR TRAIN MODEL
+    # LOAD MODEL
     ########################################################################################
-    if args.model_file.exists():
-        logging.info(f"Loading model from {args.model_file}")
+    model = PageSequenceTagger(device=args.device)
 
-        model = torch.load(args.model_file)
-    else:
-        logging.info("Training model from scratch")
-
-        model = PageSequenceTagger(device=args.device)
-        if args.device is not None:
-            assert model.to_device(args.device)
-        model.train_(
-            training_data,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            weights=training_data.class_weights(),
-        )
-        torch.save(model, args.model_file)
+    model.train_(
+        training_data,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        weights=training_data.class_weights(),
+    )
+    torch.save(model, args.model_file)
 
     logging.debug(str(model))
 
