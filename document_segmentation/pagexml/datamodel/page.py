@@ -39,12 +39,8 @@ class Page(BaseModel):
         Args:
             min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
         """
-        return Page(
-            label=self.label,
-            regions=[region for region in self.regions if len(region) >= min_chars],
-            scan_nr=self.scan_nr,
-            doc_id=self.doc_id,
-        )
+        self.regions = [region for region in self.regions if len(region) >= min_chars]
+        return self
 
     @classmethod
     def from_pagexml(cls, label: Label, scan_nr: int, pagexml: PageXMLScan):
