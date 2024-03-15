@@ -14,6 +14,7 @@ class Page(BaseModel):
     regions: list[Region]
     scan_nr: PositiveInt
     doc_id: Optional[str] = None
+    external_ref: str
 
     @field_validator("label")
     def enum_from_int(cls, value):
@@ -59,4 +60,10 @@ class Page(BaseModel):
             for region in pagexml.get_text_regions_in_reading_order()
         ]
 
-        return cls(label=label, regions=regions, scan_nr=scan_nr, doc_id=pagexml.id)
+        return cls(
+            label=label,
+            regions=regions,
+            scan_nr=scan_nr,
+            doc_id=pagexml.id,
+            external_ref=pagexml.metadata["@externalRef"],
+        )
