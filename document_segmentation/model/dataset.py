@@ -178,7 +178,7 @@ class DocumentDataset(AbstractDataset):
             files (Iterable[Path]): A collection of JSON files.
         """
         return cls.from_documents(
-            Document.model_validate_json(file.open("rt").read())
+            Document.from_json_file(file)
             for file in tqdm(list(files), unit="file", desc="Reading JSON files")
         )
 

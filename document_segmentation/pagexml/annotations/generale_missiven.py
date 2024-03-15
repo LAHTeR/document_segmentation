@@ -35,7 +35,7 @@ class GeneraleMissiven(Sheet):
             dtype=self._dtypes,
         ).dropna(subset=self._dropna)
 
-    def _remove_row(self, row: pd.Series) -> tuple[bool, str]:
+    def _filter_row(self, row: pd.Series) -> tuple[bool, str]:
         return row[self._STATUS_COLUMN] == self._SKIP_MESSAGE, self._SKIP_MESSAGE
 
     def _pagexml(self, id, page):

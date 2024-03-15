@@ -15,7 +15,6 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysis,
     RenateAnalysisInv,
 )
-from document_segmentation.pagexml.annotations.sheet import Sheet
 from document_segmentation.pagexml.datamodel.document import Document
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.settings import (
@@ -100,31 +99,30 @@ if __name__ == "__main__":
     # LOAD ANNOTATION SHEETS AND DATA
     ########################################################################################
 
-    sheets: list[Sheet] = []
+    document_sets: list[Iterable[Document]] = []
     sheet_paths: list[Path] = []
-
-    if args.gm_sheet:
-        sheets.append(GeneraleMissiven(args.gm_sheet))
-        sheet_paths.append(args.gm_sheet)
-    if args.renate_categorisation_sheet:
-        sheets.append(RenateAnalysis(args.renate_categorisation_sheet))
-        sheet_paths.append(args.renate_categorisation_sheet)
-    sheets.extend([RenateAnalysisInv(sheet) for sheet in args.renate_analysis_sheet])
-    sheet_paths.extend(args.renate_analysis_sheet)
 
     training_sets: list[AbstractDataset] = []
     test_sets: list[AbstractDataset] = []
 
-    for sheet in sheets:
-        if isinstance(sheet, GeneraleMissiven):
-            target_dir = GENERALE_MISSIVEN_DOCUMENT_DIR
-        else:
-            target_dir = RENATE_ANALYSIS_DIR
-        sheet.download(target_dir, args.n)
+    if args.gm_sheet:
+        sheet = GeneraleMissiven(args.gm_sheet)
+        document_sets.append(sheet.download(GENERALE_MISSIVEN_DOCUMENT_DIR, args.n))
+        sheet_paths.append(args.gm_sheet)
+    if args.renate_categorisation_sheet:
+        sheet = RenateAnalysis(args.renate_categorisation_sheet)
+        document_sets.append(sheet.download(RENATE_ANALYSIS_DIR, args.n))
+        sheet_paths.append(args.renate_categorisation_sheet)
+    for _sheet in args.renate_analysis_sheet:
+        sheet = RenateAnalysisInv(_sheet)
+        document_sets.append(sheet.download(RENATE_ANALYSIS_DIR, args.n))
+        sheet_paths.append(_sheet)
 
-        # TODO add name to dataset for evaluation output
-        documents: Iterable[Document] = sheet.to_documents(n=args.n)
-        dataset: AbstractDataset = DocumentDataset.from_documents(documents)
+    training_sets: list[AbstractDataset] = []
+    test_sets: list[AbstractDataset] = []
+
+    for documents in document_sets:
+        dataset: DocumentDataset = DocumentDataset.from_documents(documents)
         dataset.shuffle()
         train, test = dataset.split(args.split)
 

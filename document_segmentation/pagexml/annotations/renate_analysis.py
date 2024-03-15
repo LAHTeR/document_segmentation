@@ -4,7 +4,6 @@ from tempfile import TemporaryDirectory
 from typing import Iterable
 
 import pandas as pd
-from tqdm import tqdm
 
 from ...settings import RENATE_TANAP_CATEGORISATION_SHEET
 from ..datamodel.document import Document
@@ -45,17 +44,8 @@ class RenateAnalysisInv(Sheet):
         self._id = path.stem
         self._inv_nr = int(self._id[-4:])
 
-    def to_documents(
-        self, *, skip_errors: bool = False, n: int = None, skip_ids: set[str] = None
-    ) -> Iterable[Document]:
-        if skip_errors:
-            raise NotImplementedError(
-                f"'skip_errors' is not implemented yet for the '{self.__class__.__name__}' class."
-            )
-        if skip_ids:
-            raise NotImplementedError(
-                f"'skip_ids' is not implemented yet for the '{self.__class__.__name__}' class."
-            )
+    def download(self, target_dir: Path, n: int = None) -> Iterable[Document]:
+        target_dir.mkdir(parents=True, exist_ok=True)
 
         with TemporaryDirectory() as cache_directory:
             inventory = InventoryReader(
@@ -64,41 +54,37 @@ class RenateAnalysisInv(Sheet):
             fallback_label = "OUT"
             pages = []
 
-            for idx, row in self._data.iterrows():
+            for idx, row in self._data.head(n).iterrows():
                 page = int(idx[-4:])
                 page_xml = inventory.pagexml(page)
 
+                document_file = target_dir / f"{idx}.json"
                 try:
-                    label = Label[row[self._LABEL_COLUMN].strip() or fallback_label]
-                except KeyError as e:
-                    raise ValueError(
-                        f"Invalid label '{row[self._LABEL_COLUMN]}' in inventory '{self._id}' for page '{idx}'."
-                    ) from e
+                    yield Document.from_json_file(document_file)
+                except FileNotFoundError:
+                    try:
+                        label = Label[row[self._LABEL_COLUMN].strip() or fallback_label]
+                    except KeyError as e:
+                        raise ValueError(
+                            f"Invalid label '{row[self._LABEL_COLUMN]}' in inventory '{self._id}' for page '{idx}'."
+                        ) from e
 
-                pages.append(Page.from_pagexml(label, self._inv_nr, page_xml))
+                    pages.append(Page.from_pagexml(label, self._inv_nr, page_xml))
 
-                if label == Label.BEGIN:
-                    logging.info("Beginning of document.")
-                    fallback_label = "IN"
-                elif label == Label.END:
-                    logging.info("End of document.")
+                    if label == Label.BEGIN:
+                        logging.info("Beginning of document.")
+                        fallback_label = "IN"
+                    elif label == Label.END:
+                        logging.info("End of document.")
 
-                    yield Document(
-                        id=idx, inventory_nr=self._inv_nr, pages=pages.copy()
-                    )
+                        document = Document(
+                            id=idx, inventory_nr=self._inv_nr, pages=pages.copy()
+                        )
+                        with document_file.open("xt") as f:
+                            f.write(document.model_dump_json())
+                            f.write("\n")
 
-                    pages = []
-                    fallback_label = "OUT"
+                        yield document
 
-    def download(self, target_dir: Path, n: int = None, total: int = 26) -> None:
-        for document in tqdm(
-            self.to_documents(n=n), desc="Writing documents", unit="doc", total=total
-        ):
-            document_file = target_dir / f"{document.id}.json"
-
-            if document_file.exists():
-                logging.info(f"Document {document.id} already exists, skipping")
-            else:
-                with document_file.open("xt") as f:
-                    f.write(document.model_dump_json())
-                    f.write("\n")
+                        pages = []
+                        fallback_label = "OUT"
