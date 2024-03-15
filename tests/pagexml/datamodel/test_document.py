@@ -11,7 +11,7 @@ class TestDocument:
             "inventory_nr": 1068,
             "inventory_part": null,
             "pages": [
-                { "label": 0, "regions": [], "scan_nr": 617 }
+                { "label": 0, "regions": [], "scan_nr": 617, "external_ref": "test_ref" }
             ]
         }
         """
@@ -20,7 +20,11 @@ class TestDocument:
             id="1",
             inventory_nr=1068,
             inventory_part=None,
-            pages=[Page(label=Label.BEGIN, regions=[], scan_nr=617)],
+            pages=[
+                Page(
+                    label=Label.BEGIN, regions=[], scan_nr=617, external_ref="test_ref"
+                )
+            ],
         )
         document = Document.model_validate_json(json)
 

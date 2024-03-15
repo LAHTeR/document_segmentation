@@ -10,9 +10,13 @@ from ...conftest import TEST_FILE
 
 class TestPage:
     def test_enum_from_int(self):
-        json = '{ "label": 0, "regions": [], "scan_nr": 617 }'
+        json = (
+            '{ "label": 0, "regions": [], "scan_nr": 617 , "external_ref": "test_ref"}'
+        )
 
-        expected_page = Page(label=Label.BEGIN, regions=[], scan_nr=617)
+        expected_page = Page(
+            label=Label.BEGIN, regions=[], scan_nr=617, external_ref="test_ref"
+        )
         page = Page.model_validate_json(json)
 
         assert page == expected_page
@@ -25,6 +29,7 @@ class TestPage:
             "label": Label.BEGIN,
             "scan_nr": 1,
             "doc_id": "NL-HaNA_1.04.02_1201_0001.jpg",
+            "external_ref": "a37e52e8-c9af-4b0f-8390-df846024830a",
         }
         expected_region_ids = [
             "region_7d00fe73-664c-4a16-84e2-e57325fec161_2",
