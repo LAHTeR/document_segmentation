@@ -1,7 +1,7 @@
 import logging
 import shutil
 import zipfile
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional
@@ -160,7 +160,7 @@ class InventoryReader:
 
         return page_xml_path
 
-    @lru_cache(maxsize=512)
+    @cache
     def pagexml(self, page_nr: int) -> PageXMLScan:
         if not self.local_zip_file.exists():
             self._download()
