@@ -60,7 +60,7 @@ if __name__ == "__main__":
         "--model-file",
         type=Path,
         default=Path("model.pt"),
-        help="Output file for the model",
+        help="Output file for the model. Defaults to 'model.pt'.",
     )
 
     arg_parser.add_argument(
@@ -135,23 +135,16 @@ if __name__ == "__main__":
     ########################################################################################
     # LOAD OR TRAIN MODEL
     ########################################################################################
-    if args.model_file.exists():
-        logging.info(f"Loading model from {args.model_file}")
+    model = PageSequenceTagger(device=args.device)
 
-        model = torch.load(args.model_file)
-    else:
-        logging.info("Training model from scratch")
-
-        model = PageSequenceTagger(device=args.device)
-        if args.device is not None:
-            assert model.to_device(args.device)
-        model.train_(
-            training_data,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            weights=training_data.class_weights(),
-        )
-        torch.save(model, args.model_file)
+    model.train_(
+        training_data,
+        validation_dataset=sum(test_sets, DocumentDataset([])),
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        weights=training_data.class_weights(),
+    )
+    torch.save(model, args.model_file)
 
     logging.debug(str(model))
 
