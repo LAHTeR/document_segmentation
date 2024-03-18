@@ -60,7 +60,7 @@ if __name__ == "__main__":
         "--model-file",
         type=Path,
         default=Path("model.pt"),
-        help="Output file for the model",
+        help="Output file for the model. Defaults to 'model.pt'.",
     )
 
     arg_parser.add_argument(
@@ -142,6 +142,7 @@ if __name__ == "__main__":
 
     model.train_(
         training_data,
+        validation_dataset=sum(test_sets, DocumentDataset([])),
         epochs=args.epochs,
         batch_size=args.batch_size,
         weights=training_data.class_weights(),
