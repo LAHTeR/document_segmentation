@@ -74,6 +74,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
     def train_(
         self,
         dataset: DocumentDataset,
+        validation_dataset: Optional[DocumentDataset] = None,
+        *,
         epochs: int = 3,
         batch_size: int = _DEFAULT_BATCH_SIZE,
         weights: Optional[list[float]] = None,
@@ -83,6 +85,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         Args:
             dataset (DocumentDataset): The dataset to train on.
+            validation_dataset (Optional[DocumentDataset], optional): The validation dataset.
+                Defaults to None. If given, will evaluate after each epoch.
             epochs (int, optional): The number of epochs to train. Defaults to 3.
             batch_size (int, optional): The batch size. Defaults to 8.
             weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
@@ -148,9 +152,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         }
                     )
 
-            if _wandb:
+            if validation_dataset is not None:
                 _eval = {}
-                for metric in self.eval_(dataset, batch_size, None):
+                for metric in self.eval_(validation_dataset, batch_size, None):
                     if metric.average is None:
                         _eval[metric.__class__.__name__] = {
                             label.name: score
@@ -158,7 +162,12 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         }
                     else:
                         _eval[metric.__class__.__name__] = metric.compute().item()
-                wandb.log(_eval)
+
+                if _wandb:
+                    wandb.log(_eval)
+                else:
+                    tqdm.write(str(_eval))
+
                 self.train()
 
         if _wandb:

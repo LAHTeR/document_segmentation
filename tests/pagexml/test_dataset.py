@@ -52,9 +52,21 @@ REGION3 = Region.model_validate(
 )
 
 
-def page(scan_nr: int = 1, doc_id: str = "test doc"):
-    """Create a page with the given document ID."""
-    return Page(label=Label.BEGIN, regions=[], scan_nr=scan_nr, doc_id=doc_id)
+def page(
+    label=Label.BEGIN,
+    scan_nr: int = 1,
+    doc_id: str = "test doc",
+    external_ref="",
+    regions=None,
+):
+    """Create a page with the given values or defaults."""
+    return Page(
+        label=label,
+        regions=regions or [],
+        scan_nr=scan_nr,
+        doc_id=doc_id,
+        external_ref="",
+    )
 
 
 class TestLabel:
@@ -167,13 +179,13 @@ class TestPageDataset:
         "pages, expected",
         [
             ([], [0.0, 0.0, 0.0, 0.0]),
-            ([Page(label=Label.BEGIN, regions=[], scan_nr=1)], [0.5, 1.0, 1.0, 1.0]),
+            ([page()], [0.5, 1.0, 1.0, 1.0]),
             (
                 [
-                    Page(label=Label.BEGIN, regions=[], scan_nr=1),
-                    Page(label=Label.IN, regions=[], scan_nr=1),
-                    Page(label=Label.IN, regions=[], scan_nr=1),
-                    Page(label=Label.END, regions=[], scan_nr=1),
+                    page(),
+                    page(label=Label.IN),
+                    page(label=Label.IN),
+                    page(label=Label.END),
                 ],
                 [2.0, 1.3333333333333333, 2.0, 4.0],
             ),
@@ -186,19 +198,16 @@ class TestPageDataset:
         "pages,expected",
         [
             ([], []),
-            ([Page(label=Label.BEGIN, scan_nr=1, regions=[])], []),
-            ([Page(label=Label.BEGIN, scan_nr=1, regions=[REGION1])], [Label.BEGIN]),
-            (
-                [Page(label=Label.IN, scan_nr=1, regions=[REGION1] * 5)],
-                [Label.IN] * 5,
-            ),
+            ([page()], []),
+            ([page(regions=[REGION1])], [Label.BEGIN]),
+            ([page(label=Label.IN, regions=[REGION1] * 5)], [Label.IN] * 5),
         ],
     )
     def test_region_labels(self, pages, expected):
         assert list(PageDataset(pages).region_labels()) == expected
 
     def test_regions(self):
-        dataset = PageDataset([Page(label=Label.BEGIN, scan_nr=1, regions=[REGION1])])
+        dataset = PageDataset([page(regions=[REGION1])])
 
         assert list(dataset.regions()) == [REGION1]
 
@@ -208,12 +217,9 @@ class TestRegionDataset:
         "pages,expected_regions",
         [
             ([], []),
-            ([Page(label=Label.BEGIN, scan_nr=1, regions=[])], []),
-            ([Page(label=Label.BEGIN, scan_nr=1, regions=[REGION1])], [REGION1]),
-            (
-                [Page(label=Label.BEGIN, scan_nr=1, regions=[REGION1, REGION1])],
-                [REGION1, REGION1],
-            ),
+            ([page()], []),
+            ([page(regions=[REGION1])], [REGION1]),
+            ([page(regions=[REGION1, REGION1])], [REGION1, REGION1]),
         ],
     )
     def test_from_page_dataset(self, pages, expected_regions):

@@ -246,6 +246,17 @@ class PageDataset(AbstractDataset):
         else:
             return self._pages[index]
 
+    def batches(self, batch_size: int) -> Iterable["PageDataset"]:
+        """Return a generator over batches of the given size.
+
+        Args:
+            batch_size (int): The batch size.
+        Returns:
+            Iterable[PageDataset]: A generator over batches of the given size.
+        """
+        for i in range(0, len(self), batch_size):
+            yield self[i : i + batch_size]
+
     def doc_ids(self) -> list[str]:
         """Return the page IDs in this dataset.
 

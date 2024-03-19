@@ -99,7 +99,8 @@ class Sheet(abc.ABC):
                             part = None
 
                         if (
-                            inventory._inv_nr != str(inv_nr)
+                            inventory is None
+                            or inventory._inv_nr != str(inv_nr)
                             or inventory._inventory_part != part
                         ):
                             inventory = InventoryReader(
