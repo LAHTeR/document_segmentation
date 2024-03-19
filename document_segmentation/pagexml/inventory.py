@@ -169,3 +169,11 @@ class InventoryReader:
         page_xml_path: Path = self._find_page_xml(page_nr)
 
         return parse_pagexml_file(str(page_xml_path))
+
+    def all_pagexmls(self):
+        if not self.local_zip_file.exists():
+            self._download()
+        if not self._pagexml_directory.exists():
+            self._extract()
+        for file in sorted(self._pagexml_directory.rglob("*.xml")):
+            yield parse_pagexml_file(str(file))
