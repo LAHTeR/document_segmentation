@@ -5,10 +5,11 @@ from typing import Iterable
 class Label(IntEnum):
     """Labels for pages in a sequence."""
 
-    BEGIN = 0
-    IN = 1
-    END = 2
-    OUT = 3
+    UNK = 0
+    BEGIN = 1
+    IN = 2
+    END = 3
+    OUT = 4
 
     def to_list(self) -> list[int]:
         """Convert the label to a list of integers.
@@ -18,11 +19,11 @@ class Label(IntEnum):
         """
         return [int(self == label) for label in Label]
 
-    def succesor(self) -> "Label":
-        """Return the succesor of the label.
+    def successor(self) -> "Label":
+        """Return the successor of the label.
 
         Returns:
-            Label: The succesor of the label.
+            Label: The successor of the label.
         """
         if self == Label.BEGIN:
             return Label.IN
