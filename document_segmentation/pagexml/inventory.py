@@ -175,5 +175,5 @@ class InventoryReader:
             self._download()
         if not self._pagexml_directory.exists():
             self._extract()
-        for file in self._pagexml_directory.rglob("*.xml"):
+        for file in sorted(self._pagexml_directory.rglob("*.xml")):
             yield parse_pagexml_file(str(file))
