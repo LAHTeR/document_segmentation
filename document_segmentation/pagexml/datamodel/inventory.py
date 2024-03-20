@@ -25,40 +25,41 @@ class Inventory(BaseModel):
     inventory_part: str = ""
     pages: list[Page]
 
-    def write(self, mode="xt", file: Optional[Path] = None):
+    def __len__(self) -> int:
+        """Return the number of pages in the inventory."""
+        return len(self.pages)
+
+    def write(self, target_file: Optional[Path] = None, mode="xt") -> Path:
         """Write the a Json representation of the inventory to a file.
 
         Args:
+            target_file (Path, optional): The target file path.
             mode (str, optional): The mode to open the file in. Defaults to "xt".
-            file (Path, optional): The file to write to. Defaults to a combination of INVENTORY_PATH and inventory numberß.
+
         """
-        target_file: Path = file or self.filepath
+        target_file: Path = target_file or self.__class__._filepath(
+            self.inv_nr, self.inventory_part, INVENTORY_DIR
+        )
 
         target_file.parent.mkdir(parents=True, exist_ok=True)
 
         with target_file.open(mode) as f:
             f.write(self.model_dump_json())
-
-    @property
-    def filepath(self):
-        """The default path to the inventory file."""
-        return self.__class__._filepath(self.inv_nr, self.inventory_part)
+        return target_file
 
     @staticmethod
-    def _filepath(
-        inv_nr: int, inventory_part: str = "", path: Path = INVENTORY_DIR
-    ) -> Path:
+    def _filepath(inv_nr: int, inventory_part: str, directory: Path) -> Path:
         """Return the path of the inventory Json file.
 
         Args:
             inv_nr (int): The inventory number.
             inventory_part (str, optional): The inventory part. Defaults to None.
-            path (Path): The path to the inventory directory. Defaults to INVENTORY_DIR.
+            directory (Path): The path to the inventory directory. Defaults to INVENTORY_DIR.
 
         Returns:
             Path: The path to the inventory Json file.
         """
-        return (path / f"{inv_nr:04d}{inventory_part}").with_suffix(".json")
+        return (directory / f"{inv_nr:04d}{inventory_part}").with_suffix(".json")
 
     @classmethod
     def download(
@@ -72,7 +73,7 @@ class Inventory(BaseModel):
         target_directory: Optional[Path] = INVENTORY_DIR,
         server_url=DEFAULT_SERVER,
         base_path=DEFAULT_BASE_PATH,
-    ) -> "Inventory":
+    ) -> tuple["Inventory", Path]:
         """Download an inventory from the repository.
 
         Args:
@@ -80,7 +81,7 @@ class Inventory(BaseModel):
             inventory_part (str, optional): The inventory part. Defaults to None.
 
         Returns:
-            Inventory: The downloaded inventory.
+            Inventory, Path: The downloaded inventory and the path to the inventory file.
         """
         local_file = cls._filepath(inv_nr, inventory_part, target_directory)
         if local_file.exists():
@@ -115,6 +116,4 @@ class Inventory(BaseModel):
                         continue
         inventory = cls(inv_nr=inv_nr, inventory_part=inventory_part, pages=pages)
 
-        inventory.write()
-
-        return inventory
+        return inventory, inventory.write(local_file)

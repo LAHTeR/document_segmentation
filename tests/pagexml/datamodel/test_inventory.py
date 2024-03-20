@@ -1,17 +1,14 @@
-import pytest
-
 from document_segmentation.pagexml.datamodel.inventory import Inventory
-from document_segmentation.settings import INVENTORY_DIR
 
 
 class TestInventory:
-    @pytest.mark.skip(reason="Testing actual download, should be mocked.")
-    # TODO: mock the download
-    # TODO: test with inventory part
-    def test_download(self):
-        inv_nr = 1547
+    def test_download(self, mock_request, tmp_path):
+        expected_pages = 806
 
-        inventory = Inventory.download(inv_nr)
+        inventory, filepath = Inventory.download(inv_nr=1201, target_directory=tmp_path)
 
-        with (INVENTORY_DIR / str(inv_nr)).with_suffix(".json").open("rt") as f:
-            assert Inventory.model_validate_json(f.read()) == inventory
+        assert len(inventory) == expected_pages
+
+        with open(filepath, "rt") as f:
+            _json = f.read()
+            assert Inventory.model_validate_json(_json) == inventory
