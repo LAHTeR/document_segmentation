@@ -1,3 +1,4 @@
+import logging
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -29,6 +30,14 @@ class Inventory(BaseModel):
         """Return the number of pages in the inventory."""
         return len(self.pages)
 
+    def __getitem__(self, idx: int) -> Page:
+        """Return the page at the given index."""
+        return self.pages[idx]
+
+    def labelled(self) -> list[Page]:
+        """Return the labelled pages in the inventory."""
+        return [page for page in self.pages if page.label != Label.UNK]
+
     def write(self, target_file: Optional[Path] = None, mode="xt") -> Path:
         """Write the a Json representation of the inventory to a file.
 
@@ -37,7 +46,7 @@ class Inventory(BaseModel):
             mode (str, optional): The mode to open the file in. Defaults to "xt".
 
         """
-        target_file: Path = target_file or self.__class__._filepath(
+        target_file: Path = target_file or self.__class__.local_file(
             self.inv_nr, self.inventory_part, INVENTORY_DIR
         )
 
@@ -48,7 +57,7 @@ class Inventory(BaseModel):
         return target_file
 
     @staticmethod
-    def _filepath(inv_nr: int, inventory_part: str, directory: Path) -> Path:
+    def local_file(inv_nr: int, inventory_part: str, directory: Path) -> Path:
         """Return the path of the inventory Json file.
 
         Args:
@@ -62,6 +71,21 @@ class Inventory(BaseModel):
         return (directory / f"{inv_nr:04d}{inventory_part}").with_suffix(".json")
 
     @classmethod
+    def load_or_download(
+        cls, inv_nr: int, inventory_part: str = "", inventory_dir: Path = INVENTORY_DIR
+    ):
+        local_file = cls.local_file(inv_nr, inventory_part, inventory_dir)
+
+        try:
+            inventory = Inventory.model_validate_json(local_file.read_text())
+        except FileNotFoundError:
+            logging.info(f"Downloading inventory {inv_nr}...")
+            inventory = cls.download(
+                inv_nr, inventory_part, target_directory=inventory_dir
+            )
+        return inventory
+
+    @classmethod
     def download(
         cls,
         inv_nr: int,
@@ -73,7 +97,7 @@ class Inventory(BaseModel):
         target_directory: Optional[Path] = INVENTORY_DIR,
         server_url=DEFAULT_SERVER,
         base_path=DEFAULT_BASE_PATH,
-    ) -> tuple["Inventory", Path]:
+    ) -> "Inventory":
         """Download an inventory from the repository.
 
         Args:
@@ -81,9 +105,9 @@ class Inventory(BaseModel):
             inventory_part (str, optional): The inventory part. Defaults to None.
 
         Returns:
-            Inventory, Path: The downloaded inventory and the path to the inventory file.
+            Inventory: The downloaded Inventory object.
         """
-        local_file = cls._filepath(inv_nr, inventory_part, target_directory)
+        local_file = cls.local_file(inv_nr, inventory_part, target_directory)
         if local_file.exists():
             raise FileExistsError(f"Inventory file {local_file} already exists")
 
@@ -115,5 +139,6 @@ class Inventory(BaseModel):
                     except IsADirectoryError:
                         continue
         inventory = cls(inv_nr=inv_nr, inventory_part=inventory_part, pages=pages)
+        inventory.write(local_file)
 
-        return inventory, inventory.write(local_file)
+        return inventory
