@@ -89,10 +89,15 @@ class Sheet(abc.ABC):
             end_scan = row[self._LAST_PAGE_COLUMN]
 
             if all(page.label == Label.UNK for page in inventory[begin_scan:end_scan]):
-                inventory[begin_scan].label = Label.BEGIN
-                inventory[end_scan].label = Label.END
-                for page in range(begin_scan + 1, end_scan):
-                    inventory[page].label = Label.IN
+                try:
+                    inventory[begin_scan].label = Label.BEGIN
+                    inventory[end_scan].label = Label.END
+                    for page in range(begin_scan + 1, end_scan):
+                        inventory[page].label = Label.IN
+                except IndexError:
+                    logging.warning(
+                        f"Pages between {begin_scan} and {end_scan} not found in inventory {inventory.inv_nr}_{inventory.inventory_part} of length {len(inventory)}. Skipping."
+                    )
             else:
                 raise ValueError(
                     f"Pages between {begin_scan} and {end_scan} already have labels."

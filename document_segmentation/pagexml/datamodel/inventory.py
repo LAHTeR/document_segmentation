@@ -2,11 +2,13 @@ import logging
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Counter, Iterable, Optional
 
 import requests
+import torch
 from pagexml.parser import parse_pagexml_file
 from pydantic import BaseModel, PositiveInt
+from torch.utils.data import Dataset
 
 from ...settings import (
     DEFAULT_BASE_PATH,
@@ -19,7 +21,7 @@ from .label import Label
 from .page import Page
 
 
-class Inventory(BaseModel):
+class Inventory(BaseModel, Dataset):
     """Represents an inventory of a collection of scans."""
 
     inv_nr: PositiveInt
@@ -37,9 +39,70 @@ class Inventory(BaseModel):
     def __repr__(self) -> str:
         return f"Inventory(inv_nr={self.inv_nr}, inventory_part={self.inventory_part}, pages={len(self.pages)} pages)"
 
+    def _labels(self) -> Iterable[Label]:
+        return (page.label for page in self.pages)
+
+    def class_counts(self) -> Counter[Label]:
+        return Counter(self._labels())
+
+    def class_weights(self) -> list[float]:
+        """Get the inverse frequency of each label in this dataset.
+
+        Applies add-one smoothing to avoid division by zero.
+
+        Returns:
+            list[float]: List of frequency of each label in dataset divided by dataset length.
+        """
+        counts = self.class_counts()
+        return [len(self) / (counts[label] + 1) for label in Label]
+
     def labelled(self) -> list[Page]:
         """Return the labelled pages in the inventory."""
         return [page for page in self.pages if page.label != Label.UNK]
+
+    def labelled_inventories(self) -> Iterable["Inventory"]:
+        if len(self.labelled()) == 0:
+            # no pages in inventory are labelled
+            raise ValueError("No labelled pages in inventory")
+        elif len(self.labelled()) == len(self):
+            # all pages in inventory are labelled
+            yield self
+        else:
+            # yield per labeled segment (documents)
+            pages = None
+            for page in self.pages:
+                if pages is None:
+                    # outside of any document
+                    if page.label != Label.UNK:
+                        # new document starting
+                        pages = [page]
+                    else:
+                        pass
+                else:
+                    # inside a document
+                    if page.label != Label.UNK:
+                        # document continues
+                        pages.append(page)
+                    else:
+                        # document ending
+                        yield Inventory(
+                            inv_nr=self.inv_nr,
+                            inventory_part=self.inventory_part,
+                            pages=pages,
+                        )
+                        pages = None
+            if pages:
+                # final batch/segment
+                yield Inventory(pages)
+
+    def label_tensor(self) -> torch.Tensor:
+        """Get a tensor over all labels in this dataset.
+
+        Returns:
+            tensor[int]: a Tensor of shape (len(self), len(Label)).
+        """
+
+        return torch.Tensor([label.to_list() for label in self._labels()])
 
     def write(self, target_file: Optional[Path] = None, mode="xt") -> Path:
         """Write the a Json representation of the inventory to a file.
@@ -71,7 +134,10 @@ class Inventory(BaseModel):
         Returns:
             Path: The path to the inventory Json file.
         """
-        return (directory / f"{inv_nr:04d}{inventory_part}").with_suffix(".json")
+        filename: str = (
+            "_".join((f"{inv_nr:04d}", inventory_part)).rstrip("_") + ".json"
+        )
+        return directory / filename
 
     @classmethod
     def load_or_download(
