@@ -1,12 +1,11 @@
 import abc
 import logging
-from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 import pandas as pd
 import requests
+from tqdm import tqdm
 
-from ...settings import INVENTORY_DIR, SERVER_PASSWORD, SERVER_USERNAME
 from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
 
@@ -42,53 +41,60 @@ class Sheet(abc.ABC):
     def __len__(self):
         return len(self._data)
 
-    def _filter_row(self, row: pd.Series) -> bool:
-        """Filter a row from the sheet.
+    def inventories(self, *, n: Optional[int] = None) -> Iterable[Inventory]:
+        """Retrieve all inventories in the sheet.
 
         Args:
-            row (pd.Series): The row to filter.
+            n (int, optional): The maximum number of inventories to retrieve.
         Returns:
-            bool: Whether to filter out the row.
-            str: The reason for filtering out the row.
+            Iterable[Inventory]: The inventories in the sheet.
         """
-        return False, None
+        keys = [self._INV_NR_COLUMN, self._DEEL_VAN_INVENTARIS_COL]
 
-    def set_labels(
-        self, target_dir: Path = INVENTORY_DIR, n: int = None
-    ) -> Iterable[Inventory]:
-        """Download the data annotated in the sheet, and store as Json files..
+        count = 0
+        for key, _ in tqdm(
+            self._data.groupby(keys, dropna=False),
+            desc="Loading inventories",
+            total=n or self._data[keys].nunique(),
+            unit="inventory",
+        ):
+            inv_nr, part = key
+
+            try:
+                count += 1
+                yield Inventory.load_or_download(inv_nr, part if pd.notna(part) else "")
+            except requests.HTTPError as e:
+                logging.error(f"Failed to load inventory {inv_nr}: {e}")
+            if n is not None and count >= n:
+                break
+
+    def annotate_inventory(self, inventory: Inventory) -> Inventory:
+        """Annotate the inventory with the labels from the sheet in-place.
 
         Args:
-            target_dir (Path): The directory to store the downloaded data.
-            n (int): The maximum number of documents to download.
-                Defaults to None (all documents).
+            inventory (Inventory): The inventory to annotate.
+        Returns:
+            Inventory: The annotated inventory.
         """
+        inventory_rows = self._data.loc[
+            self._data[self._INV_NR_COLUMN] == inventory.inv_nr
+        ]
+        if len(inventory_rows) == 0:
+            logging.warning(
+                f"Inventory {inventory.inv_nr} not found in the sheet. Skipping."
+            )
 
-        with requests.Session() as session:
-            session.auth = (SERVER_USERNAME, SERVER_PASSWORD)
+        for idx, row in inventory_rows.iterrows():
+            begin_scan = row[self._START_PAGE_COLUMN]
+            end_scan = row[self._LAST_PAGE_COLUMN]
 
-            for idx, row in self._data.head(n).iterrows():
-                inv_nr = row[self._INV_NR_COLUMN]
-
-                filter, reason = self._filter_row(row)
-                if filter:
-                    logging.warning(
-                        f"Skipping row with inventory number {str(inv_nr)} due to reason: '{reason}'"
-                    )
-                    continue
-
-                part = row.get(self._DEEL_VAN_INVENTARIS_COL)
-                if pd.isna(part) or part not in self._VALID_INVENTORY_PARTS:
-                    part = ""
-
-                inventory = Inventory.load_or_download(inv_nr, part, target_dir)
-
-                begin_scan = row[self._START_PAGE_COLUMN]
-                end_scan = row[self._LAST_PAGE_COLUMN]
-
+            if all(page.label == Label.UNK for page in inventory[begin_scan:end_scan]):
                 inventory[begin_scan].label = Label.BEGIN
                 inventory[end_scan].label = Label.END
                 for page in range(begin_scan + 1, end_scan):
                     inventory[page].label = Label.IN
-
-                yield inventory
+            else:
+                raise ValueError(
+                    f"Pages between {begin_scan} and {end_scan} already have labels."
+                )
+        return Inventory

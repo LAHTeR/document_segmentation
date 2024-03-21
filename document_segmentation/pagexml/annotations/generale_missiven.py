@@ -32,6 +32,3 @@ class GeneraleMissiven(Sheet):
             index_col=self._INDEX_COLUMN,
             dtype=self._dtypes,
         ).dropna(subset=self._dropna)
-
-    def _filter_row(self, row: pd.Series) -> tuple[bool, str]:
-        return row[self._STATUS_COLUMN] == self._SKIP_MESSAGE, self._SKIP_MESSAGE

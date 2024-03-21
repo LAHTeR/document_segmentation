@@ -34,6 +34,9 @@ class Inventory(BaseModel):
         """Return the page at the given index."""
         return self.pages[idx]
 
+    def __repr__(self) -> str:
+        return f"Inventory(inv_nr={self.inv_nr}, inventory_part={self.inventory_part}, pages={len(self.pages)} pages)"
+
     def labelled(self) -> list[Page]:
         """Return the labelled pages in the inventory."""
         return [page for page in self.pages if page.label != Label.UNK]
