@@ -81,6 +81,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         epochs: int = 3,
         weights: Optional[list[float]] = None,
         shuffle: bool = True,
+        log_wandb: bool = True,
     ):
         """Train the model on the given dataset.
 
@@ -91,6 +92,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             epochs (int, optional): The number of epochs to train. Defaults to 3.
             weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
+            log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
         """
         self.train()
 
@@ -111,7 +113,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
-        _wandb = wandb.login()
+        _wandb = log_wandb and wandb.login()
         if _wandb:
             wandb.init(
                 project=self.__class__.__name__,
@@ -131,7 +133,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 "Weights & Biases not available. Set the WANDB_API_KEY environment variable for logging in."
             )
 
-        for _ in range(epochs):
+        for epoch in range(epochs):
             if shuffle:
                 random.shuffle(training_inventories)
 
@@ -146,7 +148,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
                 loss = criterion(outputs, inventory.label_tensor().to(self._device)).to(
                     self._device
-                )
+                ) * len(inventory)
 
                 loss.backward()
                 optimizer.step()
@@ -161,7 +163,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
 
             if validation_inventories:
-                _eval = {}
+                _eval = {"epoch": epoch}
                 for metric in self.eval_(validation_inventories, None):
                     if metric.average is None:
                         _eval[metric.__class__.__name__] = {
