@@ -216,7 +216,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             inventories, desc="Evaluating", total=len(inventories), unit="batch"
         ):
             predicted = self(inventory.pages)
-            labels = inventory._labels()
+            labels = inventory.labels()
 
             _labels = torch.Tensor([label.value for label in labels]).to(int)
 
@@ -224,7 +224,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 metric.update(predicted, _labels)
 
             if results_out is not None:
-                for page, pred, label in zip(inventory.pages, predicted, labels):
+                for page, pred, label in zip(
+                    inventory.pages, predicted, labels, strict=True
+                ):
                     writer.writerow(
                         {
                             "Predicted": Label(pred.argmax().item()).name,

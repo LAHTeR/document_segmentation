@@ -1,10 +1,9 @@
 import abc
 import logging
-from typing import Iterable, Optional
+from typing import Iterable
 
 import pandas as pd
 import requests
-from tqdm import tqdm
 
 from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
@@ -41,32 +40,23 @@ class Sheet(abc.ABC):
     def __len__(self):
         return len(self._data)
 
-    def inventories(self, *, n: Optional[int] = None) -> Iterable[Inventory]:
+    def inventory_numbers(self) -> Iterable[tuple[int, str]]:
+        key_fields = [self._INV_NR_COLUMN, self._DEEL_VAN_INVENTARIS_COL]
+
+        for keys, _ in self._data.groupby(key_fields, dropna=False):
+            yield keys
+
+    def inventories(self) -> Iterable[Inventory]:
         """Retrieve all inventories in the sheet.
 
-        Args:
-            n (int, optional): The maximum number of inventories to retrieve.
         Returns:
             Iterable[Inventory]: The inventories in the sheet.
         """
-        keys = [self._INV_NR_COLUMN, self._DEEL_VAN_INVENTARIS_COL]
-
-        count = 0
-        for key, _ in tqdm(
-            self._data.groupby(keys, dropna=False),
-            desc="Loading inventories",
-            total=n or self._data[keys].nunique(),
-            unit="inventory",
-        ):
-            inv_nr, part = key
-
+        for inv_nr, part in self.inventory_numbers():
             try:
-                count += 1
                 yield Inventory.load_or_download(inv_nr, part if pd.notna(part) else "")
             except requests.HTTPError as e:
                 logging.error(f"Failed to load inventory {inv_nr}: {e}")
-            if n is not None and count >= n:
-                break
 
     def annotate_inventory(self, inventory: Inventory) -> Inventory:
         """Annotate the inventory with the labels from the sheet in-place.

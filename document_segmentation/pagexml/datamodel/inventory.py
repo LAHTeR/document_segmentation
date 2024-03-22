@@ -14,6 +14,7 @@ from ...settings import (
     DEFAULT_BASE_PATH,
     DEFAULT_SERVER,
     INVENTORY_DIR,
+    MIN_REGION_TEXT_LENGTH,
     SERVER_PASSWORD,
     SERVER_USERNAME,
 )
@@ -39,11 +40,11 @@ class Inventory(BaseModel, Dataset):
     def __repr__(self) -> str:
         return f"Inventory(inv_nr={self.inv_nr}, inventory_part={self.inventory_part}, pages={len(self.pages)} pages)"
 
-    def _labels(self) -> Iterable[Label]:
-        return (page.label for page in self.pages)
+    def labels(self) -> list[Label]:
+        return [page.label for page in self.pages]
 
     def class_counts(self) -> Counter[Label]:
-        return Counter(self._labels())
+        return Counter(self.labels())
 
     def class_weights(self) -> list[float]:
         """Get the inverse frequency of each label in this dataset.
@@ -102,7 +103,30 @@ class Inventory(BaseModel, Dataset):
             tensor[int]: a Tensor of shape (len(self), len(Label)).
         """
 
-        return torch.Tensor([label.to_list() for label in self._labels()])
+        return torch.Tensor([label.to_list() for label in self.labels()])
+
+    def preprocess(self) -> "Inventory":
+        """Preprocess the inventory in-place.
+
+        Returns:
+            Inventory: The preprocessed inventory.
+        """
+        self.remove_short_regions()
+        return self
+
+    def remove_short_regions(
+        self, min_chars: int = MIN_REGION_TEXT_LENGTH
+    ) -> "Inventory":
+        """Remove all page regions with fewer than `min_chars` characters are removed in-place.
+
+        Args:
+            min_chars (int, optional): The minimum number of characters in a region.
+                Defaults to settings.MIN_REGION_TEXT_LENGTH.
+        Returns:
+            Inventory: The inventory with short regions removed.
+        """
+        self.pages = [page.filter_short_regions(min_chars) for page in self.pages]
+        return self
 
     def write(self, target_file: Optional[Path] = None, mode="xt") -> Path:
         """Write the a Json representation of the inventory to a file.
