@@ -86,4 +86,4 @@ class Sheet(abc.ABC):
                     inventory.annotate_scan(scan_nr, Label.IN)
             except ValueError as e:
                 logging.error(str(e))
-        return self
+        return inventory

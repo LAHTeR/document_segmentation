@@ -7,7 +7,7 @@ from typing import Counter, Iterable, Optional
 import requests
 import torch
 from pagexml.parser import parse_pagexml_file
-from pydantic import BaseModel, PositiveInt
+from pydantic import BaseModel, PositiveInt, ValidationError
 from torch.utils.data import Dataset
 
 from ...settings import (
@@ -195,6 +195,11 @@ class Inventory(BaseModel, Dataset):
             inventory = cls.download(
                 inv_nr, inventory_part, target_directory=inventory_dir
             )
+        except ValidationError as e:
+            logging.error(
+                f"Error loading inventory {inv_nr}_{inventory_part} from file {local_file}: {e}"
+            )
+            raise e
         return inventory
 
     @classmethod
