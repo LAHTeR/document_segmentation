@@ -5,6 +5,7 @@ from typing import Any, Optional, TextIO
 
 import torch
 import torch.nn as nn
+import wandb
 from torch import optim
 from torcheval.metrics import (
     Metric,
@@ -14,8 +15,6 @@ from torcheval.metrics import (
     MulticlassRecall,
 )
 from tqdm import tqdm
-
-import wandb
 
 from ..pagexml.datamodel.label import Label
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
