@@ -54,7 +54,7 @@ class Sheet(abc.ABC):
         """
         for inv_nr, part in self.inventory_numbers():
             try:
-                yield Inventory.load_or_download(inv_nr, part if pd.notna(part) else "")
+                yield Inventory.load_or_download(inv_nr, part)
             except requests.HTTPError as e:
                 logging.error(f"Failed to load inventory {inv_nr}: {e}")
 
@@ -67,7 +67,8 @@ class Sheet(abc.ABC):
             Inventory: The annotated inventory.
         """
         inventory_rows = self._data.loc[
-            self._data[self._INV_NR_COLUMN] == inventory.inv_nr
+            (self._data[self._INV_NR_COLUMN] == inventory.inv_nr)
+            & (self._data[self._DEEL_VAN_INVENTARIS_COL] == inventory.inventory_part)
         ]
         if len(inventory_rows) == 0:
             logging.warning(
@@ -78,18 +79,11 @@ class Sheet(abc.ABC):
             begin_scan = row[self._START_PAGE_COLUMN]
             end_scan = row[self._LAST_PAGE_COLUMN]
 
-            if all(page.label == Label.UNK for page in inventory[begin_scan:end_scan]):
-                try:
-                    inventory[begin_scan].label = Label.BEGIN
-                    inventory[end_scan].label = Label.END
-                    for page in range(begin_scan + 1, end_scan):
-                        inventory[page].label = Label.IN
-                except IndexError:
-                    logging.warning(
-                        f"Pages between {begin_scan} and {end_scan} not found in inventory {inventory.inv_nr}_{inventory.inventory_part} of length {len(inventory)}. Skipping."
-                    )
-            else:
-                raise ValueError(
-                    f"Pages between {begin_scan} and {end_scan} already have labels."
-                )
-        return Inventory
+            try:
+                inventory.annotate_scan(begin_scan, Label.BEGIN)
+                inventory.annotate_scan(end_scan, Label.END)
+                for scan_nr in range(begin_scan + 1, end_scan):
+                    inventory.annotate_scan(scan_nr, Label.IN)
+            except ValueError as e:
+                logging.error(str(e))
+        return self

@@ -32,3 +32,7 @@ class GeneraleMissiven(Sheet):
             index_col=self._INDEX_COLUMN,
             dtype=self._dtypes,
         ).dropna(subset=self._dropna)
+
+        self._data[self._DEEL_VAN_INVENTARIS_COL] = self._data[
+            self._DEEL_VAN_INVENTARIS_COL
+        ].fillna("")

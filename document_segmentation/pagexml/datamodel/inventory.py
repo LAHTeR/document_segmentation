@@ -40,6 +40,23 @@ class Inventory(BaseModel, Dataset):
     def __repr__(self) -> str:
         return f"Inventory(inv_nr={self.inv_nr}, inventory_part={self.inventory_part}, pages={len(self.pages)} pages)"
 
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def annotate_scan(self, scan_nr: int, label: Label):
+        page = None
+        try:
+            page: Page = self.pages[scan_nr - 1]
+        except IndexError as e:
+            raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
+
+        if page.label == Label.UNK:
+            page.label = label
+        else:
+            logging.warning(
+                f"Scan {scan_nr} already has label {page.label}. Ignoring new label ({label}). Inventory: {str(self)}"
+            )
+
     def labels(self) -> list[Label]:
         return [page.label for page in self.pages]
 
@@ -55,7 +72,9 @@ class Inventory(BaseModel, Dataset):
             list[float]: List of frequency of each label in dataset divided by dataset length.
         """
         counts = self.class_counts()
-        return [len(self) / (counts[label] + 1) for label in Label]
+        weights = [len(self) / (counts[label] + 1) for label in Label]
+        weights[Label.UNK] = 0.0
+        return weights
 
     def labelled(self) -> list[Page]:
         """Return the labelled pages in the inventory."""
@@ -165,7 +184,7 @@ class Inventory(BaseModel, Dataset):
 
     @classmethod
     def load_or_download(
-        cls, inv_nr: int, inventory_part: str = "", inventory_dir: Path = INVENTORY_DIR
+        cls, inv_nr: int, inventory_part: str, inventory_dir: Path = INVENTORY_DIR
     ):
         local_file = cls.local_file(inv_nr, inventory_part, inventory_dir)
 
@@ -215,19 +234,20 @@ class Inventory(BaseModel, Dataset):
         r.raise_for_status()
 
         pages: list[Page] = []
-        with TemporaryDirectory() as cache_directory:
-            local_zip_file = Path(cache_directory) / filename
+        with TemporaryDirectory() as tmp_dir:
+            local_zip_file = Path(tmp_dir) / filename
 
             with open(local_zip_file, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
 
             with zipfile.ZipFile(local_zip_file, "r") as zip_file:
-                for file in zip_file.filelist:
-                    pagexml_path: str = zip_file.extract(file, path=cache_directory)
+                zip_file.extractall(tmp_dir)
+                for filename in zip_file.namelist():
+                    tmp_file: Path = Path(tmp_dir) / filename
                     try:
-                        pagexml = parse_pagexml_file(pagexml_path)
-                        scan_nr: int = int(Path(pagexml_path).stem.split("_")[-1])
+                        pagexml = parse_pagexml_file(tmp_file)
+                        scan_nr: int = int(tmp_file.stem.split("_")[-1])
                         pages.append(Page.from_pagexml(Label.UNK, scan_nr, pagexml))
                     except IsADirectoryError:
                         continue

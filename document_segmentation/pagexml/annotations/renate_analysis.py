@@ -24,6 +24,10 @@ class RenateAnalysis(Sheet):
             sheet, dtype=self._dtypes, index_col=self._INDEX_COLUMN
         ).dropna(subset=self._dropna)
 
+        self._data[self._DEEL_VAN_INVENTARIS_COL] = self._data[
+            self._DEEL_VAN_INVENTARIS_COL
+        ].fillna("")
+
 
 class RenateAnalysisInv(Sheet):
     _INDEX_COLUMN = "Scan File_Name"
