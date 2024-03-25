@@ -11,10 +11,10 @@ class Page(BaseModel):
     """Class for representing a page in a PageXML file."""
 
     label: Label
-    regions: list[Region]
     scan_nr: PositiveInt
     doc_id: Optional[str] = None
     external_ref: str
+    regions: list[Region]
 
     @field_validator("label")
     def enum_from_int(cls, value):
