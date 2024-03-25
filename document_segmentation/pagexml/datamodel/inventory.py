@@ -82,10 +82,9 @@ class Inventory(BaseModel, Dataset):
 
     def labelled_inventories(self) -> Iterable["Inventory"]:
         if len(self.labelled()) == 0:
-            # no pages in inventory are labelled
-            raise ValueError("No labelled pages in inventory")
+            raise ValueError(f"No labelled pages in inventory: {self}")
         elif len(self.labelled()) == len(self):
-            # all pages in inventory are labelled
+            logging.debug(f"All pages are labelled, no need to split up: {self}")
             yield self
         else:
             # yield per labeled segment (documents)
@@ -112,8 +111,10 @@ class Inventory(BaseModel, Dataset):
                         )
                         pages = None
             if pages:
-                # final batch/segment
-                yield Inventory(pages)
+                # final segment
+                yield Inventory(
+                    inv_nr=self.inv_nr, inventory_part=self.inventory_part, pages=pages
+                )
 
     def label_tensor(self) -> torch.Tensor:
         """Get a tensor over all labels in this dataset.

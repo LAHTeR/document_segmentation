@@ -1,10 +1,13 @@
 import abc
 import logging
-from typing import Iterable
+from itertools import islice
+from typing import Iterable, Optional
 
 import pandas as pd
 import requests
+from tqdm import tqdm
 
+from ...settings import MIN_REGION_TEXT_LENGTH
 from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
 
@@ -87,3 +90,37 @@ class Sheet(abc.ABC):
             except ValueError as e:
                 logging.error(str(e))
         return inventory
+
+    def all_annotated_inventories(
+        self,
+        n: Optional[int] = None,
+        *,
+        min_region_text_length=MIN_REGION_TEXT_LENGTH,
+        skip_errors: bool = True,
+    ) -> Iterable[Inventory]:
+        """Load, label, and preprocess all inventories in the sheet.
+
+        Args:
+            n (Optional[int], optional): The number of inventories to load.
+                Defaults to None.
+            min_region_text_length ([type], optional): The minimum length of text in a region.
+                Defaults to MIN_REGION_TEXT_LENGTH.
+            skip_errors (bool, optional): If True (default), errors are logged, otherwise they are raised.
+        """
+
+        for inventory in tqdm(
+            islice(self.inventories(), n),
+            desc="Loading Inventories",
+            total=n or len(list(self.inventory_numbers())),
+            unit="inventory",
+        ):
+            self.annotate_inventory(inventory)
+
+            try:
+                for labelled in inventory.labelled_inventories():
+                    yield labelled.remove_short_regions(min_region_text_length)
+            except ValueError as e:
+                if skip_errors:
+                    logging.error(str(e))
+                else:
+                    raise e
