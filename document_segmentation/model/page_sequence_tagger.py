@@ -1,5 +1,6 @@
 import csv
 import logging
+import math
 import random
 import sys
 from typing import Any, Optional, TextIO
@@ -128,7 +129,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     "modules": self.__dict__["_modules"],
                 },
             )
-        else:
+        elif log_wandb:
             logging.warning(
                 "Weights & Biases not available. Set the WANDB_API_KEY environment variable for logging in."
             )
@@ -146,9 +147,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 optimizer.zero_grad()
                 outputs = self(inventory.pages).to(self._device)
 
-                loss = criterion(outputs, inventory.label_tensor().to(self._device)).to(
-                    self._device
-                ) * len(inventory)
+                loss = criterion(
+                    outputs, inventory.label_tensor().to(self._device)
+                ) * math.log(len(inventory))
 
                 loss.backward()
                 optimizer.step()
