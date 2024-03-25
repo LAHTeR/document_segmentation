@@ -11,7 +11,7 @@ from ...conftest import TEST_FILE
 class TestPage:
     def test_enum_from_int(self):
         json = (
-            '{ "label": 0, "regions": [], "scan_nr": 617 , "external_ref": "test_ref"}'
+            '{ "label": 1, "regions": [], "scan_nr": 617 , "external_ref": "test_ref"}'
         )
 
         expected_page = Page(

@@ -32,7 +32,8 @@ class TestRegionType:
             (RegionType.PARAGRAPH, 5),
             (RegionType.PHYSICAL_STRUCTURE_DOC, 6),
             (RegionType.SIGNATURE_MARK, 7),
-            (RegionType.TEXT_REGION, 8),
+            (RegionType.STRUCTURE_DOC, 8),
+            (RegionType.TEXT_REGION, 9),
         ],
     )
     def test_index(self, region_type, expected):
