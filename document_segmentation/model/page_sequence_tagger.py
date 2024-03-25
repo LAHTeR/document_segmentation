@@ -144,6 +144,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 unit="inventory",
                 total=len(training_inventories),
             ):
+                if len(inventory) < 2:
+                    logging.warning(f"Skipping inventory: {inventory}")
+                    continue
+
                 optimizer.zero_grad()
                 outputs = self(inventory.pages).to(self._device)
 

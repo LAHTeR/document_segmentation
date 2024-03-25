@@ -24,9 +24,9 @@ class RenateAnalysis(Sheet):
             sheet, dtype=self._dtypes, index_col=self._INDEX_COLUMN
         ).dropna(subset=self._dropna)
 
-        self._data[self._DEEL_VAN_INVENTARIS_COL] = self._data[
-            self._DEEL_VAN_INVENTARIS_COL
-        ].fillna("")
+        self._data[self._DEEL_VAN_INVENTARIS_COL] = (
+            self._data[self._DEEL_VAN_INVENTARIS_COL].replace({"0": pd.NA}).fillna("")
+        )
 
 
 class RenateAnalysisInv(Sheet):
@@ -43,21 +43,26 @@ class RenateAnalysisInv(Sheet):
         )
 
         self._id = path.stem
-        self._inventory = Inventory.load_or_download(self.int(self._id[-4:]))
+        self._inventory = Inventory.load_or_download(int(self._id[-4:]), "")
 
-    def set_labels(self) -> Iterable[Inventory]:
+    def inventories(self) -> Iterable[Inventory]:
+        yield self._inventory
+
+    def inventory_numbers(self) -> Iterable[tuple[int, str]]:
+        return [(self._inventory.inv_nr, self._inventory.inventory_part)]
+
+    def annotate_inventory(self, inventory: Inventory) -> "Inventory":
+        # TODO: handle multiple labels per scan
         default_label = "OUT"
 
         for idx, row in self._data.iterrows():
-            page = int(idx[-4:])
+            scan_nr = int(idx[-4:])
             label = Label[row[self._LABEL_COLUMN].strip() or default_label]
-
-            # Subtract 1 from page number because they start counting at 1
-            self._inventory[page - 1].label = label
+            inventory.annotate_scan(scan_nr, label)
 
             if label == Label.BEGIN:
                 default_label = "IN"
             elif label == Label.END:
                 default_label = "OUT"
 
-        yield self._inventory
+        return inventory
