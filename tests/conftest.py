@@ -3,17 +3,8 @@ from pathlib import Path
 import pytest
 import requests_mock
 
-from document_segmentation.pagexml.inventory import InventoryReader
-
 TEST_INV_NR = 1201
 TEST_SHEET_SIZE = 192681
-
-
-@pytest.fixture
-def inventory(
-    tmp_path, mock_request, inventory_nr: int = TEST_INV_NR
-) -> InventoryReader:
-    return InventoryReader(str(inventory_nr), cache_directory=tmp_path)
 
 
 @pytest.fixture
