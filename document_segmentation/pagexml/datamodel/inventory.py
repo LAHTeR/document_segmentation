@@ -256,7 +256,11 @@ class Inventory(BaseModel, Dataset):
                         pages.append(Page.from_pagexml(Label.UNK, scan_nr, pagexml))
                     except IsADirectoryError:
                         continue
-        inventory = cls(inv_nr=inv_nr, inventory_part=inventory_part, pages=pages)
+        inventory = cls(
+            inv_nr=inv_nr,
+            inventory_part=inventory_part,
+            pages=sorted(pages, key=lambda page: page.scan_nr),
+        )
         inventory.write(local_file)
 
         return inventory
