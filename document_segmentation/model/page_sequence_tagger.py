@@ -220,7 +220,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         self.eval()
 
         for inventory in tqdm(
-            inventories, desc="Evaluating", total=len(inventories), unit="batch"
+            inventories, desc="Evaluating", total=len(inventories), unit="inventory"
         ):
             predicted = self(inventory.pages)
             labels = inventory.labels()
