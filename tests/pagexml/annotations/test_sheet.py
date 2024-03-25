@@ -1,3 +1,5 @@
+from itertools import islice
+
 import pytest
 
 from document_segmentation import settings
@@ -7,6 +9,8 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysisInv,
 )
 from document_segmentation.pagexml.datamodel.label import Label
+
+from ...conftest import GENERALE_MISSIVEN_CSV
 
 
 class TestSheet:
@@ -45,4 +49,51 @@ class TestRenateAnalysisInv:
 
         assert len(sheet) == 690
         assert sheet._id == "Analysis Renate 1547"
-        assert sheet._inv_nr == 1547
+        assert sheet.inventory_numbers() == [(1547, "")]
+
+
+class TestGeneraleMissiven:
+    @pytest.fixture(scope="class")
+    def test_sheet(self):
+        return GeneraleMissiven(GENERALE_MISSIVEN_CSV)
+
+    def test_inventory_numbers(self, test_sheet):
+        n = 5
+
+        assert list(islice(test_sheet.inventory_numbers(), n)) == [
+            (1068, ""),
+            (1070, ""),
+            (1071, ""),
+            (1072, ""),
+            (1073, ""),
+        ]
+
+    def test_inventories(self, test_sheet):
+        expected_inv_nrs = [1068, 1070, 1071, 1072, 1073]
+        expected_inv_parts = [""] * 5
+        expected_lengths = [1024, 1322, 688, 942, 702]
+
+        for inventory, inv_nr, inv_part, length in zip(
+            test_sheet.inventories(),
+            expected_inv_nrs,
+            expected_inv_parts,
+            expected_lengths,
+        ):
+            assert inventory.inv_nr == inv_nr
+            assert inventory.inventory_part == inv_part
+            assert len(inventory) == length
+
+    def test_all_annotated_inventories(self, test_sheet):
+        expected_inv_nrs = [1068, 1068, 1068, 1068, 1070]
+        expected_inv_parts = [""] * 5
+        expected_lengths = [19, 35, 24, 7, 9]
+
+        for inventory, inv_nr, inv_part, length in zip(
+            test_sheet.all_annotated_inventories(),
+            expected_inv_nrs,
+            expected_inv_parts,
+            expected_lengths,
+        ):
+            assert inventory.inv_nr == inv_nr
+            assert inventory.inventory_part == inv_part
+            assert len(inventory) == length
