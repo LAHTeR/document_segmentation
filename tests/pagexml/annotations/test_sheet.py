@@ -6,7 +6,6 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysis,
     RenateAnalysisInv,
 )
-from document_segmentation.pagexml.datamodel.document import Document
 from document_segmentation.pagexml.datamodel.label import Label
 
 
@@ -47,12 +46,3 @@ class TestRenateAnalysisInv:
         assert len(sheet) == 690
         assert sheet._id == "Analysis Renate 1547"
         assert sheet._inv_nr == 1547
-
-    @pytest.mark.skip("Mock the download of the correct inventory.")
-    def test_to_documents(self, test_sheet):
-        """Test the to_documents method."""
-        sheet = RenateAnalysisInv(test_sheet)
-        documents = list(sheet.to_documents())
-
-        assert len(documents) == 26
-        assert all(isinstance(doc, Document) for doc in documents)
