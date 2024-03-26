@@ -11,9 +11,10 @@ class Page(BaseModel):
     """Class for representing a page in a PageXML file."""
 
     label: Label
-    regions: list[Region]
     scan_nr: PositiveInt
     doc_id: Optional[str] = None
+    external_ref: str
+    regions: list[Region]
 
     @field_validator("label")
     def enum_from_int(cls, value):
@@ -38,12 +39,8 @@ class Page(BaseModel):
         Args:
             min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
         """
-        return Page(
-            label=self.label,
-            regions=[region for region in self.regions if len(region) >= min_chars],
-            scan_nr=self.scan_nr,
-            doc_id=self.doc_id,
-        )
+        self.regions = [region for region in self.regions if len(region) >= min_chars]
+        return self
 
     @classmethod
     def from_pagexml(cls, label: Label, scan_nr: int, pagexml: PageXMLScan):
@@ -59,4 +56,10 @@ class Page(BaseModel):
             for region in pagexml.get_text_regions_in_reading_order()
         ]
 
-        return cls(label=label, regions=regions, scan_nr=scan_nr, doc_id=pagexml.id)
+        return cls(
+            label=label,
+            regions=regions,
+            scan_nr=scan_nr,
+            doc_id=pagexml.id,
+            external_ref=pagexml.metadata["@externalRef"],
+        )

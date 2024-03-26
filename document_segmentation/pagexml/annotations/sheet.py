@@ -1,20 +1,16 @@
 import abc
 import logging
+from itertools import islice
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Iterable
+from typing import Iterable, Optional
 
 import pandas as pd
 import requests
-from pagexml.model.physical_document_model import PageXMLScan
-from requests import HTTPError
 from tqdm import tqdm
 
-from ...settings import SERVER_PASSWORD, SERVER_USERNAME
-from ..datamodel.document import Document
+from ...settings import INVENTORY_DIR, MIN_REGION_TEXT_LENGTH
+from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
-from ..datamodel.page import Page
-from ..inventory import InventoryReader
 
 
 class Sheet(abc.ABC):
@@ -29,8 +25,16 @@ class Sheet(abc.ABC):
 
     _VALID_INVENTORY_PARTS = {"A", "B", "C"}
 
-    def __init__(self) -> None:
+    def __init__(self, *, inventory_dir: Path = INVENTORY_DIR) -> None:
+        """Initialize the sheet.
+
+        Args:
+            inventory_dir (Path, optional): The directory where the inventories are stored.
+                Defaults to INVENTORY_DIR.
+        """
         super().__init__()
+
+        self._inventory_dir = inventory_dir
 
         self._dtypes = {
             self._INDEX_COLUMN: str,
@@ -48,95 +52,84 @@ class Sheet(abc.ABC):
     def __len__(self):
         return len(self._data)
 
-    def _filter_row(self, row: pd.Series) -> bool:
-        """Filter a row from the sheet.
+    def inventory_numbers(self) -> Iterable[tuple[int, str]]:
+        key_fields = [self._INV_NR_COLUMN, self._DEEL_VAN_INVENTARIS_COL]
 
-        Args:
-            row (pd.Series): The row to filter.
+        for keys, _ in self._data.groupby(key_fields, dropna=False):
+            yield keys
+
+    def inventories(self) -> Iterable[Inventory]:
+        """Retrieve all inventories in the sheet.
+
         Returns:
-            bool: Whether to filter out the row.
-            str: The reason for filtering out the row.
+            Iterable[Inventory]: The inventories in the sheet.
         """
-        return False, None
+        for inv_nr, part in self.inventory_numbers():
+            try:
+                yield Inventory.load_or_download(inv_nr, part, self._inventory_dir)
+            except requests.HTTPError as e:
+                logging.error(f"Failed to load inventory {inv_nr}: {e}")
 
-    def download(self, target_dir: Path, n: int = None) -> Iterable[Document]:
-        """Download the data annotated in the sheet, and store as Json files..
+    def annotate_inventory(self, inventory: Inventory) -> Inventory:
+        """Annotate the inventory with the labels from the sheet in-place.
 
         Args:
-            target_dir (Path): The directory to store the downloaded data.
-            n (int): The maximum number of documents to download.
-                Defaults to None (all documents).
+            inventory (Inventory): The inventory to annotate.
+        Returns:
+            Inventory: The annotated inventory.
+        """
+        inventory_rows = self._data.loc[
+            (self._data[self._INV_NR_COLUMN] == inventory.inv_nr)
+            & (self._data[self._DEEL_VAN_INVENTARIS_COL] == inventory.inventory_part)
+        ]
+        if len(inventory_rows) == 0:
+            logging.warning(
+                f"Inventory {inventory.inv_nr} not found in the sheet. Skipping."
+            )
+
+        for idx, row in inventory_rows.iterrows():
+            begin_scan = row[self._START_PAGE_COLUMN]
+            end_scan = row[self._LAST_PAGE_COLUMN]
+
+            try:
+                inventory.annotate_scan(begin_scan, Label.BEGIN)
+                inventory.annotate_scan(end_scan, Label.END)
+                for scan_nr in range(begin_scan + 1, end_scan):
+                    inventory.annotate_scan(scan_nr, Label.IN)
+            except ValueError as e:
+                logging.error(str(e))
+        return inventory
+
+    def all_annotated_inventories(
+        self,
+        n: Optional[int] = None,
+        *,
+        min_region_text_length=MIN_REGION_TEXT_LENGTH,
+        skip_errors: bool = True,
+    ) -> Iterable[Inventory]:
+        """Load, label, and preprocess all inventories in the sheet.
+
+        Args:
+            n (Optional[int], optional): The number of inventories to load.
+                Defaults to None.
+            min_region_text_length ([type], optional): The minimum length of text in a region.
+                Defaults to MIN_REGION_TEXT_LENGTH.
+            skip_errors (bool, optional): If True (default), errors are logged, otherwise they are raised.
         """
 
-        target_dir.mkdir(parents=True, exist_ok=True)
+        for inventory in tqdm(
+            islice(self.inventories(), n),
+            desc="Loading Inventories",
+            total=n or len(list(self.inventory_numbers())),
+            unit="inventory",
+        ):
+            self.annotate_inventory(inventory)
 
-        with TemporaryDirectory() as cache_directory, requests.Session() as session:
-            session.auth = (SERVER_USERNAME, SERVER_PASSWORD)
-
-            inventory = None
-
-            for idx, row in (
-                self._data.head(n).sort_values(by=self._INV_NR_COLUMN).iterrows()
-            ):
-                target_file: Path = (target_dir / str(idx)).with_suffix(".json")
-                try:
-                    yield Document.from_json_file(target_file)
-                except FileNotFoundError:
-                    inv_nr = row[self._INV_NR_COLUMN]
-                    assert inv_nr is not None, "Inventory number is None."
-
-                    filter, reason = self._filter_row(row)
-                    if filter:
-                        tqdm.write(
-                            f"Skipping row with inventory number {str(inv_nr)} due to reason: '{reason}'"
-                        )
-                    else:
-                        begin_scan = row[self._START_PAGE_COLUMN]
-                        end_scan = row[self._LAST_PAGE_COLUMN]
-
-                        part = row.get(self._DEEL_VAN_INVENTARIS_COL)
-                        if pd.isna(part) or part not in self._VALID_INVENTORY_PARTS:
-                            part = None
-
-                        if (
-                            inventory._inv_nr != str(inv_nr)
-                            or inventory._inventory_part != part
-                        ):
-                            inventory = InventoryReader(
-                                inv_nr,
-                                inventory_part=part,
-                                cache_directory=Path(cache_directory),
-                                session=session,
-                            )
-
-                        pages: list[Page] = []
-
-                        for page_number in range(begin_scan, end_scan + 1):
-                            try:
-                                page_xml: PageXMLScan = inventory.pagexml(page_number)
-                            except HTTPError as e:
-                                logging.error(
-                                    f"Skipping inventory '{inv_nr}' due to error: {str(e)}"
-                                )
-                                break
-
-                            if page_number == begin_scan:
-                                label = Label.BEGIN
-                            elif page_number == end_scan:
-                                label = Label.END
-                            else:
-                                label = Label.IN
-
-                            pages.append(Page.from_pagexml(label, inv_nr, page_xml))
-
-                        document = Document(
-                            id=str(idx),
-                            inventory_nr=inv_nr,
-                            inventory_part=part,
-                            pages=pages,
-                        )
-
-                        with target_file.open("xt") as f:
-                            f.write(document.model_dump_json())
-                            f.write("\n")
-                        yield document
+            try:
+                for labelled in inventory.labelled_inventories():
+                    yield labelled.remove_short_regions(min_region_text_length)
+            except ValueError as e:
+                if skip_errors:
+                    logging.error(str(e))
+                else:
+                    raise e

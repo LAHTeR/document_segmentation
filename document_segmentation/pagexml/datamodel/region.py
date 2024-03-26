@@ -16,6 +16,7 @@ class RegionType(Enum):
     PARAGRAPH = "paragraph"
     PHYSICAL_STRUCTURE_DOC = "physical_structure_doc"
     SIGNATURE_MARK = "signature-mark"
+    STRUCTURE_DOC = "structure_doc"
     TEXT_REGION = "text_region"
 
     def index(self) -> int:

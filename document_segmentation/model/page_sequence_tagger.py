@@ -1,5 +1,7 @@
 import csv
 import logging
+import math
+import random
 import sys
 from typing import Any, Optional, TextIO
 
@@ -16,9 +18,11 @@ from torcheval.metrics import (
 )
 from tqdm import tqdm
 
+from document_segmentation.pagexml.datamodel.inventory import Inventory
+from document_segmentation.pagexml.datamodel.page import Page
+
 from ..pagexml.datamodel.label import Label
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
-from .dataset import DocumentDataset, PageDataset
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
@@ -26,7 +30,8 @@ from .page_embedding import PageEmbedding
 class PageSequenceTagger(nn.Module, DeviceModule):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
-    _DEFAULT_BATCH_SIZE: int = 8
+    _LARGE_INVENTORY_SIZE: int = 1751
+    """Issue a warning for inventories larger than this size."""
 
     def __init__(
         self,
@@ -52,8 +57,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         self.to_device(device)
 
-    def forward(self, pages: PageDataset):
-        page_embeddings = self._page_embedding(pages.pages)
+    def forward(self, pages: list[Page]):
+        page_embeddings = self._page_embedding(pages)
 
         assert page_embeddings.size() == (
             len(pages),
@@ -72,39 +77,51 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
     def train_(
         self,
-        dataset: DocumentDataset,
+        training_inventories: list[Inventory],
+        validation_inventories: Optional[list[Inventory]] = None,
+        *,
         epochs: int = 3,
-        batch_size: int = _DEFAULT_BATCH_SIZE,
         weights: Optional[list[float]] = None,
         shuffle: bool = True,
+        log_wandb: bool = True,
     ):
         """Train the model on the given dataset.
 
         Args:
-            dataset (DocumentDataset): The dataset to train on.
+            training_inventories (list[Inventory]): The dataset to train on.
+            validation_inventories (Optional[list[Inventory]], optional): The validation dataset.
+                Defaults to None. If given, will evaluate after each epoch.
             epochs (int, optional): The number of epochs to train. Defaults to 3.
-            batch_size (int, optional): The batch size. Defaults to 8.
             weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
+            log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
         """
         self.train()
 
-        if weights is not None:
-            if len(weights) != len(Label):
-                raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
-            weights = torch.Tensor(weights).to(self._device)
+        if weights is None:
+            # TODO: weighed average?
+            weights = (
+                torch.Tensor(
+                    [inventory.class_weights() for inventory in training_inventories]
+                )
+                .to(self._device)
+                .mean(dim=0)
+            )
+        if not len(weights) == len(Label):
+            raise ValueError(
+                f"Length of weights ({len(weights)}) does not match number of labels ({len(Label)})"
+            )
 
         criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
-        _wandb = wandb.login()
+        _wandb = log_wandb and wandb.login()
         if _wandb:
             wandb.init(
                 project=self.__class__.__name__,
                 config={
-                    "training size": len(dataset),
+                    "training size": len(training_inventories),
                     "epochs": epochs,
-                    "batch_size": batch_size,
                     "weights": weights,
                     "shuffle": shuffle,
                     "optimizer": optimizer.__class__.__name__,
@@ -113,27 +130,34 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     "modules": self.__dict__["_modules"],
                 },
             )
-        else:
+        elif log_wandb:
             logging.warning(
                 "Weights & Biases not available. Set the WANDB_API_KEY environment variable for logging in."
             )
 
-        for _ in range(epochs):
+        for epoch in range(epochs):
             if shuffle:
-                dataset.shuffle()
+                random.shuffle(training_inventories)
 
-            for batch in tqdm(
-                dataset.batches(batch_size),
+            for inventory in tqdm(
+                training_inventories,
                 desc="Training",
-                unit="batch",
-                total=dataset.n_batches(batch_size),
+                unit="inventory",
+                total=len(training_inventories),
             ):
-                optimizer.zero_grad()
-                outputs = self(batch).to(self._device)
+                if len(inventory) < 2:
+                    logging.warning(f"Skipping inventory: {inventory}")
+                    continue
+                elif len(inventory) > PageSequenceTagger._LARGE_INVENTORY_SIZE:
+                    # FIXME: introduce max_size parameter and split large inventories if necessary
+                    logging.warning(f"Large inventory: {inventory}")
 
-                loss = criterion(outputs, batch.label_tensor().to(self._device)).to(
-                    self._device
-                )
+                optimizer.zero_grad()
+                outputs = self(inventory.pages).to(self._device)
+
+                loss = criterion(
+                    outputs, inventory.label_tensor().to(self._device)
+                ) * math.log(len(inventory))
 
                 loss.backward()
                 optimizer.step()
@@ -142,14 +166,14 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     wandb.log(
                         {
                             "loss": loss.item(),
-                            "batch_size": len(batch),
+                            "inventory length": len(inventory),
                             "cache": self._page_embedding._region_model._text_embeddings.cache_info()._asdict(),
                         }
                     )
 
-            if _wandb:
-                _eval = {}
-                for metric in self.eval_(dataset, batch_size, None):
+            if validation_inventories:
+                _eval = {"epoch": epoch}
+                for metric in self.eval_(validation_inventories, None):
                     if metric.average is None:
                         _eval[metric.__class__.__name__] = {
                             label.name: score
@@ -157,7 +181,12 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         }
                     else:
                         _eval[metric.__class__.__name__] = metric.compute().item()
-                wandb.log(_eval)
+
+                if _wandb:
+                    wandb.log(_eval)
+                else:
+                    tqdm.write(str(_eval))
+
                 self.train()
 
         if _wandb:
@@ -165,30 +194,24 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             # TODO: save model to WandB or HuggingFace
 
     def eval_(
-        self,
-        dataset: DocumentDataset,
-        batch_size: int,
-        results_out: TextIO = sys.stdout,
+        self, inventories: list[Inventory], results_out: TextIO = sys.stdout
     ) -> tuple[Metric, Metric, Metric, Metric]:
         """Evaluate the model on the given dataset.
 
         Args:
-            dataset (DocumentDataset): The dataset to evaluate on.
-            batch_size (int): The batch size.
+            inventories (list[Inventory]): The inventories to evaluate on.
             results_out (TextIO): The file to write the output labels per sample.
                 If None (default), does not print the individual test labels.
                 Defaults to stdout.
         Returns:
             tuple[Metric, Metric, Metric, Metric]: The precision, recall, F1 score, and accuracy.
         """
-        metrics: tuple[Metric] = tuple(
-            metric(average=None, num_classes=len(Label))
-            for metric in (
-                MulticlassPrecision,
-                MulticlassRecall,
-                MulticlassF1Score,
-            )
-        ) + (MulticlassAccuracy(),)
+        metrics: tuple[Metric] = (
+            MulticlassPrecision(average=None, num_classes=len(Label)),
+            MulticlassRecall(average=None, num_classes=len(Label)),
+            MulticlassF1Score(average=None, num_classes=len(Label)),
+            MulticlassAccuracy(),
+        )
 
         if results_out is not None:
             writer = csv.DictWriter(
@@ -200,14 +223,11 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         self.eval()
 
-        for batch in tqdm(
-            dataset.batches(batch_size),
-            desc="Evaluating",
-            total=dataset.n_batches(batch_size),
-            unit="batch",
+        for inventory in tqdm(
+            inventories, desc="Evaluating", total=len(inventories), unit="inventory"
         ):
-            predicted = self(batch)
-            labels = batch.labels()
+            predicted = self(inventory.pages)
+            labels = inventory.labels()
 
             _labels = torch.Tensor([label.value for label in labels]).to(int)
 
@@ -215,7 +235,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 metric.update(predicted, _labels)
 
             if results_out is not None:
-                for page, pred, label in zip(batch.pages, predicted, labels):
+                for page, pred, label in zip(
+                    inventory.pages, predicted, labels, strict=True
+                ):
                     writer.writerow(
                         {
                             "Predicted": Label(pred.argmax().item()).name,

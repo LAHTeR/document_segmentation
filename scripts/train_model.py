@@ -4,23 +4,19 @@ import logging
 import random
 from itertools import groupby
 from pathlib import Path
-from typing import Iterable
 
 import torch
 
-from document_segmentation.model.dataset import AbstractDataset, DocumentDataset
 from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
 from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysis,
     RenateAnalysisInv,
 )
-from document_segmentation.pagexml.datamodel.document import Document
+from document_segmentation.pagexml.datamodel.inventory import Inventory
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.settings import (
-    GENERALE_MISSIVEN_DOCUMENT_DIR,
     GENERALE_MISSIVEN_SHEET,
-    RENATE_ANALYSIS_DIR,
     RENATE_ANALYSIS_SHEETS,
     RENATE_TANAP_CATEGORISATION_SHEET,
 )
@@ -60,7 +56,7 @@ if __name__ == "__main__":
         "--model-file",
         type=Path,
         default=Path("model.pt"),
-        help="Output file for the model",
+        help="Output file for the model. Defaults to 'model.pt'.",
     )
 
     arg_parser.add_argument(
@@ -99,74 +95,59 @@ if __name__ == "__main__":
     # LOAD ANNOTATION SHEETS AND DATA
     ########################################################################################
 
-    document_sets: list[Iterable[Document]] = []
     sheet_paths: list[Path] = []
-
-    training_sets: list[AbstractDataset] = []
-    test_sets: list[AbstractDataset] = []
+    inventories: list[list[Inventory]] = []
 
     if args.gm_sheet:
         sheet = GeneraleMissiven(args.gm_sheet)
-        document_sets.append(sheet.download(GENERALE_MISSIVEN_DOCUMENT_DIR, args.n))
+        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
+
         sheet_paths.append(args.gm_sheet)
     if args.renate_categorisation_sheet:
         sheet = RenateAnalysis(args.renate_categorisation_sheet)
-        document_sets.append(sheet.download(RENATE_ANALYSIS_DIR, args.n))
+        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
+
         sheet_paths.append(args.renate_categorisation_sheet)
     for _sheet in args.renate_analysis_sheet:
         sheet = RenateAnalysisInv(_sheet)
-        document_sets.append(sheet.download(RENATE_ANALYSIS_DIR, args.n))
+        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
+
         sheet_paths.append(_sheet)
 
-    training_sets: list[AbstractDataset] = []
-    test_sets: list[AbstractDataset] = []
+    training_inventories: list[list[Inventory]] = []
+    validation_inventories: list[list[Inventory]] = []
 
-    for documents in document_sets:
-        dataset: DocumentDataset = DocumentDataset.from_documents(documents)
-        dataset.shuffle()
-        train, test = dataset.split(args.split)
-
-        training_sets.append(train)
-        test_sets.append(test)
-
-    training_data: DocumentDataset = sum(training_sets, DocumentDataset([]))
-    training_data.shuffle()
+    for _inventories in inventories:
+        random.shuffle(inventories)
+        split = int(len(_inventories) * args.split)
+        training_inventories.append(_inventories[:split])
+        validation_inventories.append(_inventories[split:])
 
     ########################################################################################
     # LOAD OR TRAIN MODEL
     ########################################################################################
-    if args.model_file.exists():
-        logging.info(f"Loading model from {args.model_file}")
+    model = PageSequenceTagger(device=args.device)
 
-        model = torch.load(args.model_file)
-    else:
-        logging.info("Training model from scratch")
-
-        model = PageSequenceTagger(device=args.device)
-        if args.device is not None:
-            assert model.to_device(args.device)
-        model.train_(
-            training_data,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            weights=training_data.class_weights(),
-        )
-        torch.save(model, args.model_file)
+    model.train_(
+        sum(training_inventories, start=[]),
+        sum(validation_inventories, start=[]),
+        epochs=args.epochs,
+    )
+    torch.save(model, args.model_file)
 
     logging.debug(str(model))
 
     ########################################################################################
     # EVALUATE MODEL
     ########################################################################################
-    for test_set, sheet_path in zip(test_sets, sheet_paths, strict=True):
+    for validation, sheet_path in zip(validation_inventories, sheet_paths, strict=True):
         print(f"Sheet: {sheet_path}", file=args.eval_output, flush=True)
         print(f"Sheet: {sheet_path}", file=args.test_output, flush=True)
 
-        metrics = model.eval_(test_set, args.batch_size, args.test_output)
+        metrics = model.eval_(validation, args.test_output)
 
         for average, _metrics in groupby(
-            sorted(metrics, key=lambda metric: metric.average is None),
-            key=lambda m: m.average,
+            sorted(metrics, key=lambda m: m.average is None), key=lambda m: m.average
         ):
             if average is None:
                 writer = csv.DictWriter(

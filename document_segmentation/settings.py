@@ -13,12 +13,13 @@ RENATE_TANAP_CATEGORISATION_SHEET: Path = (
 )
 
 RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(DATA_DIR.glob("Analysis Renate ????.xlsx"))
-RENATE_ANALYSIS_DIR: Path = DATA_DIR / "renate_analysis"
 
 GENERALE_MISSIVEN_SHEET: Path = (
     DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
 )
-GENERALE_MISSIVEN_DOCUMENT_DIR: Path = DATA_DIR / "generale_missiven"
+
+INVENTORY_DIR: Path = DATA_DIR / "inventories"
+"""Path to store the inventory files locally."""
 
 DEFAULT_SERVER: str = "https://hucdrive.huc.knaw.nl/"
 """The default server URL."""
