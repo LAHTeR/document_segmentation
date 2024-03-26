@@ -1,4 +1,5 @@
 from itertools import islice
+from pathlib import Path
 
 import pytest
 
@@ -17,13 +18,11 @@ class TestSheet:
     INV_COLUMN = "Inv.nr. Nationaal Archief (1.04.02)"
 
     @pytest.mark.parametrize(
-        "sheet_class, length, min_inv, max_inv",
-        [(RenateAnalysis, 78, 1060, 8935), (GeneraleMissiven, 914, 1068, 7957)],
+        "sheet, length, min_inv, max_inv",
+        [(RenateAnalysis(), 78, 1060, 8935), (GeneraleMissiven(), 914, 1068, 7957)],
     )
-    def test_init(self, sheet_class, length, min_inv, max_inv):
+    def test_init(self, sheet, length, min_inv, max_inv):
         """Read the sheet and check the length and inventory numbers."""
-
-        sheet = sheet_class()
 
         assert len(sheet) == length
         assert sheet._data[self.INV_COLUMN].min(skipna=False) == min_inv
@@ -32,18 +31,19 @@ class TestSheet:
         assert not sheet._data[self.INV_COLUMN].hasnans
 
 
+@pytest.mark.skipif(
+    not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
+    reason="No server credentials.",
+)
 class TestRenateAnalysisInv:
+    # FIXME: Mock servers requests
+
     @pytest.fixture()
-    def test_sheet(self):
+    def test_sheet(self) -> Path:
         return settings.DATA_DIR / "Analysis Renate 1547.xlsx"
 
-    @pytest.mark.skipif(
-        not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
-        reason="No server credentials.",
-    )
     def test_init(self, test_sheet, tmp_path):
         """Test the initialization of the RenateAnalysisInv class."""
-        # FIXME: This test download the inventory from the server, mock request
         sheet = RenateAnalysisInv(test_sheet, inventory_dir=tmp_path)
 
         for label in sheet._data[RenateAnalysisInv._LABEL_COLUMN]:
@@ -57,10 +57,16 @@ class TestRenateAnalysisInv:
         assert sheet.inventory_numbers() == [(1547, "")]
 
 
+@pytest.mark.skipif(
+    not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
+    reason="No server credentials.",
+)
 class TestGeneraleMissiven:
-    @pytest.fixture(scope="class")
-    def test_sheet(self):
-        return GeneraleMissiven(GENERALE_MISSIVEN_CSV)
+    # FIXME: Mock servers requests
+
+    @pytest.fixture()
+    def test_sheet(self, tmp_path):
+        return GeneraleMissiven(GENERALE_MISSIVEN_CSV, inventory_dir=tmp_path)
 
     def test_inventory_numbers(self, test_sheet):
         n = 5
