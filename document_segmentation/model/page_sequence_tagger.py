@@ -30,8 +30,8 @@ from .page_embedding import PageEmbedding
 class PageSequenceTagger(nn.Module, DeviceModule):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
-    _LARGE_INVENTORY_SIZE: int
-    """Issue warning for inventories larger than this size."""
+    _LARGE_INVENTORY_SIZE: int = 1751
+    """Issue a warning for inventories larger than this size."""
 
     def __init__(
         self,
@@ -148,7 +148,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 if len(inventory) < 2:
                     logging.warning(f"Skipping inventory: {inventory}")
                     continue
-                elif len(inventory) > self._LARGE_INVENTORY_SIZE:
+                elif len(inventory) > PageSequenceTagger._LARGE_INVENTORY_SIZE:
                     # FIXME: introduce max_size parameter and split large inventories if necessary
                     logging.warning(f"Large inventory: {inventory}")
 
