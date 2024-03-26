@@ -141,14 +141,14 @@ if __name__ == "__main__":
     # EVALUATE MODEL
     ########################################################################################
     for validation, sheet_path in zip(validation_inventories, sheet_paths, strict=True):
-        print(f"Sheet: {sheet_path}", file=args.eval_output, flush=True)
-        print(f"Sheet: {sheet_path}", file=args.test_output, flush=True)
+        print(f"Sheet: {sheet_path}", file=args.eval_output)
+        print(f"Sheet: {sheet_path}", file=args.test_output)
 
-        metrics = model.eval_(validation, args.test_output)
+        results = model.eval_(validation)
+        metrics = results[:4]
+        table = results[4]
 
-        for average, _metrics in groupby(
-            sorted(metrics, key=lambda m: m.average is None), key=lambda m: m.average
-        ):
+        for average, _metrics in groupby(metrics, key=lambda m: m.average):
             if average is None:
                 writer = csv.DictWriter(
                     args.eval_output,
@@ -174,6 +174,9 @@ if __name__ == "__main__":
                         flush=True,
                     )
             args.eval_output.flush()
+        print("=" * 80, file=args.eval_output)
 
-        print("=" * 80, file=args.eval_output, flush=True)
-        print("=" * 80, file=args.test_output, flush=True)
+        results[4].to_csv(
+            args.test_output, sep="\t", index=False, header=True, mode="a"
+        )
+        print("=" * 80, file=args.test_output)
