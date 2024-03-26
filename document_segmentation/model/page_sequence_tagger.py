@@ -1,10 +1,9 @@
-import csv
 import logging
 import math
 import random
-import sys
-from typing import Any, Optional, TextIO
+from typing import Any, Optional
 
+import pandas as pd
 import torch
 import torch.nn as nn
 import wandb
@@ -115,9 +114,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
-        _wandb = log_wandb and wandb.login()
-        if _wandb:
-            wandb.init(
+        if log_wandb and wandb.login():
+            wandb_run = wandb.init(
                 project=self.__class__.__name__,
                 config={
                     "training size": len(training_inventories),
@@ -130,9 +128,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     "modules": self.__dict__["_modules"],
                 },
             )
-        elif log_wandb:
+        else:
+            wandb_run = None
             logging.warning(
-                "Weights & Biases not available. Set the WANDB_API_KEY environment variable for logging in."
+                "Not logging to Weights & Biases. Set the WANDB_API_KEY environment variable for logging in."
             )
 
         for epoch in range(epochs):
@@ -162,8 +161,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 loss.backward()
                 optimizer.step()
 
-                if _wandb:
-                    wandb.log(
+                if wandb_run:
+                    wandb_run.log(
                         {
                             "loss": loss.item(),
                             "inventory length": len(inventory),
@@ -171,9 +170,14 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         }
                     )
 
-            if validation_inventories:
+            if validation_inventories and wandb_run:
                 _eval = {"epoch": epoch}
-                for metric in self.eval_(validation_inventories, None):
+
+                results = self.eval_(validation_inventories)
+                metrics = results[:4]
+                table = results[4]
+
+                for metric in metrics:
                     if metric.average is None:
                         _eval[metric.__class__.__name__] = {
                             label.name: score
@@ -182,30 +186,28 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     else:
                         _eval[metric.__class__.__name__] = metric.compute().item()
 
-                if _wandb:
-                    wandb.log(_eval)
-                else:
-                    tqdm.write(str(_eval))
+                wandb_run.log(_eval)
+
+                wandb_run.log({"results": wandb.Table(dataframe=table)})
 
                 self.train()
 
-        if _wandb:
+        if wandb_run:
             wandb.finish()
             # TODO: save model to WandB or HuggingFace
 
     def eval_(
-        self, inventories: list[Inventory], results_out: TextIO = sys.stdout
-    ) -> tuple[Metric, Metric, Metric, Metric]:
+        self, inventories: list[Inventory]
+    ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
         Args:
             inventories (list[Inventory]): The inventories to evaluate on.
-            results_out (TextIO): The file to write the output labels per sample.
-                If None (default), does not print the individual test labels.
-                Defaults to stdout.
         Returns:
-            tuple[Metric, Metric, Metric, Metric]: The precision, recall, F1 score, and accuracy.
+            tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
+                and a DataFrame containing the results per row.
         """
+        # TODO: log output to Weights & Biases
         metrics: tuple[Metric] = (
             MulticlassPrecision(average=None, num_classes=len(Label)),
             MulticlassRecall(average=None, num_classes=len(Label)),
@@ -213,15 +215,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             MulticlassAccuracy(),
         )
 
-        if results_out is not None:
-            writer = csv.DictWriter(
-                results_out,
-                fieldnames=("Predicted", "Actual", "Page ID", "Text", "Scores"),
-                delimiter="\t",
-            )
-            writer.writeheader()
-
         self.eval()
+
+        results: list[list[Any]] = []
 
         for inventory in tqdm(
             inventories, desc="Evaluating", total=len(inventories), unit="inventory"
@@ -234,18 +230,21 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             for metric in metrics:
                 metric.update(predicted, _labels)
 
-            if results_out is not None:
-                for page, pred, label in zip(
-                    inventory.pages, predicted, labels, strict=True
-                ):
-                    writer.writerow(
-                        {
-                            "Predicted": Label(pred.argmax().item()).name,
-                            "Actual": label.name,
-                            "Page ID": page.doc_id,
-                            "Text": page.text(delimiter="; ")[:50],
-                            "Scores": str(pred.tolist()),
-                        }
-                    )
+            for page, pred, label in zip(
+                inventory.pages, predicted, labels, strict=True
+            ):
+                results.append(
+                    [
+                        Label(pred.argmax().item()).name,
+                        label.name,
+                        page.doc_id,
+                        page.text(delimiter="; ")[:50],
+                        str(pred.tolist()),
+                    ]
+                )
 
-        return metrics
+        return metrics + (
+            pd.DataFrame(
+                results, columns=["Predicted", "Actual", "Page ID", "Text", "Scores"]
+            ),
+        )
