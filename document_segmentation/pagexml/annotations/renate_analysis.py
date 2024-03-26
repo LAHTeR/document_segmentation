@@ -5,23 +5,28 @@ import pandas as pd
 
 from document_segmentation.pagexml.datamodel.inventory import Inventory
 
-from ...settings import RENATE_TANAP_CATEGORISATION_SHEET
+from ...settings import INVENTORY_DIR, RENATE_TANAP_CATEGORISATION_SHEET
 from ..datamodel.label import Label
 from .sheet import Sheet
 
 
 class RenateAnalysis(Sheet):
-    def __init__(self, sheet: Path = RENATE_TANAP_CATEGORISATION_SHEET) -> None:
+    def __init__(
+        self,
+        sheet_file: Path = RENATE_TANAP_CATEGORISATION_SHEET,
+        *,
+        inventory_dir: Path = INVENTORY_DIR,
+    ) -> None:
         """Helper class to handle the 'Renate Analysis' sheet.
 
         Args:
-            sheet (Path, optional): Paths to the spreadsheet.
+            sheet_file (Path, optional): Paths to the spreadsheet.
                 Defaults to settings.RENATE_TANAP_CATEGORISATION_SHEET.
         """
-        super().__init__()
+        super().__init__(inventory_dir=inventory_dir)
 
         self._data = pd.read_excel(
-            sheet, dtype=self._dtypes, index_col=self._INDEX_COLUMN
+            sheet_file, dtype=self._dtypes, index_col=self._INDEX_COLUMN
         ).dropna(subset=self._dropna)
 
         self._data[self._DEEL_VAN_INVENTARIS_COL] = (
@@ -34,16 +39,20 @@ class RenateAnalysisInv(Sheet):
     _PAGE_COLUMN = "Page"
     _LABEL_COLUMN = "TANAP Boundaries"
 
-    def __init__(self, path: Path) -> None:
-        super().__init__()
+    def __init__(
+        self, sheet_file: Path, *, inventory_dir: Path = INVENTORY_DIR
+    ) -> None:
+        super().__init__(inventory_dir=inventory_dir)
 
-        self._data = pd.read_excel(path, index_col=self._INDEX_COLUMN).fillna("")
+        self._data = pd.read_excel(sheet_file, index_col=self._INDEX_COLUMN).fillna("")
         self._data[self._LABEL_COLUMN] = self._data[self._LABEL_COLUMN].str.replace(
             "START", "BEGIN"
         )
 
-        self._id = path.stem
-        self._inventory = Inventory.load_or_download(int(self._id[-4:]), "")
+        self._id = sheet_file.stem
+        self._inventory = Inventory.load_or_download(
+            int(self._id[-4:]), "", self._inventory_dir
+        )
 
     def inventories(self) -> Iterable[Inventory]:
         yield self._inventory

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ...settings import GENERALE_MISSIVEN_SHEET
+from ...settings import GENERALE_MISSIVEN_SHEET, INVENTORY_DIR
 from .sheet import Sheet
 
 
@@ -18,13 +18,18 @@ class GeneraleMissiven(Sheet):
 
     _SEPARATOR = ";"
 
-    def __init__(self, sheet_file: Path = GENERALE_MISSIVEN_SHEET) -> None:
+    def __init__(
+        self,
+        sheet_file: Path = GENERALE_MISSIVEN_SHEET,
+        inventory_dir: Path = INVENTORY_DIR,
+    ) -> None:
         """Load the spreadsheet into memory.
 
         Args:
             sheet_file (Path, optional): Path to the spreadsheet. Defaults to settings.GENERALE_MISSIVEN_SHEET.
+            inventory_dir (Path, optional): The directory where the inventories are stored.
         """
-        super().__init__()
+        super().__init__(inventory_dir=inventory_dir)
 
         self._data = pd.read_csv(
             sheet_file,

@@ -37,9 +37,14 @@ class TestRenateAnalysisInv:
     def test_sheet(self):
         return settings.DATA_DIR / "Analysis Renate 1547.xlsx"
 
-    def test_init(self, test_sheet):
+    @pytest.mark.skipif(
+        not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
+        reason="No server credentials.",
+    )
+    def test_init(self, test_sheet, tmp_path):
         """Test the initialization of the RenateAnalysisInv class."""
-        sheet = RenateAnalysisInv(test_sheet)
+        # FIXME: This test download the inventory from the server, mock request
+        sheet = RenateAnalysisInv(test_sheet, inventory_dir=tmp_path)
 
         for label in sheet._data[RenateAnalysisInv._LABEL_COLUMN]:
             try:

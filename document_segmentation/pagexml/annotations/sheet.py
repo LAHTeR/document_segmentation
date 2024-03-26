@@ -1,13 +1,14 @@
 import abc
 import logging
 from itertools import islice
+from pathlib import Path
 from typing import Iterable, Optional
 
 import pandas as pd
 import requests
 from tqdm import tqdm
 
-from ...settings import MIN_REGION_TEXT_LENGTH
+from ...settings import INVENTORY_DIR, MIN_REGION_TEXT_LENGTH
 from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
 
@@ -24,8 +25,16 @@ class Sheet(abc.ABC):
 
     _VALID_INVENTORY_PARTS = {"A", "B", "C"}
 
-    def __init__(self) -> None:
+    def __init__(self, *, inventory_dir: Path = INVENTORY_DIR) -> None:
+        """Initialize the sheet.
+
+        Args:
+            inventory_dir (Path, optional): The directory where the inventories are stored.
+                Defaults to INVENTORY_DIR.
+        """
         super().__init__()
+
+        self._inventory_dir = inventory_dir
 
         self._dtypes = {
             self._INDEX_COLUMN: str,
@@ -57,7 +66,7 @@ class Sheet(abc.ABC):
         """
         for inv_nr, part in self.inventory_numbers():
             try:
-                yield Inventory.load_or_download(inv_nr, part)
+                yield Inventory.load_or_download(inv_nr, part, self._inventory_dir)
             except requests.HTTPError as e:
                 logging.error(f"Failed to load inventory {inv_nr}: {e}")
 

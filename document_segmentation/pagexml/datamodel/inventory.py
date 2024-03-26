@@ -197,10 +197,9 @@ class Inventory(BaseModel, Dataset):
                 inv_nr, inventory_part, target_directory=inventory_dir
             )
         except ValidationError as e:
-            logging.error(
+            raise ValidationError(
                 f"Error loading inventory {inv_nr}_{inventory_part} from file {local_file}: {e}"
-            )
-            raise e
+            ) from e
         return inventory
 
     @classmethod
