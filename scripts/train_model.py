@@ -95,44 +95,44 @@ if __name__ == "__main__":
     # LOAD ANNOTATION SHEETS AND DATA
     ########################################################################################
 
-    sheet_paths: list[Path] = []
-    inventories: list[list[Inventory]] = []
+    training_inventories: list[Inventory] = []
+    validation_inventories: dict[str, list[Inventory]] = {}
 
     if args.gm_sheet:
         sheet = GeneraleMissiven(args.gm_sheet)
-        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
+        _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
-        sheet_paths.append(args.gm_sheet)
+        random.shuffle(_inventories)
+        split = int(len(_inventories) * args.split)
+        training_inventories.extend(_inventories[:split])
+        validation_inventories[args.gm_sheet.name] = _inventories[split:]
+
     if args.renate_categorisation_sheet:
         sheet = RenateAnalysis(args.renate_categorisation_sheet)
-        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
+        _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
-        sheet_paths.append(args.renate_categorisation_sheet)
-    for _sheet in args.renate_analysis_sheet:
-        sheet = RenateAnalysisInv(_sheet)
-        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
-
-        sheet_paths.append(_sheet)
-
-    training_inventories: list[list[Inventory]] = []
-    validation_inventories: list[list[Inventory]] = []
-
-    for _inventories in inventories:
-        random.shuffle(inventories)
+        random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
-        training_inventories.append(_inventories[:split])
-        validation_inventories.append(_inventories[split:])
+        training_inventories.extend(_inventories[:split])
+        validation_inventories[args.renate_categorisation_sheet.name] = _inventories[
+            split:
+        ]
+
+    for i, _sheet in enumerate(args.renate_analysis_sheet):
+        sheet = RenateAnalysisInv(_sheet)
+        _inventories = list(sheet.all_annotated_inventories(n=args.n))
+        if i == 0:
+            # TODO: randomize when there are more than two sheets
+            training_inventories.extend(_inventories)
+        else:
+            validation_inventories[_sheet.stem] = _inventories
 
     ########################################################################################
     # LOAD OR TRAIN MODEL
     ########################################################################################
     model = PageSequenceTagger(device=args.device)
 
-    model.train_(
-        sum(training_inventories, start=[]),
-        sum(validation_inventories, start=[]),
-        epochs=args.epochs,
-    )
+    model.train_(training_inventories, validation_inventories, epochs=args.epochs)
     torch.save(model, args.model_file)
 
     logging.debug(str(model))
@@ -140,15 +140,15 @@ if __name__ == "__main__":
     ########################################################################################
     # EVALUATE MODEL
     ########################################################################################
-    for validation, sheet_path in zip(validation_inventories, sheet_paths, strict=True):
-        print(f"Sheet: {sheet_path}", file=args.eval_output, flush=True)
-        print(f"Sheet: {sheet_path}", file=args.test_output, flush=True)
+    for name, validation in validation_inventories.items():
+        print(f"Sheet: {name}", file=args.eval_output)
+        print(f"Sheet: {name}", file=args.test_output)
 
-        metrics = model.eval_(validation, args.test_output)
+        results = model.eval_(validation)
+        metrics = results[:4]
+        table = results[4]
 
-        for average, _metrics in groupby(
-            sorted(metrics, key=lambda m: m.average is None), key=lambda m: m.average
-        ):
+        for average, _metrics in groupby(metrics, key=lambda m: m.average):
             if average is None:
                 writer = csv.DictWriter(
                     args.eval_output,
@@ -174,6 +174,9 @@ if __name__ == "__main__":
                         flush=True,
                     )
             args.eval_output.flush()
+        print("=" * 80, file=args.eval_output)
 
-        print("=" * 80, file=args.eval_output, flush=True)
-        print("=" * 80, file=args.test_output, flush=True)
+        results[4].to_csv(
+            args.test_output, sep="\t", index=False, header=True, mode="a"
+        )
+        print("=" * 80, file=args.test_output)
