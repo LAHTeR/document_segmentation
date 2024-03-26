@@ -95,44 +95,44 @@ if __name__ == "__main__":
     # LOAD ANNOTATION SHEETS AND DATA
     ########################################################################################
 
-    sheet_paths: list[Path] = []
-    inventories: list[list[Inventory]] = []
+    training_inventories: list[Inventory] = []
+    validation_inventories: dict[str, list[Inventory]] = {}
 
     if args.gm_sheet:
         sheet = GeneraleMissiven(args.gm_sheet)
-        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
+        _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
-        sheet_paths.append(args.gm_sheet)
+        random.shuffle(_inventories)
+        split = int(len(_inventories) * args.split)
+        training_inventories.extend(_inventories[:split])
+        validation_inventories[args.gm_sheet.name] = _inventories[split:]
+
     if args.renate_categorisation_sheet:
         sheet = RenateAnalysis(args.renate_categorisation_sheet)
-        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
+        _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
-        sheet_paths.append(args.renate_categorisation_sheet)
-    for _sheet in args.renate_analysis_sheet:
-        sheet = RenateAnalysisInv(_sheet)
-        inventories.append(list(sheet.all_annotated_inventories(n=args.n)))
-
-        sheet_paths.append(_sheet)
-
-    training_inventories: list[list[Inventory]] = []
-    validation_inventories: list[list[Inventory]] = []
-
-    for _inventories in inventories:
-        random.shuffle(inventories)
+        random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
-        training_inventories.append(_inventories[:split])
-        validation_inventories.append(_inventories[split:])
+        training_inventories.extend(_inventories[:split])
+        validation_inventories[args.renate_categorisation_sheet.name] = _inventories[
+            split:
+        ]
+
+    for i, _sheet in enumerate(args.renate_analysis_sheet):
+        sheet = RenateAnalysisInv(_sheet)
+        _inventories = list(sheet.all_annotated_inventories(n=args.n))
+        if i == 0:
+            # TODO: randomize when there are more than two sheets
+            training_inventories.extend(_inventories)
+        else:
+            validation_inventories[_sheet.stem] = _inventories
 
     ########################################################################################
     # LOAD OR TRAIN MODEL
     ########################################################################################
     model = PageSequenceTagger(device=args.device)
 
-    model.train_(
-        sum(training_inventories, start=[]),
-        sum(validation_inventories, start=[]),
-        epochs=args.epochs,
-    )
+    model.train_(training_inventories, validation_inventories, epochs=args.epochs)
     torch.save(model, args.model_file)
 
     logging.debug(str(model))
@@ -140,9 +140,9 @@ if __name__ == "__main__":
     ########################################################################################
     # EVALUATE MODEL
     ########################################################################################
-    for validation, sheet_path in zip(validation_inventories, sheet_paths, strict=True):
-        print(f"Sheet: {sheet_path}", file=args.eval_output)
-        print(f"Sheet: {sheet_path}", file=args.test_output)
+    for name, validation in validation_inventories.items():
+        print(f"Sheet: {name}", file=args.eval_output)
+        print(f"Sheet: {name}", file=args.test_output)
 
         results = model.eval_(validation)
         metrics = results[:4]

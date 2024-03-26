@@ -77,7 +77,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
     def train_(
         self,
         training_inventories: list[Inventory],
-        validation_inventories: Optional[list[Inventory]] = None,
+        validation_inventories: Optional[dict[str, list[Inventory]]] = None,
         *,
         epochs: int = 3,
         weights: Optional[list[float]] = None,
@@ -88,8 +88,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         Args:
             training_inventories (list[Inventory]): The dataset to train on.
-            validation_inventories (Optional[list[Inventory]], optional): The validation dataset.
-                Defaults to None. If given, will evaluate after each epoch.
+            validation_inventories (Optional[dict[str[list[Inventory]]], optional): Validation datasets with name.
+                Defaults to None. If given, will evaluate each dataset separately after each epoch.
             epochs (int, optional): The number of epochs to train. Defaults to 3.
             weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
@@ -173,23 +173,31 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             if validation_inventories and wandb_run:
                 _eval = {"epoch": epoch}
 
-                results = self.eval_(validation_inventories)
-                metrics = results[:4]
-                table = results[4]
+                for name, inventories in validation_inventories.items():
+                    dataset_eval = {}
 
-                for metric in metrics:
-                    if metric.average is None:
-                        _eval[metric.__class__.__name__] = {
-                            label.name: score
-                            for label, score in zip(Label, metric.compute().tolist())
-                        }
-                    else:
-                        _eval[metric.__class__.__name__] = metric.compute().item()
+                    results = self.eval_(inventories)
+                    metrics = results[:4]
+                    table = results[4]
+
+                    wandb_run.log({name + "_results": wandb.Table(dataframe=table)})
+
+                    for metric in metrics:
+                        if metric.average is None:
+                            dataset_eval[metric.__class__.__name__] = {
+                                label.name: score
+                                for label, score in zip(
+                                    Label, metric.compute().tolist()
+                                )
+                            }
+                        else:
+                            dataset_eval[metric.__class__.__name__] = (
+                                metric.compute().item()
+                            )
+
+                    _eval[name] = dataset_eval
 
                 wandb_run.log(_eval)
-
-                wandb_run.log({"results": wandb.Table(dataframe=table)})
-
                 self.train()
 
         if wandb_run:
