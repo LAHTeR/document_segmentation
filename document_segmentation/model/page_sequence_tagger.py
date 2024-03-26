@@ -215,7 +215,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
         """
-        # TODO: log output to Weights & Biases
         metrics: tuple[Metric] = (
             MulticlassPrecision(average=None, num_classes=len(Label)),
             MulticlassRecall(average=None, num_classes=len(Label)),
