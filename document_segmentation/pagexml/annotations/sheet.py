@@ -8,7 +8,12 @@ import pandas as pd
 import requests
 from tqdm import tqdm
 
-from ...settings import INVENTORY_DIR, MIN_REGION_TEXT_LENGTH
+from ...settings import (
+    INVENTORY_DIR,
+    MIN_REGION_TEXT_LENGTH,
+    SERVER_PASSWORD,
+    SERVER_USERNAME,
+)
 from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
 
@@ -51,6 +56,25 @@ class Sheet(abc.ABC):
 
     def __len__(self):
         return len(self._data)
+
+    def download_inventories(
+        self, *, username: str = SERVER_USERNAME, password: str = SERVER_PASSWORD
+    ):
+        session = requests.Session()
+        session.auth = (SERVER_USERNAME, SERVER_PASSWORD)
+
+        for inv_nr, part in tqdm(
+            list(self.inventory_numbers()), desc="Downloading inventories", unit="inv"
+        ):
+            inv_str = f"{inv_nr}_{part}"
+            try:
+                Inventory.download(
+                    inv_nr, part, target_directory=self._inventory_dir, session=session
+                )
+            except FileExistsError as e:
+                logging.info(f"Skipping inventory {inv_str}: {e}")
+            except requests.HTTPError as e:
+                logging.error(f"Failed to load inventory {inv_str}: {e}")
 
     def inventory_numbers(self) -> Iterable[tuple[int, str]]:
         key_fields = [self._INV_NR_COLUMN, self._DEEL_VAN_INVENTARIS_COL]
