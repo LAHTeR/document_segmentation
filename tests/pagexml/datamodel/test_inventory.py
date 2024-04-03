@@ -37,7 +37,7 @@ class TestInventory:
             pages=[
                 Page(
                     label=Label.UNK,
-                    scan_nr=1,
+                    scan_nr=1,  # Scans start at 1
                     doc_id="doc1",
                     external_ref="ref1",
                     regions=[],
@@ -65,6 +65,11 @@ class TestInventory:
         for page, expected_label in zip(inventory.pages, expected_labels):
             assert page.label == expected_label
 
+        # END and BEGIN on the same page:
+        inventory.annotate_scan(2, Label.END)
+        assert inventory.pages[1].label == Label.END_BEGIN
+
+        # Invalid scan numbers:
         with pytest.raises(ValueError):
             inventory.annotate_scan(0, Label.END)
             inventory.annotate_scan(4, Label.END)

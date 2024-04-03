@@ -35,7 +35,7 @@ class Inventory(BaseModel, Dataset):
         """Remove invalid inventory parts.
 
 
-        Currently, letters are allowed (A, B, C, I, II) and empty strings. Integers are invalid.
+        Currently, letters are allowed (e.g. A, B, C, I, II) and empty strings. Integers are invalid.
         """
 
         default_value = ""
@@ -77,6 +77,13 @@ class Inventory(BaseModel, Dataset):
 
         if page.label == Label.UNK:
             page.label = label
+        elif {page.label, label} == {Label.BEGIN, Label.END}:
+            new_label = Label.END_BEGIN
+            # TODO: log to info level
+            logging.warning(
+                f"Scan {scan_nr} already has label {page.label.name}. Changing to {new_label.name}. Inventory: {str(self)}"
+            )
+            page.label = new_label
         else:
             logging.warning(
                 f"Scan {scan_nr} already has label {page.label}. Ignoring new label ({label}). Inventory: {str(self)}"
