@@ -7,7 +7,7 @@ from typing import Counter, Iterable, Optional
 import requests
 import torch
 from pagexml.parser import parse_pagexml_file
-from pydantic import BaseModel, PositiveInt, ValidationError
+from pydantic import BaseModel, PositiveInt, ValidationError, field_validator
 from torch.utils.data import Dataset
 
 from ...settings import (
@@ -29,6 +29,31 @@ class Inventory(BaseModel, Dataset):
     inventory_part: str = ""
     pages: list[Page]
 
+    @field_validator("inventory_part")
+    @classmethod
+    def validate_inv_part(cls, value: str) -> str:
+        """Remove invalid inventory parts.
+
+
+        Currently, letters are allowed (e.g. A, B, C, I, II) and empty strings. Integers are invalid.
+        """
+
+        default_value = ""
+
+        if len(value) == 0:
+            # Empty string
+            pass
+        else:
+            try:
+                int(value)
+            except ValueError:
+                # Not an integer
+                pass
+            else:
+                logging.warning("Removing invalid inventory part: '%s'", value)
+                value = default_value
+        return value
+
     def __len__(self) -> int:
         """Return the number of pages in the inventory."""
         return len(self.pages)
@@ -46,16 +71,27 @@ class Inventory(BaseModel, Dataset):
     def annotate_scan(self, scan_nr: int, label: Label):
         page = None
         try:
-            page: Page = self.pages[scan_nr - 1]
+            page: Page = self.get_scan(scan_nr)
         except IndexError as e:
             raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
 
         if page.label == Label.UNK:
             page.label = label
+        elif {page.label, label} == {Label.BEGIN, Label.END}:
+            new_label = Label.END_BEGIN
+            # TODO: log to info level
+            logging.warning(
+                f"Scan {scan_nr} already has label {page.label.name}. Changing to {new_label.name}. Inventory: {str(self)}"
+            )
+            page.label = new_label
         else:
             logging.warning(
                 f"Scan {scan_nr} already has label {page.label}. Ignoring new label ({label}). Inventory: {str(self)}"
             )
+
+    def get_scan(self, scan_nr: int) -> Page:
+        """Get the page with the given scan number."""
+        return self.pages[scan_nr - 1]
 
     def labels(self) -> list[Label]:
         return [page.label for page in self.pages]
@@ -81,6 +117,15 @@ class Inventory(BaseModel, Dataset):
         return [page for page in self.pages if page.label != Label.UNK]
 
     def labelled_inventories(self) -> Iterable["Inventory"]:
+        """Split the inventory into segments.
+
+        Each segment will have a continuous sequence of labelled pages.
+        Non-labelled pages are cut out.
+
+        Returns:
+            Iterable[Inventory]: An iterable of Inventories with labelled pages; singleton if all pages are labelled.
+        """
+
         if len(self.labelled()) == 0:
             raise ValueError(f"No labelled pages in inventory: {self}")
         elif len(self.labelled()) == len(self):
@@ -178,6 +223,7 @@ class Inventory(BaseModel, Dataset):
         Returns:
             Path: The path to the inventory Json file.
         """
+        inventory_part = Inventory.validate_inv_part(inventory_part)
         filename: str = (
             "_".join((f"{inv_nr:04d}", inventory_part)).rstrip("_") + ".json"
         )
@@ -232,15 +278,17 @@ class Inventory(BaseModel, Dataset):
             session = requests.Session()
         session.auth = (username, password)
 
-        filename = f"{inv_nr:04d}{inventory_part}.zip"
-        remote_url = "/".join((server_url.rstrip("/"), base_path.rstrip("/"), filename))
+        remote_filename = (
+            f"{inv_nr:04d}{Inventory.validate_inv_part(inventory_part)}.zip"
+        )
+        url = "/".join((server_url.rstrip("/"), base_path.rstrip("/"), remote_filename))
 
-        r = session.get(remote_url, stream=True)
+        r = session.get(url, stream=True)
         r.raise_for_status()
 
         pages: list[Page] = []
         with TemporaryDirectory() as tmp_dir:
-            local_zip_file = Path(tmp_dir) / filename
+            local_zip_file = Path(tmp_dir) / remote_filename
 
             with open(local_zip_file, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
