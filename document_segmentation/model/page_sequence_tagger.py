@@ -1,6 +1,7 @@
 import logging
 import math
 import random
+from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
@@ -17,7 +18,10 @@ from torcheval.metrics import (
 )
 from tqdm import tqdm
 
-from document_segmentation.pagexml.datamodel.inventory import Inventory
+from document_segmentation.pagexml.datamodel.inventory import (
+    Inventory,
+    ThumbnailDownloader,
+)
 from document_segmentation.pagexml.datamodel.page import Page
 
 from ..pagexml.datamodel.label import Label
@@ -83,6 +87,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         weights: Optional[list[float]] = None,
         shuffle: bool = True,
         log_wandb: bool = True,
+        thumbnail_downloader: Optional[ThumbnailDownloader] = None,
     ):
         """Train the model on the given dataset.
 
@@ -94,6 +99,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
+            thumbnail_downloader (Optional[ThumbnailDownloader], optional): The thumbnail downloader to use.
         """
         self.train()
 
@@ -176,7 +182,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 for name, inventories in validation_inventories.items():
                     dataset_eval = {}
 
-                    results = self.eval_(inventories)
+                    results = self.eval_(inventories, thumbnail_downloader)
                     metrics = results[:4]
                     table = results[4]
 
@@ -205,12 +211,15 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             # TODO: save model to WandB or HuggingFace
 
     def eval_(
-        self, inventories: list[Inventory]
+        self,
+        inventories: list[Inventory],
+        thumbnail_downloader: Optional[ThumbnailDownloader] = None,
     ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
         Args:
             inventories (list[Inventory]): The inventories to evaluate on.
+            thumbnail_downloader (Optional[ThumbnailDownloader], optional): The thumbnail downloader to use.
         Returns:
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
@@ -240,18 +249,21 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             for page, pred, label in zip(
                 inventory.pages, predicted, labels, strict=True
             ):
-                results.append(
-                    [
-                        Label(pred.argmax().item()).name,
-                        label.name,
-                        page.doc_id,
-                        page.text(delimiter="; ")[:50],
-                        str(pred.tolist()),
-                    ]
-                )
+                row = [
+                    Label(pred.argmax().item()).name,
+                    label.name,
+                    page.doc_id,
+                    page.text(delimiter="; ")[:50],
+                    str(pred.tolist()),
+                ]
+                if thumbnail_downloader:
+                    img_file: Path = thumbnail_downloader.thumbnail(inventory, page)
+                    row.append(wandb.Image(str(img_file)))
 
-        return metrics + (
-            pd.DataFrame(
-                results, columns=["Predicted", "Actual", "Page ID", "Text", "Scores"]
-            ),
-        )
+                results.append(row)
+
+        columns = ["Predicted", "Actual", "Page ID", "Text", "Scores"]
+        if thumbnail_downloader:
+            columns.append("Thumbnail")
+
+        return metrics + (pd.DataFrame(results, columns=columns),)

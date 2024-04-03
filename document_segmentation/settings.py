@@ -36,6 +36,13 @@ SERVER_PASSWORD: str = os.getenv("HUC_PASSWORD", "")
 if not SERVER_PASSWORD:
     logging.warning("No password set for accessing the HUC server.")
 
+INV_NR_UUID_MAPPING_FILE: Path = DATA_DIR / "1.04.02_inventory2uuid.json"
+if not INV_NR_UUID_MAPPING_FILE.exists():
+    raise ValueError(
+        f"Inventory number to UUID mapping file not found: {INV_NR_UUID_MAPPING_FILE}"
+    )
+THUMBNAILS_DIR: Path = DATA_DIR / "thumbnails"
+
 LANGUAGE_MODEL: str = os.getenv(
     "LANGUAGE_MODEL",
     "NetherlandsForensicInstitute/robbert-2022-dutch-sentence-transformers",

@@ -28,3 +28,5 @@ CWD = Path(__file__).parent.absolute()
 DATA_DIR = CWD / "data"
 GENERALE_MISSIVEN_CSV = DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
 TEST_FILE = (DATA_DIR / str(TEST_INV_NR)).with_suffix(".zip")
+
+TEST_THUMBNAIL_FILE: Path = DATA_DIR / "aa84f770-f5d7-40ac-bfda-db3d06f204c9.jpg"

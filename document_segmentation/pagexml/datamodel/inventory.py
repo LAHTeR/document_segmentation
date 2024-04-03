@@ -1,9 +1,13 @@
+import json
 import logging
 import zipfile
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Counter, Iterable, Optional
+from uuid import UUID
 
+import PIL.Image
 import requests
 import torch
 from pagexml.parser import parse_pagexml_file
@@ -13,10 +17,12 @@ from torch.utils.data import Dataset
 from ...settings import (
     DEFAULT_BASE_PATH,
     DEFAULT_SERVER,
+    INV_NR_UUID_MAPPING_FILE,
     INVENTORY_DIR,
     MIN_REGION_TEXT_LENGTH,
     SERVER_PASSWORD,
     SERVER_USERNAME,
+    THUMBNAILS_DIR,
 )
 from .label import Label
 from .page import Page
@@ -92,6 +98,13 @@ class Inventory(BaseModel, Dataset):
     def get_scan(self, scan_nr: int) -> Page:
         """Get the page with the given scan number."""
         return self.pages[scan_nr - 1]
+
+    def full_inv_nr(self, *, delimiter: str = "") -> str:
+        if self.inventory_part:
+            inv_nr = delimiter.join([str(self.inv_nr), self.inventory_part])
+        else:
+            inv_nr = str(self.inv_nr)
+        return inv_nr
 
     def labels(self) -> list[Label]:
         return [page.label for page in self.pages]
@@ -312,3 +325,84 @@ class Inventory(BaseModel, Dataset):
         inventory.write(local_file)
 
         return inventory
+
+
+class ThumbnailDownloader:
+    """Retrieve thumbnails for scans in an inventory."""
+
+    def __init__(
+        self, mapping: dict[str, UUID], *, thumbnails_dir: Path = THUMBNAILS_DIR
+    ) -> None:
+        """Initialize the thumbnail downloader.
+
+        Args:
+            mapping (dict[str, UUID]): A mapping from inventory numbers to UUIDs.
+            thumbnails_dir (Path, optional): The directory where the thumbnails are stored. Defaults to THUMBNAILS_DIR.
+        """
+        self._base_url: str = "https://service.archief.nl/iipsrv?IIIF="
+
+        self._mapping = mapping
+        self._thumbnails_dir = thumbnails_dir
+        self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
+
+    def get_uuid(self, inventory: Inventory) -> UUID:
+        return self._mapping[inventory.full_inv_nr()]
+
+    def _local_file(self, inventory: Inventory, page: Page, size: str) -> Path:
+        return (
+            self._thumbnails_dir / f"{inventory.full_inv_nr()}_{page.scan_nr}_{size}"
+        ).with_suffix(".jpg")
+
+    def thumbnail(
+        self, inventory: Inventory, page: Page, *, size: str = "120,"
+    ) -> Path:
+        """Get the thumbnail for the given page.
+
+        If the file already exists, it will be read from disk. Otherwise, it will be downloaded.
+
+        Args:
+            inventory (Inventory): The inventory.
+            page (Page): The page.
+            size (str): The size of the thumbnail. Defaults to "120,".
+                Valid modes are documented here: https://iiif.io/api/image/2.1/#size
+        """
+        thumbnail_file = self._local_file(inventory, page, size)
+
+        if not thumbnail_file.exists():
+            self.download(inventory, page, size=size)
+        return thumbnail_file
+
+    def download(self, inventory: Inventory, page: Page, *, size: str) -> Path:
+        # TODO: add other parameters for size (and format)
+        # Example URL: "https://service.archief.nl/iipsrv?IIIF=/db/77/6f/a8/9d/77/45/ca/8e/85/e1/c4/84/06/a5/55/aa84f770-f5d7-40ac-bfda-db3d06f204c9.jp2/full/100,/0/default.jpg"
+
+        _uuid: str = self.get_uuid(inventory).hex
+        uuid_part: str = "/".join([_uuid[i : i + 2] for i in range(0, len(_uuid), 2)])
+        url = f"{self._base_url}/{uuid_part}/{page.external_ref}.jp2/full/{size}/0/default.jpg"
+
+        response: requests.Response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        image = PIL.Image.open(BytesIO(response.content))
+
+        target_file = self._local_file(inventory, page, size)
+        image.save(target_file)
+
+        return target_file
+
+    @classmethod
+    def from_file(
+        cls, file: Path = INV_NR_UUID_MAPPING_FILE, **kwargs
+    ) -> "ThumbnailDownloader":
+        with file.open("rt") as f:
+            mapping = {inv_nr: UUID(_uuid) for inv_nr, _uuid in json.load(f).items()}
+        return cls(mapping, **kwargs)
+
+    @classmethod
+    def from_url(
+        cls,
+        url="https://raw.githubusercontent.com/globalise-huygens/knowledge-graph/main/htr/inventory2uuid.json",
+    ):
+        raise NotImplementedError()
+        mapping = requests.get(url).json()
+        return cls(mapping)

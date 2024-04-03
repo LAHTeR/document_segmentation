@@ -1,10 +1,17 @@
 import logging
+from uuid import UUID
 
 import pytest
+import requests_mock
 
-from document_segmentation.pagexml.datamodel.inventory import Inventory
+from document_segmentation.pagexml.datamodel.inventory import (
+    Inventory,
+    ThumbnailDownloader,
+)
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.pagexml.datamodel.page import Page
+
+from ...conftest import TEST_THUMBNAIL_FILE
 
 
 class TestInventory:
@@ -104,3 +111,26 @@ class TestInventory:
                 Inventory.local_file(inv_nr, inv_part, tmp_path) == tmp_path / expected
             )
             assert caplog.messages == expected_logs, "Unexpected log messages"
+
+
+class TestThumbnailDownloader:
+    def test_download(self, tmp_path):
+        thumbnail_downloader = ThumbnailDownloader(
+            mapping={"1": UUID("db776fa8-9d77-45ca-8e85-e1c48406a555")},
+            thumbnails_dir=tmp_path,
+        )
+        page = Page(
+            label=Label.UNK,
+            scan_nr=1,
+            external_ref="aa84f770-f5d7-40ac-bfda-db3d06f204c9",
+            regions=[],
+        )
+        inventory = Inventory(inv_nr=1, inventory_part="", pages=[page])
+
+        expected_url = "https://service.archief.nl/iipsrv?IIIF=/db/77/6f/a8/9d/77/45/ca/8e/85/e1/c4/84/06/a5/55/aa84f770-f5d7-40ac-bfda-db3d06f204c9.jp2/full/100,/0/default.jpg"
+
+        with requests_mock.Mocker() as mocker:
+            mocker.get(expected_url, content=TEST_THUMBNAIL_FILE.open("rb").read())
+
+            target_file = thumbnail_downloader.download(inventory, page, size="100,")
+        assert target_file.is_file()
