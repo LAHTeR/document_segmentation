@@ -71,7 +71,7 @@ class Inventory(BaseModel, Dataset):
     def annotate_scan(self, scan_nr: int, label: Label):
         page = None
         try:
-            page: Page = self.pages[scan_nr - 1]
+            page: Page = self.get_scan(scan_nr)
         except IndexError as e:
             raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
 
@@ -88,6 +88,10 @@ class Inventory(BaseModel, Dataset):
             logging.warning(
                 f"Scan {scan_nr} already has label {page.label}. Ignoring new label ({label}). Inventory: {str(self)}"
             )
+
+    def get_scan(self, scan_nr: int) -> Page:
+        """Get the page with the given scan number."""
+        return self.pages[scan_nr - 1]
 
     def labels(self) -> list[Label]:
         return [page.label for page in self.pages]
@@ -113,6 +117,15 @@ class Inventory(BaseModel, Dataset):
         return [page for page in self.pages if page.label != Label.UNK]
 
     def labelled_inventories(self) -> Iterable["Inventory"]:
+        """Split the inventory into segments.
+
+        Each segment will have a continuous sequence of labelled pages.
+        Non-labelled pages are cut out.
+
+        Returns:
+            Iterable[Inventory]: An iterable of Inventories with labelled pages; singleton if all pages are labelled.
+        """
+
         if len(self.labelled()) == 0:
             raise ValueError(f"No labelled pages in inventory: {self}")
         elif len(self.labelled()) == len(self):

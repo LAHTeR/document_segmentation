@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Iterable
 
@@ -5,7 +6,11 @@ import pandas as pd
 
 from document_segmentation.pagexml.datamodel.inventory import Inventory
 
-from ...settings import INVENTORY_DIR, RENATE_TANAP_CATEGORISATION_SHEET
+from ...settings import (
+    INVENTORY_DIR,
+    MIN_REGION_TEXT_LENGTH,
+    RENATE_TANAP_CATEGORISATION_SHEET,
+)
 from ..datamodel.label import Label
 from .sheet import Sheet
 
@@ -61,17 +66,56 @@ class RenateAnalysisInv(Sheet):
         return [(self._inventory.inv_nr, self._inventory.inventory_part)]
 
     def annotate_inventory(self, inventory: Inventory) -> "Inventory":
-        # TODO: handle multiple labels per scan
-        default_label = "OUT"
+        in_doc: bool = False
+        """Inside a document or not."""
+        pre_annotation: bool = True
+        """Not seen any annotation yet"""
 
         for idx, row in self._data.iterrows():
             scan_nr = int(idx[-4:])
-            label = Label[row[self._LABEL_COLUMN].strip() or default_label]
-            inventory.annotate_scan(scan_nr, label)
 
-            if label == Label.BEGIN:
-                default_label = "IN"
-            elif label == Label.END:
-                default_label = "OUT"
+            has_text: bool = (
+                len(inventory.get_scan(scan_nr).text()) >= MIN_REGION_TEXT_LENGTH
+            )
+
+            if annotation := row[self._LABEL_COLUMN].strip():
+                # sheet provides annotation for page (BEGIN or END)
+                label: Label = Label[annotation]
+                pre_annotation = False
+
+                message = f"Unexpected label: '{label.name}' for scan '{scan_nr}' for inventory '{inventory}' in sheet '{self}."
+
+                if label == Label.BEGIN:
+                    if in_doc:
+                        logging.warning(message)
+                    in_doc = True
+                elif label == Label.END:
+                    if not in_doc:
+                        logging.warning(message)
+                    in_doc = False
+                else:
+                    raise ValueError(message)
+            elif pre_annotation:
+                # In the beginning of the inventory
+                if has_text:
+                    if in_doc:
+                        label = Label.IN
+                    else:
+                        label = Label.BEGIN
+                        in_doc = True
+                else:
+                    if in_doc:
+                        label = Label.END
+                        in_doc = False
+                    else:
+                        label = Label.OUT
+            else:
+                # No annotation for scan, but not in the beginning of the inventory
+                if in_doc:
+                    label = Label.IN
+                else:
+                    label = Label.OUT
+
+            inventory.annotate_scan(scan_nr, label)
 
         return inventory
