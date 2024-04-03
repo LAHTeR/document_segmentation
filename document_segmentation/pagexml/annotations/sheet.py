@@ -28,8 +28,6 @@ class Sheet(abc.ABC):
     _DEEL_VAN_INVENTARIS_COL = "Part of the inv.nr."
     _SKIP_MESSAGE = ""
 
-    _VALID_INVENTORY_PARTS = {"A", "B", "C"}
-
     def __init__(self, *, inventory_dir: Path = INVENTORY_DIR) -> None:
         """Initialize the sheet.
 

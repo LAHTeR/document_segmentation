@@ -74,6 +74,7 @@ class TestInventory:
             inventory.annotate_scan(0, Label.END)
             inventory.annotate_scan(4, Label.END)
 
+    # TODO: test for files with inventory parts (both valid ("A" and invalid ("1"))
     def test_download(self, mock_request, tmp_path):
         inventory = Inventory.download(
             inv_nr=1201, inventory_part="", target_directory=tmp_path

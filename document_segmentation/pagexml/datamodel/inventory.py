@@ -265,15 +265,17 @@ class Inventory(BaseModel, Dataset):
             session = requests.Session()
         session.auth = (username, password)
 
-        filename = f"{inv_nr:04d}{inventory_part}.zip"
-        remote_url = "/".join((server_url.rstrip("/"), base_path.rstrip("/"), filename))
+        remote_filename = (
+            f"{inv_nr:04d}{Inventory.validate_inv_part(inventory_part)}.zip"
+        )
+        url = "/".join((server_url.rstrip("/"), base_path.rstrip("/"), remote_filename))
 
-        r = session.get(remote_url, stream=True)
+        r = session.get(url, stream=True)
         r.raise_for_status()
 
         pages: list[Page] = []
         with TemporaryDirectory() as tmp_dir:
-            local_zip_file = Path(tmp_dir) / filename
+            local_zip_file = Path(tmp_dir) / remote_filename
 
             with open(local_zip_file, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
