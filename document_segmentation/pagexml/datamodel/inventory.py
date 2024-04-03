@@ -7,7 +7,7 @@ from typing import Counter, Iterable, Optional
 import requests
 import torch
 from pagexml.parser import parse_pagexml_file
-from pydantic import BaseModel, PositiveInt, ValidationError
+from pydantic import BaseModel, PositiveInt, ValidationError, field_validator
 from torch.utils.data import Dataset
 
 from ...settings import (
@@ -28,6 +28,31 @@ class Inventory(BaseModel, Dataset):
     inv_nr: PositiveInt
     inventory_part: str = ""
     pages: list[Page]
+
+    @field_validator("inventory_part")
+    @classmethod
+    def validate_inv_part(cls, value: str) -> str:
+        """Remove invalid inventory parts.
+
+
+        Currently, letters are allowed (A, B, C, I, II) and empty strings. Integers are invalid.
+        """
+
+        default_value = ""
+
+        if len(value) == 0:
+            # Empty string
+            pass
+        else:
+            try:
+                int(value)
+            except ValueError:
+                # Not an integer
+                pass
+            else:
+                logging.warning("Removing invalid inventory part: '%s'", value)
+                value = default_value
+        return value
 
     def __len__(self) -> int:
         """Return the number of pages in the inventory."""
@@ -178,6 +203,7 @@ class Inventory(BaseModel, Dataset):
         Returns:
             Path: The path to the inventory Json file.
         """
+        inventory_part = Inventory.validate_inv_part(inventory_part)
         filename: str = (
             "_".join((f"{inv_nr:04d}", inventory_part)).rstrip("_") + ".json"
         )
