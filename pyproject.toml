@@ -19,6 +19,7 @@ torcheval = "^0.0.7"
 pydantic = "^2.6.3"
 sentence-transformers = "^2.5.1"
 wandb = "^0.16.4"
+pillow = "^10.3.0"
 
 
 [tool.poetry.group.dev.dependencies]
