@@ -97,6 +97,5 @@ __pypackages__/
 
 # Local PageXML cache
 document_segmentation/data/inventories
-document_segmentation/data/thumbnails
 
 wandb/
