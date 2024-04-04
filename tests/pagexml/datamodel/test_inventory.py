@@ -173,7 +173,7 @@ class TestThumbnailDownloader:
         inventory = Inventory(inv_nr=1, inventory_part="", pages=[page])
         assert (
             thumbnail_downloader.thumbnail_url(inventory, page)
-            == "https://service.archief.nl/iipsrv?IIIF=/db/77/6f/a8/9d/77/45/ca/8e/85/e1/c4/84/06/a5/55/aa84f770-f5d7-40ac-bfda-db3d06f204c9.jp2/full/200,/0/default.jpg"
+            == "https://service.archief.nl/iipsrv?IIIF=/db/77/6f/a8/9d/77/45/ca/8e/85/e1/c4/84/06/a5/55/aa84f770-f5d7-40ac-bfda-db3d06f204c9.jp2/full/,100/0/default.jpg"
         )
 
     def test_download(self, thumbnail_downloader):
