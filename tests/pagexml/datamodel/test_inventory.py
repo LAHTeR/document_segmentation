@@ -96,6 +96,21 @@ class TestInventory:
         )
 
     @pytest.mark.parametrize(
+        "inv_nr, inv_part, expected",
+        [
+            (1201, "", "1201"),
+            (1201, "A", "1201A"),
+            (1201, "1", "1201"),
+            (1, "", "0001"),
+        ],
+    )
+    def test_full_inv_nr(self, inv_nr, inv_part, expected):
+        assert (
+            Inventory(inv_nr=inv_nr, inventory_part=inv_part, pages=[]).full_inv_nr()
+            == expected
+        )
+
+    @pytest.mark.parametrize(
         "inventory_nr, doc_id, expected",
         [
             (
