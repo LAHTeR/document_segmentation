@@ -1,7 +1,6 @@
 import logging
 import math
 import random
-from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
@@ -257,19 +256,18 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     str(pred.tolist()),
                 ]
                 if thumbnail_downloader:
-                    img_file: Path = thumbnail_downloader.thumbnail(inventory, page)
+                    thumbnail_url = thumbnail_downloader.thumbnail_url(inventory, page)
                     link: str = inventory.link(page)
-                    row.extend(
-                        [
-                            wandb.Image(str(img_file)),
-                            wandb.Html(f'<a href="{link}">Link to Page</a>'),
-                        ]
+                    row.append(
+                        wandb.Html(
+                            f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
+                        )
                     )
 
                 results.append(row)
 
         columns = ["Predicted", "Actual", "Page ID", "Text", "Scores"]
         if thumbnail_downloader:
-            columns.extend(["Thumbnail", "Link"])
+            columns.append("Image")
 
         return metrics + (pd.DataFrame(results, columns=columns),)

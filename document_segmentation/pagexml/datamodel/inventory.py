@@ -17,6 +17,7 @@ from torch.utils.data import Dataset
 from ...settings import (
     DEFAULT_BASE_PATH,
     DEFAULT_SERVER,
+    DEFAULT_THUMBNAIL_SIZE,
     INV_NR_UUID_MAPPING_FILE,
     INVENTORY_DIR,
     MIN_REGION_TEXT_LENGTH,
@@ -360,7 +361,6 @@ class ThumbnailDownloader:
 
         self._mapping = mapping
         self._thumbnails_dir = thumbnails_dir
-        self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
 
         self._session = requests.Session()
 
@@ -373,7 +373,7 @@ class ThumbnailDownloader:
         ).with_suffix(".jpg")
 
     def thumbnail(
-        self, inventory: Inventory, page: Page, *, size: str = "200,"
+        self, inventory: Inventory, page: Page, *, size: str = DEFAULT_THUMBNAIL_SIZE
     ) -> Path:
         """Get the thumbnail for the given page.
 
@@ -382,8 +382,7 @@ class ThumbnailDownloader:
         Args:
             inventory (Inventory): The inventory.
             page (Page): The page.
-            size (str): The size of the thumbnail. Defaults to "200,".
-                Valid modes are documented here: https://iiif.io/api/image/2.1/#size
+            size (str): The size of the thumbnail.
         """
         thumbnail_file = self._local_file(inventory, page, size)
 
@@ -391,20 +390,46 @@ class ThumbnailDownloader:
             self.download(inventory, page, size=size)
         return thumbnail_file
 
-    def download(self, inventory: Inventory, page: Page, *, size: str) -> Path:
+    def thumbnail_url(
+        self, inventory: Inventory, page: Page, *, size: str = DEFAULT_THUMBNAIL_SIZE
+    ) -> str:
+        """Get the URL of the thumbnail for the given page.
+
+        Example URL: "https://service.archief.nl/iipsrv?IIIF=/db/77/6f/a8/9d/77/45/ca/8e/85/e1/c4/84/06/a5/55/aa84f770-f5d7-40ac-bfda-db3d06f204c9.jp2/full/100,/0/default.jpg"
+
+        Args:
+            inventory (Inventory): The inventory.
+            page (Page): The page.
+            size (str): The size of the thumbnail.
+        Returns:
+            str: The URL of the thumbnail.
+        """
         # TODO: add other parameters for size (and format)
-        # Example URL: "https://service.archief.nl/iipsrv?IIIF=/db/77/6f/a8/9d/77/45/ca/8e/85/e1/c4/84/06/a5/55/aa84f770-f5d7-40ac-bfda-db3d06f204c9.jp2/full/100,/0/default.jpg"
 
         _uuid: str = self.get_uuid(inventory).hex
         uuid_part: str = "/".join([_uuid[i : i + 2] for i in range(0, len(_uuid), 2)])
-        url = f"{self._base_url}/{uuid_part}/{page.external_ref}.jp2/full/{size}/0/default.jpg"
+        return f"{self._base_url}/{uuid_part}/{page.external_ref}.jp2/full/{size}/0/default.jpg"
 
-        response: requests.Response = self._session.get(url, stream=True)
+    def download(self, inventory: Inventory, page: Page, *, size: str) -> Path:
+        """Download the thumbnail for the given page.
+
+        Args:
+            inventory (Inventory): The inventory.
+            page (Page): The page.
+            size (str): The size of the thumbnail.
+        Returns:
+            Path: The path to the downloaded thumbnail.
+        """
+        response: requests.Response = self._session.get(
+            self.thumbnail_url(inventory, page, size=size), stream=True
+        )
         response.raise_for_status()
 
         image = PIL.Image.open(BytesIO(response.content))
 
         target_file = self._local_file(inventory, page, size)
+
+        self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
         image.save(target_file)
 
         return target_file
