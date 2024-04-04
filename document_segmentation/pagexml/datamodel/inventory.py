@@ -2,6 +2,7 @@ import json
 import logging
 import zipfile
 from io import BytesIO
+from os.path import splitext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Counter, Iterable, Optional
@@ -182,6 +183,32 @@ class Inventory(BaseModel, Dataset):
         """
 
         return torch.Tensor([label.to_list() for label in self.labels()])
+
+    def link(self, page: Page) -> str:
+        """Get the link to the page on the Nationaal Archief website.
+
+        Example: https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/1557/file/NL-HaNA_1.04.02_1557_0026
+
+        Args:
+            page (Page): The page (scan) to link to
+        Returns:
+            str: The link to the page on the Nationaal Archief website.
+
+        """
+
+        doc_id = page.doc_id
+
+        if doc_id is None:
+            doc_id = f"NL-HaNA_1.04.02_{self.full_inv_nr():04s}_{page.scan_nr:04d}"
+            logging.warning(
+                f"No doc_id for scan '{page}' in inventory '{self}'. Falling back to: '{doc_id}'."
+            )
+        else:
+            doc_id = splitext(doc_id)[0]
+
+        url = f"https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/{self.full_inv_nr()}/file/{doc_id}"
+
+        return url
 
     def preprocess(self) -> "Inventory":
         """Preprocess the inventory in-place.

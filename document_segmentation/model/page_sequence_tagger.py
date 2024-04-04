@@ -258,12 +258,18 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 ]
                 if thumbnail_downloader:
                     img_file: Path = thumbnail_downloader.thumbnail(inventory, page)
-                    row.append(wandb.Image(str(img_file)))
+                    link: str = inventory.link(page)
+                    row.extend(
+                        [
+                            wandb.Image(str(img_file)),
+                            wandb.Html(f'<a href="{link}">Link to Page</a>'),
+                        ]
+                    )
 
                 results.append(row)
 
         columns = ["Predicted", "Actual", "Page ID", "Text", "Scores"]
         if thumbnail_downloader:
-            columns.append("Thumbnail")
+            columns.extend(["Thumbnail", "Link"])
 
         return metrics + (pd.DataFrame(results, columns=columns),)

@@ -96,6 +96,33 @@ class TestInventory:
         )
 
     @pytest.mark.parametrize(
+        "inventory_nr, doc_id, expected",
+        [
+            (
+                1557,
+                "NL-HaNA_1.04.02_1557_0026.jpg",
+                "https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/1557/file/NL-HaNA_1.04.02_1557_0026",
+            ),
+            (
+                1557,
+                None,
+                "https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/1557/file/NL-HaNA_1.04.02_1557_0026",
+            ),
+        ],
+    )
+    def test_link(self, inventory_nr, doc_id, expected):
+        page = Page(
+            label=Label.UNK,
+            scan_nr=26,
+            doc_id=doc_id,
+            external_ref="test_ref",
+            regions=[],
+        )
+
+        inventory = Inventory(inv_nr=inventory_nr, inventory_part="", pages=[page])
+        assert inventory.link(page) == expected
+
+    @pytest.mark.parametrize(
         "inv_nr, inv_part, expected, expected_logs",
         [
             (1201, "", "1201.json", []),
