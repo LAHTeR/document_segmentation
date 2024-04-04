@@ -59,7 +59,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         self.to_device(device)
 
-    def forward(self, pages: list[Page]):
+    def forward(self, pages: list[Page]) -> torch.Tensor:
         page_embeddings = self._page_embedding(pages)
 
         assert page_embeddings.size() == (
@@ -182,8 +182,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     dataset_eval = {}
 
                     results = self.eval_(inventories, thumbnail_downloader)
-                    metrics = results[:4]
-                    table = results[4]
+                    metrics: tuple[Metric] = results[:4]
+                    table: pd.DataFrame = results[4]
+                    table["Image"] = table["Image"].apply(wandb.Html)
 
                     wandb_run.log({name + "_results": wandb.Table(dataframe=table)})
 
@@ -223,51 +224,67 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
         """
+        # TODO: make thumbnail_downloader a class attribute
         metrics: tuple[Metric] = (
             MulticlassPrecision(average=None, num_classes=len(Label)),
             MulticlassRecall(average=None, num_classes=len(Label)),
             MulticlassF1Score(average=None, num_classes=len(Label)),
             MulticlassAccuracy(),
         )
+        results = pd.concat(
+            (
+                self.infer(inventory, thumbnail_downloader, *metrics)
+                for inventory in tqdm(
+                    inventories,
+                    desc="Predicting",
+                    total=len(inventories),
+                    unit="inventory",
+                )
+            )
+        )
+        return metrics + (results,)
 
-        self.eval()
+    @torch.inference_mode()
+    def infer(
+        self,
+        inventory: Inventory,
+        thumbnail_downloader: Optional[ThumbnailDownloader] = None,
+        *metrics: Metric,
+    ) -> pd.DataFrame:
+        """Get model predictions for all pages in the given inventory.
+        Metrics are updated in-place.
 
-        results: list[list[Any]] = []
+        Args:
+            inventory (Inventory): The inventory to infer on.
+            thumbnail_downloader (Optional[ThumbnailDownloader], optional): The thumbnail downloader to use.
+            metrics (Metric): The metrics to update.
+        Returns:
+            pd.DataFrame: A DataFrame containing the results per row.
+        """
+        predicted = self(inventory.pages)
+        labels = inventory.labels()
 
-        for inventory in tqdm(
-            inventories, desc="Evaluating", total=len(inventories), unit="inventory"
-        ):
-            predicted = self(inventory.pages)
-            labels = inventory.labels()
+        _labels = torch.Tensor([label.value for label in labels]).to(int)
 
-            _labels = torch.Tensor([label.value for label in labels]).to(int)
+        for metric in metrics:
+            metric.update(predicted, _labels)
 
-            for metric in metrics:
-                metric.update(predicted, _labels)
+        rows: list[dict[str, str]] = []
 
-            for page, pred, label in zip(
-                inventory.pages, predicted, labels, strict=True
-            ):
-                row = [
-                    Label(pred.argmax().item()).name,
-                    label.name,
-                    page.doc_id,
-                    page.text(delimiter="; ")[:50],
-                    str(pred.tolist()),
-                ]
-                if thumbnail_downloader:
-                    thumbnail_url = thumbnail_downloader.thumbnail_url(inventory, page)
-                    link: str = inventory.link(page)
-                    row.append(
-                        wandb.Html(
-                            f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
-                        )
-                    )
+        for page, pred, label in zip(inventory.pages, predicted, labels, strict=True):
+            row = {
+                "Predicted": Label(pred.argmax().item()).name,
+                "Actual": label.name,
+                "Page ID": page.doc_id,
+                "Text": page.text(delimiter="; ")[:50],
+                "Scores": str(pred.tolist()),
+            }
+            if thumbnail_downloader:
+                thumbnail_url = thumbnail_downloader.thumbnail_url(inventory, page)
+                link: str = inventory.link(page)
+                thumbnail_html: str = f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
+                # row["Image"] = wandb.Html(thumbnail_html)
+                row["Image"] = thumbnail_html
+            rows.append(row)
 
-                results.append(row)
-
-        columns = ["Predicted", "Actual", "Page ID", "Text", "Scores"]
-        if thumbnail_downloader:
-            columns.append("Image")
-
-        return metrics + (pd.DataFrame(results, columns=columns),)
+        return pd.DataFrame(rows)
