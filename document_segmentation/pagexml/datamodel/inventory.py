@@ -81,18 +81,22 @@ class Inventory(BaseModel, Dataset):
         except IndexError as e:
             raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
 
-        if page.label == Label.UNK:
-            page.label = label
-        elif {page.label, label} == {Label.BEGIN, Label.END}:
-            new_label = Label.END_BEGIN
-            # TODO: log to info level
-            logging.warning(
-                f"Scan {scan_nr} already has label {page.label.name}. Changing to {new_label.name}. Inventory: {str(self)}"
-            )
-            page.label = new_label
+        if label != page.label:
+            if page.label == Label.UNK:
+                page.label = label
+            elif {page.label, label} == {Label.BEGIN, Label.END}:
+                new_label = Label.END_BEGIN
+                logging.info(
+                    f"Scan {scan_nr} already has label: {page.label.name}. Changing to {new_label.name}. Inventory: {str(self)}"
+                )
+                page.label = new_label
+            else:
+                logging.warning(
+                    f"Scan {scan_nr} already has label: {page.label}. Ignoring new label: '{label}'. Inventory: {str(self)}"
+                )
         else:
-            logging.warning(
-                f"Scan {scan_nr} already has label {page.label}. Ignoring new label ({label}). Inventory: {str(self)}"
+            logging.info(
+                f"Scan {scan_nr} already has label: {page.label}. Ignoring new label: {label}. Inventory: {str(self)}"
             )
 
     def get_scan(self, scan_nr: int) -> Page:
