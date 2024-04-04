@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from pagexml.model.physical_document_model import PageXMLScan
@@ -24,6 +25,16 @@ class Page(BaseModel):
             except ValueError as e:
                 raise ValidationError from e
         return value
+
+    def guess_doc_id(self, inv_nr: str) -> str:
+        if self.doc_id is not None:
+            logging.warning(
+                f"Guessing doc_id instead of using existing doc_id '{self.doc_id}'."
+            )
+        if len(inv_nr) < 4:
+            logging.warning(f"Inventory number '{inv_nr}' is not 4 characters long.")
+
+        return f"NL-HaNA_1.04.02_{inv_nr}_{self.scan_nr:>04}"
 
     def text(self, delimiter: str = "\n") -> str:
         """Return the text of the page.

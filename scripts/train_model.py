@@ -13,7 +13,10 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysis,
     RenateAnalysisInv,
 )
-from document_segmentation.pagexml.datamodel.inventory import Inventory
+from document_segmentation.pagexml.datamodel.inventory import (
+    Inventory,
+    ThumbnailDownloader,
+)
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.settings import (
     GENERALE_MISSIVEN_SHEET,
@@ -132,7 +135,12 @@ if __name__ == "__main__":
     ########################################################################################
     model = PageSequenceTagger(device=args.device)
 
-    model.train_(training_inventories, validation_inventories, epochs=args.epochs)
+    model.train_(
+        training_inventories,
+        validation_inventories,
+        epochs=args.epochs,
+        thumbnail_downloader=ThumbnailDownloader.from_file(),
+    )
     torch.save(model, args.model_file)
 
     logging.debug(str(model))
