@@ -381,7 +381,7 @@ class ThumbnailDownloader:
         ).with_suffix(".jpg")
 
     def thumbnail(
-        self, inventory: Inventory, page: Page, *, size: str = "120,"
+        self, inventory: Inventory, page: Page, *, size: str = "200,"
     ) -> Path:
         """Get the thumbnail for the given page.
 
@@ -390,7 +390,7 @@ class ThumbnailDownloader:
         Args:
             inventory (Inventory): The inventory.
             page (Page): The page.
-            size (str): The size of the thumbnail. Defaults to "120,".
+            size (str): The size of the thumbnail. Defaults to "200,".
                 Valid modes are documented here: https://iiif.io/api/image/2.1/#size
         """
         thumbnail_file = self._local_file(inventory, page, size)
