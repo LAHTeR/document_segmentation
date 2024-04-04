@@ -362,6 +362,8 @@ class ThumbnailDownloader:
         self._thumbnails_dir = thumbnails_dir
         self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
 
+        self._session = requests.Session()
+
     def get_uuid(self, inventory: Inventory) -> UUID:
         return self._mapping[inventory.full_inv_nr()]
 
@@ -397,7 +399,7 @@ class ThumbnailDownloader:
         uuid_part: str = "/".join([_uuid[i : i + 2] for i in range(0, len(_uuid), 2)])
         url = f"{self._base_url}/{uuid_part}/{page.external_ref}.jp2/full/{size}/0/default.jpg"
 
-        response: requests.Response = requests.get(url, stream=True)
+        response: requests.Response = self._session.get(url, stream=True)
         response.raise_for_status()
 
         image = PIL.Image.open(BytesIO(response.content))
