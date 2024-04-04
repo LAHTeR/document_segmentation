@@ -40,8 +40,11 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         *,
         rnn_config: dict[str, Any] = PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
         device: Optional[str] = None,
+        thumbnail_downloader: ThumbnailDownloader = ThumbnailDownloader.from_file(),
     ) -> None:
         super().__init__()
+
+        self._thumbnail_downloader = thumbnail_downloader
 
         self._page_embedding = PageEmbedding(device=device)
 
@@ -86,7 +89,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         weights: Optional[list[float]] = None,
         shuffle: bool = True,
         log_wandb: bool = True,
-        thumbnail_downloader: Optional[ThumbnailDownloader] = None,
     ):
         """Train the model on the given dataset.
 
@@ -98,7 +100,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
-            thumbnail_downloader (Optional[ThumbnailDownloader], optional): The thumbnail downloader to use.
         """
         self.train()
 
@@ -181,7 +182,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 for name, inventories in validation_inventories.items():
                     dataset_eval = {}
 
-                    results = self.eval_(inventories, thumbnail_downloader)
+                    results = self.eval_(inventories)
                     metrics: tuple[Metric] = results[:4]
                     table: pd.DataFrame = results[4]
                     table["Image"] = table["Image"].apply(wandb.Html)
@@ -211,15 +212,12 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             # TODO: save model to WandB or HuggingFace
 
     def eval_(
-        self,
-        inventories: list[Inventory],
-        thumbnail_downloader: Optional[ThumbnailDownloader] = None,
+        self, inventories: list[Inventory]
     ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
         Args:
             inventories (list[Inventory]): The inventories to evaluate on.
-            thumbnail_downloader (Optional[ThumbnailDownloader], optional): The thumbnail downloader to use.
         Returns:
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
@@ -231,9 +229,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             MulticlassF1Score(average=None, num_classes=len(Label)),
             MulticlassAccuracy(),
         )
-        results = pd.concat(
+        results: pd.DataFrame = pd.concat(
             (
-                self.infer(inventory, thumbnail_downloader, *metrics)
+                self.infer(inventory, *metrics)
                 for inventory in tqdm(
                     inventories,
                     desc="Predicting",
@@ -245,18 +243,12 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         return metrics + (results,)
 
     @torch.inference_mode()
-    def infer(
-        self,
-        inventory: Inventory,
-        thumbnail_downloader: Optional[ThumbnailDownloader] = None,
-        *metrics: Metric,
-    ) -> pd.DataFrame:
+    def infer(self, inventory: Inventory, *metrics: Metric) -> pd.DataFrame:
         """Get model predictions for all pages in the given inventory.
         Metrics are updated in-place.
 
         Args:
             inventory (Inventory): The inventory to infer on.
-            thumbnail_downloader (Optional[ThumbnailDownloader], optional): The thumbnail downloader to use.
             metrics (Metric): The metrics to update.
         Returns:
             pd.DataFrame: A DataFrame containing the results per row.
@@ -279,12 +271,17 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 "Text": page.text(delimiter="; ")[:50],
                 "Scores": str(pred.tolist()),
             }
-            if thumbnail_downloader:
-                thumbnail_url = thumbnail_downloader.thumbnail_url(inventory, page)
+            if self._thumbnail_downloader:
+                thumbnail_url = self._thumbnail_downloader.thumbnail_url(
+                    inventory, page
+                )
                 link: str = inventory.link(page)
                 thumbnail_html: str = f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
-                # row["Image"] = wandb.Html(thumbnail_html)
                 row["Image"] = thumbnail_html
             rows.append(row)
+
+        assert len(rows) == len(
+            inventory.pages
+        ), f"Expected {len(inventory.pages)} rows, got {len(rows)}."
 
         return pd.DataFrame(rows)
