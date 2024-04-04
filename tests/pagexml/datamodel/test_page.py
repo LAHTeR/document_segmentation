@@ -1,5 +1,7 @@
+import logging
 from zipfile import ZipFile
 
+import pytest
 from pagexml.parser import parse_pagexml_file
 
 from document_segmentation.pagexml.datamodel.label import Label
@@ -49,3 +51,23 @@ class TestPage:
             for key, value in expected_page.items():
                 assert getattr(page, key) == value
             assert [region.id for region in page.regions] == expected_region_ids
+
+    @pytest.mark.parametrize(
+        "scan_nr, inv_nr, expected",
+        [
+            (1, "0001", "NL-HaNA_1.04.02_0001_0001"),
+            (26, "1557", "NL-HaNA_1.04.02_1557_0026"),
+        ],
+    )
+    def test_guess_doc_id(self, caplog, scan_nr, inv_nr, expected):
+        with caplog.at_level(logging.WARNING):
+            page = Page(
+                label=Label.UNK,
+                scan_nr=scan_nr,
+                doc_id=None,
+                external_ref="test_ref",
+                regions=[],
+            )
+
+            assert page.guess_doc_id(inv_nr) == expected
+            assert caplog.messages == []

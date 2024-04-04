@@ -2,7 +2,6 @@ import json
 import logging
 import zipfile
 from io import BytesIO
-from os.path import splitext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Counter, Iterable, Optional
@@ -101,9 +100,7 @@ class Inventory(BaseModel, Dataset):
         return self.pages[scan_nr - 1]
 
     def full_inv_nr(self, *, delimiter: str = "") -> str:
-        return delimiter.join(
-            [str(self.inv_nr).rjust(4, "0"), self.inventory_part]
-        ).rstrip(delimiter)
+        return delimiter.join([str(self.inv_nr), self.inventory_part]).rstrip(delimiter)
 
     def labels(self) -> list[Label]:
         return [page.label for page in self.pages]
@@ -194,20 +191,10 @@ class Inventory(BaseModel, Dataset):
 
         """
 
-        doc_id = page.doc_id
+        inv_nr = self.full_inv_nr().rjust(4, "0")
+        doc_id = (page.doc_id or page.guess_doc_id(inv_nr)).removesuffix(".jpg")
 
-        if doc_id is None:
-            doc_id = f"NL-HaNA_1.04.02_{self.full_inv_nr()}_{page.scan_nr:>04}"
-
-            logging.warning(
-                f"No doc_id for scan '{page}' in inventory '{self}'. Falling back to: '{doc_id}'."
-            )
-        else:
-            doc_id = splitext(doc_id)[0]
-
-        url = f"https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/{self.full_inv_nr()}/file/{doc_id}"
-
-        return url
+        return f"https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/{inv_nr}/file/{doc_id}"
 
     def preprocess(self) -> "Inventory":
         """Preprocess the inventory in-place.

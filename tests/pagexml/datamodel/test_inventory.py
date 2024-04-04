@@ -97,12 +97,7 @@ class TestInventory:
 
     @pytest.mark.parametrize(
         "inv_nr, inv_part, expected",
-        [
-            (1201, "", "1201"),
-            (1201, "A", "1201A"),
-            (1201, "1", "1201"),
-            (1, "", "0001"),
-        ],
+        [(1201, "", "1201"), (1201, "A", "1201A"), (1201, "1", "1201"), (1, "", "1")],
     )
     def test_full_inv_nr(self, inv_nr, inv_part, expected):
         assert (
@@ -122,6 +117,11 @@ class TestInventory:
                 1557,
                 None,
                 "https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/1557/file/NL-HaNA_1.04.02_1557_0026",
+            ),
+            (
+                1,
+                "NL-HaNA_1.04.02_0001_0026.jpg",
+                "https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/0001/file/NL-HaNA_1.04.02_0001_0026",
             ),
         ],
     )
