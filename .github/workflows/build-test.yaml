@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
          # FIXME windows-latest, see: https://github.com/LAHTeR/document_segmentation/actions/runs/7250392510/job/19750467453
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
