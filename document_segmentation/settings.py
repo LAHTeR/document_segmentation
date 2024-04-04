@@ -42,6 +42,8 @@ if not INV_NR_UUID_MAPPING_FILE.exists():
         f"Inventory number to UUID mapping file not found: {INV_NR_UUID_MAPPING_FILE}"
     )
 THUMBNAILS_DIR: Path = DATA_DIR / "thumbnails"
+DEFAULT_THUMBNAIL_SIZE: str = ",100"
+"""Valid size formats are documented here: https://iiif.io/api/image/2.1/#size"""
 
 LANGUAGE_MODEL: str = os.getenv(
     "LANGUAGE_MODEL",
