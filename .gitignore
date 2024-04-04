@@ -96,7 +96,7 @@ __pypackages__/
 .DS_Store
 
 # Local PageXML cache
-document_segmentation/data/pagexml_cache
 document_segmentation/data/inventories
+document_segmentation/data/thumbnails
 
 wandb/
