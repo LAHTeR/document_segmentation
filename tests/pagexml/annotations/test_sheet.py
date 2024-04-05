@@ -95,16 +95,19 @@ class TestGeneraleMissiven:
             assert len(inventory) == length
 
     def test_all_annotated_inventories(self, test_sheet):
-        expected_inv_nrs = [1068, 1068, 1068, 1068, 1070]
-        expected_inv_parts = [""] * 5
-        expected_lengths = [19, 35, 24, 7, 9]
+        n = 2
+
+        expected_inv_nrs = [1068, 1070]
+        expected_inv_parts = [""] * n
+        expected_lengths = [1024, 1322]
 
         for inventory, inv_nr, inv_part, length in zip(
-            test_sheet.all_annotated_inventories(),
+            test_sheet.all_annotated_inventories(n=n),
             expected_inv_nrs,
             expected_inv_parts,
             expected_lengths,
         ):
+            assert all(page.label != Label.UNK for page in inventory.pages)
             assert inventory.inv_nr == inv_nr
             assert inventory.inventory_part == inv_part
             assert len(inventory) == length

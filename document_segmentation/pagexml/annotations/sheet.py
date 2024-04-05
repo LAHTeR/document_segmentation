@@ -95,6 +95,8 @@ class Sheet(abc.ABC):
     def annotate_inventory(self, inventory: Inventory) -> Inventory:
         """Annotate the inventory with the labels from the sheet in-place.
 
+        Pages between BEGIN and END scans are labelled as IN.
+
         Args:
             inventory (Inventory): The inventory to annotate.
         Returns:
@@ -128,7 +130,7 @@ class Sheet(abc.ABC):
         *,
         min_region_text_length=MIN_REGION_TEXT_LENGTH,
         skip_errors: bool = True,
-    ) -> Iterable[Inventory]:
+    ) -> Iterable["Inventory"]:
         """Load, label, and preprocess all inventories in the sheet.
 
         Args:
@@ -145,11 +147,12 @@ class Sheet(abc.ABC):
             total=n or len(list(self.inventory_numbers())),
             unit="inventory",
         ):
-            self.annotate_inventory(inventory)
-
             try:
-                for labelled in inventory.labelled_inventories():
-                    yield labelled.remove_short_regions(min_region_text_length)
+                yield (
+                    self.annotate_inventory(inventory)
+                    .remove_short_regions(min_chars=min_region_text_length)
+                    .empty_unlabelled()
+                )
             except ValueError as e:
                 if skip_errors:
                     logging.error(str(e))
