@@ -231,7 +231,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         )
         results: pd.DataFrame = pd.concat(
             (
-                self.infer(inventory, *metrics)
+                self.predict(inventory, *metrics)
                 for inventory in tqdm(
                     inventories,
                     desc="Predicting",
@@ -243,7 +243,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         return metrics + (results,)
 
     @torch.inference_mode()
-    def infer(self, inventory: Inventory, *metrics: Metric) -> pd.DataFrame:
+    def predict(self, inventory: Inventory, *metrics: Metric) -> pd.DataFrame:
         """Get model predictions for all pages in the given inventory.
         Metrics are updated in-place.
 
