@@ -318,7 +318,7 @@ class Inventory(BaseModel, Dataset):
         session.auth = (username, password)
 
         remote_filename = (
-            f"{inv_nr:04d}{Inventory.validate_inv_part(inventory_part)}.zip"
+            f"{inv_nr:>04}{Inventory.validate_inv_part(inventory_part)}.zip"
         )
         url = "/".join((server_url.rstrip("/"), base_path.rstrip("/"), remote_filename))
 
