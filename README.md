@@ -11,6 +11,9 @@
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/LAHTeR/document_segmentation/build-test.yaml)
 
+![Build & Test](https://github.com/LAHTeR/document_segmentation/actions/workflows/build-test.yml/badge.svg?branch=feature/badges)
+![Ruff](https://github.com/LAHTeR/document_segmentation/actions/workflows/ruff.yml/badge.svg?branch=feature/badges)
+
 ## Prerequsites
 
 ### Install Poetry
