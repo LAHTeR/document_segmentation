@@ -10,6 +10,7 @@ from document_segmentation.pagexml.datamodel.inventory import (
 )
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.pagexml.datamodel.page import Page
+from document_segmentation.pagexml.datamodel.region import Region
 
 from ...conftest import TEST_THUMBNAIL_FILE
 
@@ -94,6 +95,47 @@ class TestInventory:
             )
             == inventory
         )
+
+    @pytest.mark.parametrize(
+        "inventory, expected",
+        [
+            (
+                Inventory(inv_nr=1201, inventory_part="", pages=[]),
+                Inventory(inv_nr=1201, inventory_part="", pages=[]),
+            ),
+            (
+                Inventory(
+                    inv_nr=1201,
+                    inventory_part="",
+                    pages=[
+                        Page(
+                            label=Label.UNK,
+                            scan_nr=1,
+                            external_ref="test_ref",
+                            regions=[
+                                Region(id="test_id", types=[], coordinates=[], lines=[])
+                            ],
+                        )
+                    ],
+                ),
+                Inventory(
+                    inv_nr=1201,
+                    inventory_part="",
+                    pages=[
+                        Page(
+                            label=Label.OUT,
+                            scan_nr=1,
+                            external_ref="test_ref",
+                            regions=[],
+                        )
+                    ],
+                ),
+            ),
+        ],
+    )
+    def test_empty_unlabelled(self, inventory, expected):
+        assert inventory.empty_unlabelled().pages == expected.pages
+        assert inventory.empty_unlabelled() == expected
 
     @pytest.mark.parametrize(
         "inv_nr, inv_part, expected",

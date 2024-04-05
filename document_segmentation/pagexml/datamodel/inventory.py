@@ -61,6 +61,14 @@ class Inventory(BaseModel, Dataset):
                 value = default_value
         return value
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, Inventory)
+            and self.inv_nr == other.inv_nr
+            and self.inventory_part == other.inventory_part
+            and self.pages == other.pages
+        )
+
     def __len__(self) -> int:
         """Return the number of pages in the inventory."""
         return len(self.pages)
@@ -104,6 +112,9 @@ class Inventory(BaseModel, Dataset):
         """Get the page with the given scan number."""
         return self.pages[scan_nr - 1]
 
+    def has_labels(self) -> bool:
+        return any(page.label != Label.UNK for page in self.pages)
+
     def full_inv_nr(self, *, delimiter: str = "") -> str:
         """Return the full inventory number plus part if applicable as a string.
 
@@ -138,6 +149,7 @@ class Inventory(BaseModel, Dataset):
         return [page for page in self.pages if page.label != Label.UNK]
 
     def labelled_inventories(self) -> Iterable["Inventory"]:
+        # TODO: remove this method
         """Split the inventory into segments.
 
         Each segment will have a continuous sequence of labelled pages.
@@ -146,6 +158,7 @@ class Inventory(BaseModel, Dataset):
         Returns:
             Iterable[Inventory]: An iterable of Inventories with labelled pages; singleton if all pages are labelled.
         """
+        logging.warning("Deprecated method labelled_inventories()")
 
         if len(self.labelled()) == 0:
             raise ValueError(f"No labelled pages in inventory: {self}")
@@ -208,13 +221,17 @@ class Inventory(BaseModel, Dataset):
 
         return f"https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/{inv_nr}/file/{doc_id}"
 
-    def preprocess(self) -> "Inventory":
-        """Preprocess the inventory in-place.
+    def empty_unlabelled(self) -> "Inventory":
+        """Post-process labelled inventories.
 
-        Returns:
-            Inventory: The preprocessed inventory.
+        1. Empty all pages with label UNK.
+        2. Label empty pages with OUT.
         """
-        self.remove_short_regions()
+        if not self.has_labels():
+            logging.warning(f"No labels in inventory {self.inv_nr}")
+        for page in self.pages:
+            if page.label == Label.UNK:
+                page.empty()
         return self
 
     def remove_short_regions(
