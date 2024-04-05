@@ -5,10 +5,11 @@
 [![python](https://img.shields.io/badge/Python-3.11-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![python](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/LAHTeR/document_segmentation/build-test.yaml)
-
+[![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/LAHTeR/document_segmentation/build-test.yaml)
 
 ## Prerequsites
 
@@ -34,7 +35,7 @@ poetry install
 
 ## Usage
 
-To train a model run the [`scripts/train_model.py`](scripts/train_model.py) script.
+To *train* a model run the [`scripts/train_model.py`](scripts/train_model.py) script.
 It downloads the necessary data from the HUC server into the local temporary directory.
 
 Set your HUC credentials in the `HUC_USER` and `HUC_PASSWORD` environment variables or in [`settings.py`](document_segmentation/settings.py), and run the script.
@@ -43,13 +44,23 @@ Set your HUC credentials in the `HUC_USER` and `HUC_PASSWORD` environment variab
 HUC_USER=... HUC_PASSWORD=... poetry run python scripts/train_model.py
 ```
 
-Add the `--help` flag to see the available options.
+Add the `--help` flag to see all available options.
+
+To label the pages of one or more inventories using a previously trained model, use the [`scripts/predict_inventories.py`](scripts/predict_inventories.py) script, for instance:
+
+```console
+poetry run python scripts/predict_inventories.py --model model.pt --inventory 1547,1548 --output 1547_1548.csv
+```
+
+Missing inventories are downloaded from the HUC server if the `HUC_USER` and `HUC_PASSWORD` environment variables are provided.
+
+Add the `--help` flag to see all available options.
 
 ## Development Instructions
 
 This project uses
 
-- Python >= 3.9
+- Python >= 3.9 <= 3.12
 - [Poetry](https://python-poetry.org/) for package management
 - [PyTest](https://docs.pytest.org) for unit testing
 - [Ruff](https://github.com/astral-sh/ruff) for linting and formatting
