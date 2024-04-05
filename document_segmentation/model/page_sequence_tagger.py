@@ -1,6 +1,7 @@
 import logging
 import math
 import random
+from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
@@ -288,3 +289,19 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         ), f"Expected {len(inventory.pages)} rows, got {len(rows)}."
 
         return pd.DataFrame(rows)
+
+    def save(self, path: Path) -> None:
+        """Save the model to the given path.
+
+        Args:
+            path (str): The path to save the model to.
+        """
+        torch.save(self.state_dict(), path)
+
+    def load(self, path: Path) -> None:
+        """Load the model from the given path.
+
+        Args:
+            path (str): The path to load the model from.
+        """
+        self.load_state_dict(torch.load(path, map_location=torch.device(self._device)))

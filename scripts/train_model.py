@@ -5,8 +5,6 @@ import random
 from itertools import groupby
 from pathlib import Path
 
-import torch
-
 from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
 from document_segmentation.pagexml.annotations.renate_analysis import (
@@ -133,7 +131,7 @@ if __name__ == "__main__":
     model = PageSequenceTagger(device=args.device)
 
     model.train_(training_inventories, validation_inventories, epochs=args.epochs)
-    torch.save(model, args.model_file)
+    model.save(args.model_file)
 
     logging.debug(str(model))
 

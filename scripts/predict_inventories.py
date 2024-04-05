@@ -2,9 +2,9 @@ import argparse
 from typing import Iterable
 
 import pandas as pd
-import torch
 from tqdm import tqdm
 
+from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
 from document_segmentation.pagexml.datamodel.inventory import Inventory
 
 if __name__ == "__main__":
@@ -34,16 +34,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--device",
         type=str,
-        default="cpu",
+        required=False,
         help="The device to use for the model (e.g. 'cuda:0'). Defaults to 'cpu'.",
     )
 
     args = parser.parse_args()
 
-    # TODO: auto-determine the device
-    model = torch.load(args.model, map_location=torch.device(args.device)).to_device(
-        args.device
-    )
+    model = PageSequenceTagger(device=args.device)
+    model.load(args.model)
 
     inventory_nrs: list[list[str]] = [
         inv.split("_") if "_" in inv else [inv, ""] for inv in args.inventory
