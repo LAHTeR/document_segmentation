@@ -24,7 +24,11 @@ from ..pagexml.datamodel.inventory import (
 )
 from ..pagexml.datamodel.label import Label
 from ..pagexml.datamodel.page import Page
-from ..settings import MAX_INVENTORY_SIZE, PAGE_SEQUENCE_TAGGER_RNN_CONFIG
+from ..settings import (
+    MAX_INVENTORY_SIZE,
+    PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
+    TRAINING_WEIGHTS,
+)
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
@@ -83,7 +87,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         validation_inventories: Optional[dict[str, list[Inventory]]] = None,
         *,
         epochs: int = 3,
-        weights: Optional[list[float]] = None,
+        weights: list[float] = TRAINING_WEIGHTS,
         shuffle: bool = True,
         log_wandb: bool = True,
     ):
@@ -94,27 +98,20 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             validation_inventories (Optional[dict[str[list[Inventory]]], optional): Validation datasets with name.
                 Defaults to None. If given, will evaluate each dataset separately after each epoch.
             epochs (int, optional): The number of epochs to train. Defaults to 3.
-            weights (Optional[list[float]], optional): The weights for the loss function. Defaults to None.
+            weights (list[float]): The weights for the loss function. Defaults to TRAINING_WEIGHTS.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
         """
         self.train()
 
-        if weights is None:
-            # TODO: weighed average?
-            weights = (
-                torch.Tensor(
-                    [inventory.class_weights() for inventory in training_inventories]
-                )
-                .to(self._device)
-                .mean(dim=0)
-            )
         if not len(weights) == len(Label):
             raise ValueError(
                 f"Length of weights ({len(weights)}) does not match number of labels ({len(Label)})"
             )
 
-        criterion = nn.CrossEntropyLoss(weight=weights).to(self._device)
+        criterion = nn.CrossEntropyLoss(
+            weight=torch.Tensor(weights).to(self._device)
+        ).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
         if log_wandb and wandb.login():
