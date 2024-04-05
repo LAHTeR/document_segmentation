@@ -1,5 +1,4 @@
 import logging
-import math
 import random
 from pathlib import Path
 from typing import Any, Optional
@@ -153,9 +152,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 optimizer.zero_grad()
                 outputs = self(inventory.pages).to(self._device)
 
-                loss = criterion(
-                    outputs, inventory.label_tensor().to(self._device)
-                ) * math.log(len(inventory))
+                loss = criterion(outputs, inventory.label_tensor().to(self._device))
 
                 loss.backward()
                 optimizer.step()
