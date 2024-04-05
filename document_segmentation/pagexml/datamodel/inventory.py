@@ -248,6 +248,18 @@ class Inventory(BaseModel, Dataset):
         self.pages = [page.filter_short_regions(min_chars) for page in self.pages]
         return self
 
+    def split(self, max_size) -> Iterable["Inventory"]:
+        """Split the inventory into segments of at most `max_size` pages."""
+        if len(self) <= max_size:
+            yield self
+        else:
+            for i in range(0, len(self), max_size):
+                yield Inventory(
+                    inv_nr=self.inv_nr,
+                    inventory_part=self.inventory_part,
+                    pages=self.pages[i : i + max_size],
+                )
+
     def write(self, target_file: Optional[Path] = None, mode="xt") -> Path:
         """Write the a Json representation of the inventory to a file.
 

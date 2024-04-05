@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from ...settings import (
     INVENTORY_DIR,
+    MAX_INVENTORY_SIZE,
     MIN_REGION_TEXT_LENGTH,
     SERVER_PASSWORD,
     SERVER_USERNAME,
@@ -130,6 +131,7 @@ class Sheet(abc.ABC):
         *,
         min_region_text_length=MIN_REGION_TEXT_LENGTH,
         skip_errors: bool = True,
+        max_size: int = MAX_INVENTORY_SIZE,
     ) -> Iterable["Inventory"]:
         """Load, label, and preprocess all inventories in the sheet.
 
@@ -139,6 +141,8 @@ class Sheet(abc.ABC):
             min_region_text_length ([type], optional): The minimum length of text in a region.
                 Defaults to MIN_REGION_TEXT_LENGTH.
             skip_errors (bool, optional): If True (default), errors are logged, otherwise they are raised.
+            max_size (Optional[int], optional): The maximum number of pages per inventory. Larger inventories are chunked.
+                Defaults to MAX_INVENTORY_SIZE.
         """
 
         for inventory in tqdm(
@@ -148,10 +152,11 @@ class Sheet(abc.ABC):
             unit="inventory",
         ):
             try:
-                yield (
+                yield from (
                     self.annotate_inventory(inventory)
                     .remove_short_regions(min_chars=min_region_text_length)
                     .empty_unlabelled()
+                    .split(max_size)
                 )
             except ValueError as e:
                 if skip_errors:

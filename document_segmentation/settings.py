@@ -96,3 +96,6 @@ PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
     "bidirectional": True,
 }
 """Default configuration for the RNN module in the PageSequenceTagger"""
+
+MAX_INVENTORY_SIZE: int = 512
+"""The maximum number of pages per inventory. Larger inventories are chunked. Set to None to disable."""
