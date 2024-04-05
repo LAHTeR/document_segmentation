@@ -109,7 +109,7 @@ class Sheet(abc.ABC):
         ]
         if len(inventory_rows) == 0:
             logging.warning(
-                f"Inventory {inventory.inv_nr} not found in the sheet. Skipping."
+                f"Inventory {inventory.inv_nr} not found in the sheet '{self}'. Skipping."
             )
 
         for idx, row in inventory_rows.iterrows():
