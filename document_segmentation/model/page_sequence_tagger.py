@@ -184,7 +184,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
                     results = self.eval_(inventories)
                     metrics: tuple[Metric] = results[:4]
-                    table: pd.DataFrame = results[4]
+                    table: pd.DataFrame = results[4].drop(columns=["Thumbnail", "Link"])
                     table["Image"] = table["Image"].apply(wandb.Html)
 
                     wandb_run.log({name + "_results": wandb.Table(dataframe=table)})
@@ -276,8 +276,13 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     inventory, page
                 )
                 link: str = inventory.link(page)
-                thumbnail_html: str = f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
-                row["Image"] = thumbnail_html
+
+                row["Image"] = (
+                    f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
+                )
+                row["Thumbnail"] = thumbnail_url
+                row["Link"] = link
+
             rows.append(row)
 
         assert len(rows) == len(
