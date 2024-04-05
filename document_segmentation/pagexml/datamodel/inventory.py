@@ -105,6 +105,13 @@ class Inventory(BaseModel, Dataset):
         return self.pages[scan_nr - 1]
 
     def full_inv_nr(self, *, delimiter: str = "") -> str:
+        """Return the full inventory number plus part if applicable as a string.
+
+        Args:
+            delimiter (str, optional): The delimiter to use between the inventory number and part. Defaults to "".
+        Returns:
+            str: The full inventory number plus inventory part, e.g. 1574 or 1574A
+        """
         return delimiter.join([str(self.inv_nr), self.inventory_part]).rstrip(delimiter)
 
     def labels(self) -> list[Label]:
@@ -254,11 +261,12 @@ class Inventory(BaseModel, Dataset):
         Returns:
             Path: The path to the inventory Json file.
         """
-        inventory_part = Inventory.validate_inv_part(inventory_part)
-        filename: str = (
-            "_".join((f"{inv_nr:04d}", inventory_part)).rstrip("_") + ".json"
-        )
-        return directory / filename
+        inv_nr: str = f"{inv_nr:>04}"
+
+        if inventory_part := Inventory.validate_inv_part(inventory_part):
+            inv_nr = "_".join((inv_nr, inventory_part))
+
+        return (directory / inv_nr).with_suffix(".json")
 
     @classmethod
     def load_or_download(

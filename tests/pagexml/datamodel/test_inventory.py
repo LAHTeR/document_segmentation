@@ -143,6 +143,7 @@ class TestInventory:
             (1201, "", "1201.json", []),
             (1201, "A", "1201_A.json", []),
             (1201, "1", "1201.json", ["Removing invalid inventory part: '1'"]),
+            (1, "A", "0001_A.json", []),
         ],
     )
     def test_localfile(
