@@ -1,6 +1,7 @@
 import logging
 import math
 import random
+from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
@@ -17,13 +18,12 @@ from torcheval.metrics import (
 )
 from tqdm import tqdm
 
-from document_segmentation.pagexml.datamodel.inventory import (
+from ..pagexml.datamodel.inventory import (
     Inventory,
     ThumbnailDownloader,
 )
-from document_segmentation.pagexml.datamodel.page import Page
-
 from ..pagexml.datamodel.label import Label
+from ..pagexml.datamodel.page import Page
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
@@ -289,3 +289,19 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         ), f"Expected {len(inventory.pages)} rows, got {len(rows)}."
 
         return pd.DataFrame(rows)
+
+    def save(self, path: Path) -> None:
+        """Save the model to the given path.
+
+        Args:
+            path (str): The path to save the model to.
+        """
+        torch.save(self.state_dict(), path)
+
+    def load(self, path: Path) -> None:
+        """Load the model from the given path.
+
+        Args:
+            path (str): The path to load the model from.
+        """
+        self.load_state_dict(torch.load(path, map_location=torch.device(self._device)))
