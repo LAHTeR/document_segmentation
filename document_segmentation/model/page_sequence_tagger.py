@@ -17,13 +17,12 @@ from torcheval.metrics import (
 )
 from tqdm import tqdm
 
-from document_segmentation.pagexml.datamodel.inventory import (
+from ..pagexml.datamodel.inventory import (
     Inventory,
     ThumbnailDownloader,
 )
-from document_segmentation.pagexml.datamodel.page import Page
-
 from ..pagexml.datamodel.label import Label
+from ..pagexml.datamodel.page import Page
 from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
