@@ -26,6 +26,13 @@ class Page(BaseModel):
                 raise ValidationError from e
         return value
 
+    def empty(self) -> "Page":
+        if self.label != Label.UNK:
+            logging.warning(f"Emptying page with label '{self.label.name}'.")
+        self.regions = []
+        self.label = Label.OUT
+        return self
+
     def guess_doc_id(self, inv_nr: str) -> str:
         if self.doc_id is not None:
             logging.warning(

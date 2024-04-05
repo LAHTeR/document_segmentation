@@ -6,6 +6,7 @@ from pagexml.parser import parse_pagexml_file
 
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.pagexml.datamodel.page import Page
+from document_segmentation.pagexml.datamodel.region import Region
 
 from ...conftest import TEST_FILE
 
@@ -71,3 +72,33 @@ class TestPage:
 
             assert page.guess_doc_id(inv_nr) == expected
             assert caplog.messages == []
+
+    @pytest.mark.parametrize(
+        "page, expected, expected_warnings",
+        [
+            (
+                Page(label=Label.UNK, scan_nr=1, external_ref="test_ref", regions=[]),
+                Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]),
+                [],
+            ),
+            (
+                Page(
+                    label=Label.UNK,
+                    scan_nr=1,
+                    external_ref="test_ref",
+                    regions=[Region(id="test_id", types=[], coordinates=[], lines=[])],
+                ),
+                Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]),
+                [],
+            ),
+            (
+                Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[]),
+                Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]),
+                ["Emptying page with label 'IN'."],
+            ),
+        ],
+    )
+    def test_empty(self, caplog, page, expected, expected_warnings):
+        with caplog.at_level(logging.WARNING):
+            assert page.empty() == expected
+        assert caplog.messages == expected_warnings
