@@ -87,7 +87,7 @@ class RenateAnalysisInv(Sheet):
 
                 if label == Label.BEGIN:
                     if in_doc:
-                        logging.warning(message)
+                        label = Label.END_BEGIN
                     in_doc = True
                 elif label == Label.END:
                     if not in_doc:
@@ -118,4 +118,5 @@ class RenateAnalysisInv(Sheet):
 
             inventory.annotate_scan(scan_nr, label)
 
+        assert all(scan.label != Label.UNK for scan in inventory.pages)
         return inventory
