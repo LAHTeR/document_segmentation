@@ -162,6 +162,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         {
                             "loss": loss.item(),
                             "inventory length": len(inventory),
+                            "inventory": inventory.inv_nr,
                             "cache": self._page_embedding._region_model._text_embeddings.cache_info()._asdict(),
                         }
                     )
