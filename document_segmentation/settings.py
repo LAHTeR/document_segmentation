@@ -99,9 +99,9 @@ PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
 }
 """Default configuration for the RNN module in the PageSequenceTagger"""
 
-MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "384"))
+MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "512"))
 """The maximum number of pages per inventory. Larger inventories are chunked. Set to None to disable chunking."""
 
-TRAINING_WEIGHTS: list[float] = [0.0, 100.0, 1.0, 100.0, 0.0, 100.0]
+TRAINING_WEIGHTS: list[float] = [0.0, 100.0, 0.1, 100.0, 0.1, 100.0]
 """Weights for the different labels in the loss function. The order is the same as in the Label enum."""
 assert len(TRAINING_WEIGHTS) == len(Label)
