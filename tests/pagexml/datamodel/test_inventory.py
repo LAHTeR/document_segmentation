@@ -197,6 +197,63 @@ class TestInventory:
             )
             assert caplog.messages == expected_logs, "Unexpected log messages"
 
+    @pytest.mark.parametrize(
+        "pages, max_length, expected",
+        [
+            ([], 10, []),
+            (
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+                1,
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])],
+            ),
+            (
+                [Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+                1,
+                [Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+            ),
+            (
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+                2,
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+            ),
+            (
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2
+                + [Page(label=Label.IN, scan_nr=2, external_ref="test_ref", regions=[])]
+                + [
+                    Page(
+                        label=Label.OUT, scan_nr=3, external_ref="test_ref", regions=[]
+                    )
+                ]
+                * 2,
+                1,
+                [
+                    Page(
+                        label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]
+                    ),
+                    Page(
+                        label=Label.IN, scan_nr=2, external_ref="test_ref", regions=[]
+                    ),
+                    Page(
+                        label=Label.OUT, scan_nr=3, external_ref="test_ref", regions=[]
+                    ),
+                ],
+            ),
+        ],
+    )
+    def test_remove_empty_pages(self, pages, max_length, expected):
+        assert (
+            Inventory(inv_nr=1201, inventory_part="", pages=pages)
+            .remove_empty_pages(max_length=max_length)
+            .pages
+            == expected
+        )
+
 
 class TestThumbnailDownloader:
     @pytest.fixture

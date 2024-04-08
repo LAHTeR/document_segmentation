@@ -234,6 +234,44 @@ class Inventory(BaseModel, Dataset):
                 page.empty()
         return self
 
+    def remove_empty_pages(
+        self, *, max_length: int = 5, label: Label = Label.OUT
+    ) -> "Inventory":
+        """Remove all unlabelled pages without text.
+
+        Args:
+            max_length (int): The maximum number of blank pages in a sequence. Defaults to 10.
+            label (Label): Only remove empty pages with this label. Defaults to Label.OUT.
+        Returns:
+            Inventory: The inventory with blank pages removed.
+        """
+
+        empty_seq: list[Page] = []
+        """Indices of empty pages in current sequence"""
+        to_delete: list[Page] = []
+
+        for page in self.pages:
+            if page.is_shorter_than() and page.label == label:
+                # Hit empty and unlabelled page
+                empty_seq.append(page)
+            elif empty_seq:
+                # End of sequence
+                if len(empty_seq) > max_length:
+                    to_delete.extend(empty_seq[max_length:])
+                empty_seq = []
+
+        # Final sequence
+        if len(empty_seq) > max_length:
+            # End of sequence
+            # Mark pages for deletion
+            to_delete.extend(empty_seq[max_length:])
+
+        # Delete marked pages
+        for page in to_delete:
+            self.pages.remove(page)
+
+        return self
+
     def remove_short_regions(
         self, min_chars: int = MIN_REGION_TEXT_LENGTH
     ) -> "Inventory":

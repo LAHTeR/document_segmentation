@@ -4,6 +4,7 @@ from typing import Optional
 from pagexml.model.physical_document_model import PageXMLScan
 from pydantic import BaseModel, PositiveInt, ValidationError, field_validator
 
+from ...settings import MIN_REGION_TEXT_LENGTH
 from .label import Label
 from .region import Region
 
@@ -25,6 +26,9 @@ class Page(BaseModel):
             except ValueError as e:
                 raise ValidationError from e
         return value
+
+    def is_shorter_than(self, *, max_chars=MIN_REGION_TEXT_LENGTH) -> bool:
+        return len(self.text()) < max_chars
 
     def empty(self) -> "Page":
         if self.label != Label.UNK:
