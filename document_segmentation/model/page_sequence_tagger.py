@@ -255,6 +255,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         for page, pred, label in zip(inventory.pages, predicted, labels, strict=True):
             row = {
+                "Inventory": inventory.full_inv_nr(),
                 "Predicted": Label(pred.argmax().item()).name,
                 "Actual": label.name,
                 "Page ID": page.doc_id,
