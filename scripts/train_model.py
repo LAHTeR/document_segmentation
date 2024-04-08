@@ -142,7 +142,7 @@ if __name__ == "__main__":
         print(f"Sheet: {name}", file=args.eval_output)
         print(f"Sheet: {name}", file=args.test_output)
 
-        results = model.eval_(validation)
+        results = model.eval_(validation, name)
         metrics = results[:4]
         table = results[4]
 

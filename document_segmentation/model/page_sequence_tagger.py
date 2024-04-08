@@ -62,6 +62,16 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         self.to_device(device)
 
+        self._wandb_run: Optional[wandb.run] = None
+
+    @property
+    def wandb_run(self) -> Optional[wandb.run]:
+        return self._wandb_run
+
+    @wandb_run.setter
+    def wandb_run(self, wandb_run: Optional[wandb.run]) -> None:
+        self._wandb_run = wandb_run
+
     def forward(self, pages: list[Page]) -> torch.Tensor:
         page_embeddings = self._page_embedding(pages)
 
@@ -113,25 +123,31 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         ).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
-        if log_wandb and wandb.login():
-            wandb_run = wandb.init(
-                project=self.__class__.__name__,
-                config={
-                    "training size": len(training_inventories),
-                    "epochs": epochs,
-                    "weights": weights,
-                    "shuffle": shuffle,
-                    "optimizer": optimizer.__class__.__name__,
-                    "criterion": criterion.__class__.__name__,
-                    # TODO: convert to nested dict
-                    "modules": self.__dict__["_modules"],
-                },
-            )
+        if log_wandb:
+            if self.wandb_run is None:
+                self.wandb_run = wandb.init(
+                    project=self.__class__.__name__,
+                    config={
+                        "training size": len(training_inventories),
+                        "epochs": epochs,
+                        "weights": weights,
+                        "shuffle": shuffle,
+                        "optimizer": optimizer.__class__.__name__,
+                        "criterion": criterion.__class__.__name__,
+                        # TODO: convert to nested dict
+                        "modules": self.__dict__["_modules"],
+                    },
+                )
+                if self.wandb_run is None:
+                    logging.warning(
+                        "Failed to initialize Weights & Biases. Set the WANDB_API_KEY environment variable for logging in."
+                    )
+            else:
+                logging.info(
+                    f"Resuming logging on Weights & Biases run: {self.wandb_run}."
+                )
         else:
-            wandb_run = None
-            logging.warning(
-                "Not logging to Weights & Biases. Set the WANDB_API_KEY environment variable for logging in."
-            )
+            self.wandb_run = None
 
         for epoch in range(epochs):
             if shuffle:
@@ -157,8 +173,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 loss.backward()
                 optimizer.step()
 
-                if wandb_run:
-                    wandb_run.log(
+                if self.wandb_run:
+                    self.wandb_run.log(
                         {
                             "loss": loss.item(),
                             "inventory length": len(inventory),
@@ -167,43 +183,25 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         }
                     )
 
-            if validation_inventories and wandb_run:
-                _eval = {"epoch": epoch}
-
+            if validation_inventories:
                 for name, inventories in validation_inventories.items():
-                    dataset_eval = {}
+                    self.eval_(inventories, name, epoch)
 
-                    results = self.eval_(inventories)
-                    metrics: tuple[Metric] = results[:4]
-                    table: pd.DataFrame = results[4].drop(columns=["Thumbnail", "Link"])
-                    table["Image"] = table["Image"].apply(wandb.Html)
+                # FIXME: re-running the validation on all inventories is redundant
+                all_validation_inventories = [
+                    inventory
+                    for values in validation_inventories.values()
+                    for inventory in values
+                ]
+                self.eval_(all_validation_inventories, "total", epoch)
 
-                    wandb_run.log({name + "_results": wandb.Table(dataframe=table)})
-
-                    for metric in metrics:
-                        if metric.average is None:
-                            dataset_eval[metric.__class__.__name__] = {
-                                label.name: score
-                                for label, score in zip(
-                                    Label, metric.compute().tolist()
-                                )
-                            }
-                        else:
-                            dataset_eval[metric.__class__.__name__] = (
-                                metric.compute().item()
-                            )
-
-                    _eval[name] = dataset_eval
-
-                wandb_run.log(_eval)
                 self.train()
 
-        if wandb_run:
-            wandb.finish()
-            # TODO: save model to WandB or HuggingFace
-
     def eval_(
-        self, inventories: list[Inventory]
+        self,
+        inventories: list[Inventory],
+        name_prefix: str,
+        epoch: Optional[int] = None,
     ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
@@ -219,17 +217,48 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             MulticlassF1Score(average=None, num_classes=len(Label)),
             MulticlassAccuracy(),
         )
+
         results: pd.DataFrame = pd.concat(
             (
                 self.predict(inventory, *metrics)
                 for inventory in tqdm(
                     inventories,
-                    desc="Predicting",
+                    desc=f"Evaluating '{name_prefix}'",
                     total=len(inventories),
                     unit="inventory",
                 )
             )
         )
+        results["Sheet"] = name_prefix
+
+        if self.wandb_run is not None:
+            if epoch is not None:
+                self.wandb_run.log({"epoch": epoch}, commit=False)
+            self.wandb_run.log(
+                {
+                    f"{name_prefix}.{metric.__class__.__name__}": metric.compute().item()
+                    if metric.average
+                    else {
+                        # Nest metric per label
+                        label.name: score
+                        for label, score in zip(Label, metric.compute().tolist())
+                    }
+                    for metric in metrics
+                },
+                commit=False,
+            )
+
+            # FIXME: this changes the Image column permanently
+            results["Image"] = results["Image"].apply(wandb.Html)
+            self.wandb_run.log(
+                {
+                    f"{name_prefix}.results": wandb.Table(
+                        dataframe=results.drop(columns=["Thumbnail", "Link"])
+                    )
+                },
+                commit=True,
+            )
+
         return metrics + (results,)
 
     @torch.inference_mode()
