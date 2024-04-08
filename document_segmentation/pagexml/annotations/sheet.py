@@ -104,13 +104,18 @@ class Sheet(abc.ABC):
             Inventory: The annotated inventory.
         """
         inventory_rows = self._data.loc[
-            self._data[self._INV_NR_COLUMN].astype(str)
-            + self._data[self._DEEL_VAN_INVENTARIS_COL]
-            == inventory.full_inv_nr()
+            self._data[self._INV_NR_COLUMN] == inventory.inv_nr
         ]
+
+        if inventory.inventory_part:
+            inventory_rows = inventory_rows.loc[
+                inventory_rows[self._DEEL_VAN_INVENTARIS_COL]
+                == inventory.inventory_part
+            ]
+
         if len(inventory_rows) == 0:
             logging.warning(
-                f"No entries found for inventory {inventory.inv_nr} in sheet '{self}'. Skipping."
+                f"No entries found for inventory {inventory} in sheet '{self}'. Skipping."
             )
 
         for idx, row in inventory_rows.iterrows():
