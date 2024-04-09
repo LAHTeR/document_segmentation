@@ -160,6 +160,7 @@ class Sheet(abc.ABC):
             try:
                 yield from (
                     self.annotate_inventory(inventory)
+                    .remove_short_regions(min_chars=min_region_text_length)
                     .empty_unlabelled()
                     .remove_empty_pages()
                     .split(max_size)
