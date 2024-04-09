@@ -137,7 +137,11 @@ if __name__ == "__main__":
 
     ########################################################################################
     # EVALUATE MODEL
+    # Log to local file only
     ########################################################################################
+
+    model.wandb_run = None
+
     for name, validation in validation_inventories.items():
         print(f"Sheet: {name}", file=args.eval_output)
         print(f"Sheet: {name}", file=args.test_output)

@@ -149,7 +149,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         else:
             self.wandb_run = None
 
-        for epoch in range(epochs):
+        for epoch in range(1, epochs + 1):
             if shuffle:
                 random.shuffle(training_inventories)
 
@@ -184,8 +184,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
 
             if validation_inventories:
-                for name, inventories in validation_inventories.items():
-                    self.eval_(inventories, name, epoch)
+                for sheet_name, _validation in validation_inventories.items():
+                    self.eval_(_validation, sheet_name, epoch=epoch, log_pages=True)
 
                 # FIXME: re-running the validation on all inventories is redundant
                 all_validation_inventories = [
@@ -193,20 +193,27 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     for values in validation_inventories.values()
                     for inventory in values
                 ]
-                self.eval_(all_validation_inventories, "total", epoch)
+                self.eval_(
+                    all_validation_inventories, "total", epoch=epoch, log_pages=False
+                )
 
                 self.train()
 
     def eval_(
         self,
         inventories: list[Inventory],
-        name_prefix: str,
+        sheet_name: str,
+        *,
         epoch: Optional[int] = None,
+        log_pages: bool = True,
     ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
         Args:
-            inventories (list[Inventory]): The inventories to evaluate on.
+            inventories (list[Inventory]): The inventories to evaluate.
+            sheet_name (str): The name to use for the evaluation logs.
+            epoch (Optional[int], optional): The epoch number. Defaults to None.
+            log_pages (bool, optional): Whether to log the pages to Weights & Biases. Defaults to True.
         Returns:
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
@@ -223,41 +230,35 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 self.predict(inventory, *metrics)
                 for inventory in tqdm(
                     inventories,
-                    desc=f"Evaluating '{name_prefix}'",
+                    desc=f"Evaluating '{sheet_name}'",
                     total=len(inventories),
                     unit="inventory",
                 )
             )
         )
-        results["Sheet"] = name_prefix
 
         if self.wandb_run is not None:
+            if log_pages:
+                # FIXME: this changes the Image column permanently in-place
+                results["Image"] = results["Image"].apply(wandb.Html)
+                table = wandb.Table(
+                    dataframe=results.drop(columns=["Thumbnail", "Link"])
+                )
+                self.wandb_run.log({f"{sheet_name}_results": table})
+
             if epoch is not None:
                 self.wandb_run.log({"epoch": epoch}, commit=False)
-            self.wandb_run.log(
-                {
-                    f"{name_prefix}.{metric.__class__.__name__}": metric.compute().item()
-                    if metric.average
-                    else {
-                        # Nest metric per label
-                        label.name: score
-                        for label, score in zip(Label, metric.compute().tolist())
-                    }
-                    for metric in metrics
-                },
-                commit=False,
-            )
-
-            # FIXME: this changes the Image column permanently
-            results["Image"] = results["Image"].apply(wandb.Html)
-            self.wandb_run.log(
-                {
-                    f"{name_prefix}.results": wandb.Table(
-                        dataframe=results.drop(columns=["Thumbnail", "Link"])
-                    )
-                },
-                commit=True,
-            )
+            _metrics = {
+                f"{sheet_name}.{metric.__class__.__name__}": metric.compute().item()
+                if metric.average
+                else {
+                    # Nest metric per label
+                    label.name: score
+                    for label, score in zip(Label, metric.compute().tolist())
+                }
+                for metric in metrics
+            }
+            self.wandb_run.log(_metrics, commit=True)
 
         return metrics + (results,)
 
