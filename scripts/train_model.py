@@ -134,10 +134,11 @@ if __name__ == "__main__":
     model.save(args.model_file)
 
     logging.debug(str(model))
+    model.wandb_run.finish()
 
     ########################################################################################
     # EVALUATE MODEL
-    # Log to local file only
+    # Log to local files, skip W&B logging
     ########################################################################################
 
     model.wandb_run = None
