@@ -104,6 +104,9 @@ except ValueError:
     MAX_INVENTORY_SIZE: int = None
 """The maximum number of pages per inventory. Larger inventories are chunked. Set to None to disable chunking."""
 
+MAX_EMPTY_SEQUENCE: int = 1
+"""If an annotated inventory has more than this number of subsequent empty OUT pages, they are replaced with a single OUT page."""
+
 
 def as_dict():
     excluded_keys = {"SERVER_USERNAME", "SERVER_PASSWORD"}

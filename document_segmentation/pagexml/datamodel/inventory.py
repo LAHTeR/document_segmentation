@@ -20,6 +20,7 @@ from ...settings import (
     DEFAULT_THUMBNAIL_SIZE,
     INV_NR_UUID_MAPPING_FILE,
     INVENTORY_DIR,
+    MAX_EMPTY_SEQUENCE,
     MIN_REGION_TEXT_LENGTH,
     SERVER_PASSWORD,
     SERVER_USERNAME,
@@ -235,7 +236,7 @@ class Inventory(BaseModel, Dataset):
         return self
 
     def remove_empty_pages(
-        self, *, max_length: int = 5, label: Label = Label.OUT
+        self, *, max_length: int = MAX_EMPTY_SEQUENCE, label: Label = Label.OUT
     ) -> "Inventory":
         """Remove all unlabelled pages without text.
 
