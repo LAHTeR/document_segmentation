@@ -27,6 +27,12 @@ class Page(BaseModel):
                 raise ValidationError from e
         return value
 
+    def __repr__(self) -> str:
+        return f"Page(label={self.label.name}, scan_nr={self.scan_nr}, doc_id={self.doc_id}, external_ref={self.external_ref}"
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
     def is_shorter_than(self, *, max_chars=MIN_REGION_TEXT_LENGTH) -> bool:
         return len(self.text()) < max_chars
 

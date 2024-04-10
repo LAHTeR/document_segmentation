@@ -103,16 +103,19 @@ class Inventory(BaseModel, Dataset):
                 page.label = new_label
             else:
                 logging.warning(
-                    f"Scan {scan_nr} already has label: {page.label}. Ignoring new label: '{label}'. Inventory: {str(self)}"
+                    f"Scan {scan_nr} already has label: {page.label.name}. Ignoring new label: '{label.name}'. Inventory: {str(self)}"
                 )
         else:
             logging.info(
-                f"Scan {scan_nr} already has label: {page.label}. Ignoring new label: {label}. Inventory: {str(self)}"
+                f"Scan {scan_nr} already has label: {page.label.name}. Ignoring new label: {label.name}. Inventory: {str(self)}"
             )
 
     def get_scan(self, scan_nr: int) -> Page:
         """Get the page with the given scan number."""
-        return self.pages[scan_nr - 1]
+        try:
+            return next((page for page in self.pages if page.scan_nr == scan_nr))
+        except StopIteration as e:
+            raise IndexError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
 
     def has_labels(self) -> bool:
         return any(page.label != Label.UNK for page in self.pages)
@@ -235,6 +238,11 @@ class Inventory(BaseModel, Dataset):
             if page.label == Label.UNK:
                 page.empty()
         return self
+
+    def remove_scan(self, scan_nr: int) -> "Inventory":
+        """Remove the page with the given scan number."""
+        page = self.get_scan(scan_nr)
+        self.pages.remove(page)
 
     def remove_empty_pages(
         self, *, max_length: int = MAX_EMPTY_SEQUENCE, label: Label = Label.OUT
