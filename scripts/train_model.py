@@ -119,11 +119,11 @@ if __name__ == "__main__":
     for i, _sheet in enumerate(args.renate_analysis_sheet):
         sheet = RenateAnalysisInv(_sheet)
         _inventories = list(sheet.all_annotated_inventories(n=args.n))
-        if i == 0:
-            # TODO: randomize when there are more than two sheets
-            training_inventories.extend(_inventories)
-        else:
-            validation_inventories[_sheet.stem] = _inventories
+
+        random.shuffle(_inventories)
+        split = int(len(_inventories) * args.split)
+        training_inventories.extend(_inventories[:split])
+        validation_inventories[_sheet.name] = _inventories[split:]
 
     ########################################################################################
     # LOAD OR TRAIN MODEL
