@@ -246,20 +246,21 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 )
                 self.wandb_run.log({f"{sheet_name}_pages": table})
 
-            wandb_data = {}
             if epoch is not None:
-                wandb_data["epoch"] = epoch
+                self.wandb_run.log({"epoch": epoch}, commit=False)
 
+            wandb_metrics: dict[str, Any] = {}
             for metric in metrics:
                 if metric.average is not None:
-                    wandb_data[metric.__class__.__name__] = metric.compute().item()
+                    score: float = metric.compute().item()
                 else:
-                    wandb_data[metric.__class__.__name__] = {
+                    score: dict[str, float] = {
                         label.name: score
                         for label, score in zip(Label, metric.compute().tolist())
                     }
+                wandb_metrics[metric.__class__.__name__] = score
 
-            self.wandb_run.log({sheet_name: wandb_data})
+            self.wandb_run.log({sheet_name: wandb_metrics})
 
         return metrics + (results,)
 
