@@ -1,5 +1,6 @@
 import json
 import logging
+import sys
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -329,10 +330,18 @@ class Inventory(BaseModel, Dataset):
         counts: Counter[Label] = sum(
             (inventory.class_counts() for inventory in inventories), start=Counter()
         )
+        try:
+            total = counts.total()
+        except AttributeError as e:
+            logging.warning(
+                f"Python version: '{sys.version}': {str(e)}. Using sum(counts.values()) instead."
+            )
+            total = sum(counts.values())
 
-        weights: list[float] = [counts.total() / (counts[label] + 1) for label in Label]
-        weights[Label.UNK] = 0.0
-        return weights
+        inverse_freq: list[float] = [total / (counts[label] + 1) for label in Label]
+        inverse_freq[Label.UNK] = 0.0
+
+        return inverse_freq
 
     @staticmethod
     def local_file(inv_nr: int, inventory_part: str, directory: Path) -> Path:
