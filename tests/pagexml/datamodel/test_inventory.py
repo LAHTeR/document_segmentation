@@ -254,6 +254,67 @@ class TestInventory:
             == expected
         )
 
+    @pytest.mark.parametrize(
+        "inventories, expected",
+        [
+            ([], [0.0] * 6),
+            (
+                [
+                    Inventory(
+                        inv_nr=1,
+                        inventory_part="",
+                        pages=[
+                            Page(
+                                label=Label.OUT,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            )
+                        ],
+                    )
+                ],
+                [0.0, 1.0, 1.0, 1.0, 0.5, 1.0],
+            ),
+            (
+                [
+                    Inventory(
+                        inv_nr=1,
+                        inventory_part="",
+                        pages=[
+                            Page(
+                                label=Label.OUT,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            )
+                        ],
+                    ),
+                    Inventory(
+                        inv_nr=1,
+                        inventory_part="",
+                        pages=[
+                            Page(
+                                label=Label.OUT,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            ),
+                            Page(
+                                label=Label.BEGIN,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            ),
+                        ],
+                    ),
+                ],
+                [0.0, 1.5, 3.0, 3.0, 1.0, 3.0],
+            ),
+        ],
+    )
+    def test_total_class_weights(self, inventories, expected):
+        assert Inventory.total_class_weights(inventories) == expected
+
 
 class TestThumbnailDownloader:
     @pytest.fixture

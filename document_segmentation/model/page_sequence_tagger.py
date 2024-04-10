@@ -23,11 +23,7 @@ from ..pagexml.datamodel.inventory import (
 )
 from ..pagexml.datamodel.label import Label
 from ..pagexml.datamodel.page import Page
-from ..settings import (
-    MAX_INVENTORY_SIZE,
-    PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
-    TRAINING_WEIGHTS,
-)
+from ..settings import MAX_INVENTORY_SIZE, PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
@@ -96,7 +92,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         validation_inventories: Optional[dict[str, list[Inventory]]] = None,
         *,
         epochs: int = 3,
-        weights: list[float] = TRAINING_WEIGHTS,
+        weights: list[float] = None,
         shuffle: bool = True,
         log_wandb: bool = True,
     ):
@@ -107,12 +103,17 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             validation_inventories (Optional[dict[str[list[Inventory]]], optional): Validation datasets with name.
                 Defaults to None. If given, will evaluate each dataset separately after each epoch.
             epochs (int, optional): The number of epochs to train. Defaults to 3.
-            weights (list[float]): The weights for the loss function. Defaults to TRAINING_WEIGHTS.
+            weights (list[float]): The weights for the loss function.
+                If None (default), the class weights are computed from the training dataset.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
         """
         self.train()
 
+        if weights is None:
+            weights = torch.Tensor(
+                Inventory.total_class_weights(training_inventories)
+            ).to(self._device)
         if not len(weights) == len(Label):
             raise ValueError(
                 f"Length of weights ({len(weights)}) does not match number of labels ({len(Label)})"

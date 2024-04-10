@@ -317,6 +317,23 @@ class Inventory(BaseModel, Dataset):
         return target_file
 
     @staticmethod
+    def total_class_weights(inventories: Iterable["Inventory"]) -> list[float]:
+        """Get the inverse frequency of each label in this dataset.
+
+        Applies add-one smoothing to avoid division by zero.
+
+        Returns:
+            list[float]: List of frequency of each label in dataset divided by dataset length.
+        """
+        counts: Counter[Label] = sum(
+            (inventory.class_counts() for inventory in inventories), start=Counter()
+        )
+
+        weights: list[float] = [counts.total() / (counts[label] + 1) for label in Label]
+        weights[Label.UNK] = 0.0
+        return weights
+
+    @staticmethod
     def local_file(inv_nr: int, inventory_part: str, directory: Path) -> Path:
         """Return the path of the inventory Json file.
 
