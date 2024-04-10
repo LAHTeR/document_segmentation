@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -97,5 +98,17 @@ PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
 }
 """Default configuration for the RNN module in the PageSequenceTagger"""
 
-MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "512"))
+try:
+    MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "512"))
+except ValueError:
+    MAX_INVENTORY_SIZE: int = None
 """The maximum number of pages per inventory. Larger inventories are chunked. Set to None to disable chunking."""
+
+
+def as_dict():
+    excluded_keys = {"SERVER_USERNAME", "SERVER_PASSWORD"}
+    return {
+        key: "*" * 8 if key in excluded_keys else value
+        for key, value in sys.modules[__name__].__dict__.items()
+        if key.isupper()
+    }

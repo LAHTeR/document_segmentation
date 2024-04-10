@@ -17,6 +17,7 @@ from torcheval.metrics import (
 )
 from tqdm import tqdm
 
+from .. import settings
 from ..pagexml.datamodel.inventory import (
     Inventory,
     ThumbnailDownloader,
@@ -137,6 +138,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         "criterion": criterion.__class__.__name__,
                         # TODO: convert to nested dict
                         "modules": self.__dict__["_modules"],
+                        "settings": settings.as_dict(),
                     },
                 )
                 if self.wandb_run is None:
@@ -164,7 +166,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     logging.warning(f"Skipping single page inventory: {inventory}")
                     continue
                 elif len(inventory) > MAX_INVENTORY_SIZE:
-                    logging.error(f"Large inventory: {inventory}")
+                    logging.error(
+                        f"Inventory '{inventory}' larger than {MAX_INVENTORY_SIZE} pages."
+                    )
 
                 optimizer.zero_grad()
                 outputs = self(inventory.pages).to(self._device)
