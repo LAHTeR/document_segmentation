@@ -133,13 +133,13 @@ class Sheet(abc.ABC):
 
     def preprocess(
         self, inventory: Inventory, min_region_text_length, max_size: int
-    ) -> Iterable[Inventory]:
+    ) -> Inventory:
         return (
             self.annotate_inventory(inventory)
             .remove_short_regions(min_chars=min_region_text_length)
             .empty_unlabelled()
             .remove_empty_pages()
-            .split(max_size)
+            .head(max_size)
         )
 
     def all_annotated_inventories(
@@ -158,8 +158,8 @@ class Sheet(abc.ABC):
             min_region_text_length ([type], optional): The minimum length of text in a region.
                 Defaults to MIN_REGION_TEXT_LENGTH.
             skip_errors (bool, optional): If True (default), errors are logged, otherwise they are raised.
-            max_size (Optional[int], optional): The maximum number of pages per inventory. Larger inventories are chunked.
-                Defaults to MAX_INVENTORY_SIZE.
+            max_size (Optional[int], optional): The maximum number of pages per inventory. Larger inventories are cut off.
+                Defaults to MAX_INVENTORY_SIZE. Set to 0 or None to disable.
         """
 
         for inventory in tqdm(
@@ -169,7 +169,7 @@ class Sheet(abc.ABC):
             unit="inventory",
         ):
             try:
-                yield from self.preprocess(inventory, min_region_text_length, max_size)
+                yield self.preprocess(inventory, min_region_text_length, max_size)
             except ValueError as e:
                 if skip_errors:
                     logging.error(str(e))

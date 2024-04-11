@@ -118,6 +118,16 @@ class Inventory(BaseModel, Dataset):
         except StopIteration as e:
             raise IndexError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
 
+    def head(self, n: int) -> "Inventory":
+        if (not n) or (len(self) <= n):
+            return self
+        else:
+            return Inventory(
+                inv_nr=self.inv_nr,
+                inventory_part=self.inventory_part,
+                pages=self.pages[:n],
+            )
+
     def has_labels(self) -> bool:
         return any(page.label != Label.UNK for page in self.pages)
 

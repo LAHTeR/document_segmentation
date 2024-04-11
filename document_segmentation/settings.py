@@ -98,11 +98,8 @@ PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
 }
 """Default configuration for the RNN module in the PageSequenceTagger"""
 
-try:
-    MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "512"))
-except ValueError:
-    MAX_INVENTORY_SIZE: int = None
-"""The maximum number of pages per inventory. Larger inventories are chunked. Set to None to disable chunking."""
+MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "1024"))
+"""The maximum number of pages per inventory. Larger inventories are chunked. Set to 0 to disable chunking."""
 
 MAX_EMPTY_SEQUENCE: int = 1
 """If an annotated inventory has more than this number of subsequent empty OUT pages, they are replaced with a single OUT page."""
