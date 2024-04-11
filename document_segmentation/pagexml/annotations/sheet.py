@@ -11,6 +11,7 @@ from tqdm import tqdm
 from ...settings import (
     INVENTORY_DIR,
     MAX_INVENTORY_SIZE,
+    MIN_INVENTORY_SIZE,
     MIN_REGION_TEXT_LENGTH,
     SERVER_PASSWORD,
     SERVER_USERNAME,
@@ -149,6 +150,7 @@ class Sheet(abc.ABC):
         min_region_text_length=MIN_REGION_TEXT_LENGTH,
         skip_errors: bool = True,
         max_size: int = MAX_INVENTORY_SIZE,
+        min_size: int = MIN_INVENTORY_SIZE,
     ) -> Iterable["Inventory"]:
         """Load, label, and preprocess all inventories in the sheet.
 
@@ -161,15 +163,23 @@ class Sheet(abc.ABC):
             max_size (Optional[int], optional): The maximum number of pages per inventory. Larger inventories are cut off.
                 Defaults to MAX_INVENTORY_SIZE. Set to 0 or None to disable.
         """
-
+        inventories = (
+            inventory for inventory in self.inventories() if len(inventory) >= min_size
+        )
+        total = n or len(list(self.inventory_numbers()))
         for inventory in tqdm(
-            islice(self.inventories(), n),
-            desc="Loading Inventories",
-            total=n or len(list(self.inventory_numbers())),
-            unit="inventory",
+            islice(inventories, n), desc="Loading Inventories", total=total, unit="inv"
         ):
             try:
-                yield self.preprocess(inventory, min_region_text_length, max_size)
+                preprocessed: Inventory = self.preprocess(
+                    inventory, min_region_text_length, max_size
+                )
+                if len(preprocessed) >= min_size:
+                    yield preprocessed
+                else:
+                    logging.warning(
+                        f"Inventory {inventory} is too small after preprocessing. Skipping."
+                    )
             except ValueError as e:
                 if skip_errors:
                     logging.error(str(e))
