@@ -149,6 +149,17 @@ class TestInventory:
         )
 
     @pytest.mark.parametrize(
+        "inventory_nr, expected_length",
+        [(1105, 1092), (2542, 2052)],
+    )
+    def test_get_scan(self, inventory_nr, expected_length):
+        inventory = Inventory.load(inventory_nr, "", DATA_DIR)
+
+        for scan_nr in range(1, expected_length + 1):
+            assert inventory.get_scan(scan_nr).scan_nr == scan_nr
+            assert inventory.get_scan(scan_nr) == inventory.pages[scan_nr - 1]
+
+    @pytest.mark.parametrize(
         "inventory_nr, doc_id, expected",
         [
             (
@@ -182,13 +193,17 @@ class TestInventory:
 
     @pytest.mark.parametrize(
         "inventory_nr, expected_length, expected_exception",
-        [(1105, 1092, does_not_raise()), (1, 1092, pytest.raises(FileNotFoundError))],
+        [
+            (1105, 1092, does_not_raise()),
+            (2542, 2052, does_not_raise()),
+            (1, 1092, pytest.raises(FileNotFoundError)),
+        ],
     )
     def test_load(self, inventory_nr, expected_length, expected_exception):
         with expected_exception:
             inventory = Inventory.load(inventory_nr, "", DATA_DIR)
 
-            assert inventory.inv_nr == 1105
+            assert inventory.inv_nr == inventory_nr
             assert inventory.inventory_part == ""
             assert len(inventory) == expected_length
 

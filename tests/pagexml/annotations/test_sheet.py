@@ -32,6 +32,38 @@ class TestSheet:
         assert not sheet._data[self.INV_COLUMN].hasnans
 
 
+class TestRenateAnalysis:
+    @pytest.fixture(scope="session")
+    def test_sheet(self) -> Path:
+        return RenateAnalysis()
+
+    def test_annotate_inventory(self, test_sheet):
+        annotated_inventory = test_sheet.annotate_inventory(
+            Inventory.load(2542, "", DATA_DIR)
+        )
+        assert len(annotated_inventory) == 2052
+
+        expected_labels = {114: Label.END_BEGIN}
+
+        for page in annotated_inventory.pages:
+            if page.scan_nr in expected_labels:
+                assert page.label == expected_labels[page.scan_nr]
+            else:
+                assert page.label == Label.UNK
+
+    def test_preprocess(self, test_sheet):
+        """Test the preprocessing of the RenateAnalysis sheet."""
+        min_region_text_length = 20
+        max_size = 1024
+        inventory = Inventory.load(2542, "", DATA_DIR)
+        assert len(inventory) == 2052
+
+        annotated: list[Inventory] = list(
+            test_sheet.preprocess(inventory, min_region_text_length, max_size)
+        )
+        assert len(annotated) == 1
+
+
 @pytest.mark.skipif(
     not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
     reason="No server credentials.",

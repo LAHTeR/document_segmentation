@@ -131,6 +131,17 @@ class Sheet(abc.ABC):
                 logging.error(str(e))
         return inventory
 
+    def preprocess(
+        self, inventory: Inventory, min_region_text_length, max_size: int
+    ) -> Iterable[Inventory]:
+        return (
+            self.annotate_inventory(inventory)
+            .remove_short_regions(min_chars=min_region_text_length)
+            .empty_unlabelled()
+            .remove_empty_pages()
+            .split(max_size)
+        )
+
     def all_annotated_inventories(
         self,
         n: Optional[int] = None,
@@ -158,13 +169,7 @@ class Sheet(abc.ABC):
             unit="inventory",
         ):
             try:
-                yield from (
-                    self.annotate_inventory(inventory)
-                    .remove_short_regions(min_chars=min_region_text_length)
-                    .empty_unlabelled()
-                    .remove_empty_pages()
-                    .split(max_size)
-                )
+                yield from self.preprocess(inventory, min_region_text_length, max_size)
             except ValueError as e:
                 if skip_errors:
                     logging.error(str(e))
