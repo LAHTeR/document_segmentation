@@ -166,9 +166,11 @@ class Sheet(abc.ABC):
         inventories = (
             inventory for inventory in self.inventories() if len(inventory) >= min_size
         )
-        total = n or len(list(self.inventory_numbers()))
         for inventory in tqdm(
-            islice(inventories, n), desc="Loading Inventories", total=total, unit="inv"
+            islice(inventories, n),
+            desc=f"Loading Inventories ({self.__class__.__name__})",
+            total=n or len(list(self.inventory_numbers())),
+            unit="inventory",
         ):
             try:
                 preprocessed: Inventory = self.preprocess(

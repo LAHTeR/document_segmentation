@@ -131,6 +131,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     project=self.__class__.__name__,
                     config={
                         "training size": len(training_inventories),
+                        "validation sets": {
+                            key: len(invs)
+                            for key, invs in (validation_inventories or {}).items()
+                        },
                         "epochs": epochs,
                         "weights": weights,
                         "shuffle": shuffle,
