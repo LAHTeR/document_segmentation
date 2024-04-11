@@ -11,7 +11,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
-        args: ["--maxkb=768"]
+        args: ["--maxkb=4000"]
   - repo: https://github.com/python-poetry/poetry
     rev: "1.8.0"
     hooks:

@@ -1,4 +1,5 @@
 import logging
+from contextlib import nullcontext as does_not_raise
 from uuid import UUID
 
 import pytest
@@ -12,7 +13,7 @@ from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.pagexml.datamodel.page import Page
 from document_segmentation.pagexml.datamodel.region import Region
 
-from ...conftest import TEST_THUMBNAIL_FILE
+from ...conftest import DATA_DIR, TEST_THUMBNAIL_FILE
 
 
 class TestInventory:
@@ -178,6 +179,18 @@ class TestInventory:
 
         inventory = Inventory(inv_nr=inventory_nr, inventory_part="", pages=[page])
         assert inventory.link(page) == expected
+
+    @pytest.mark.parametrize(
+        "inventory_nr, expected_length, expected_exception",
+        [(1105, 1092, does_not_raise()), (1, 1092, pytest.raises(FileNotFoundError))],
+    )
+    def test_load(self, inventory_nr, expected_length, expected_exception):
+        with expected_exception:
+            inventory = Inventory.load(inventory_nr, "", DATA_DIR)
+
+            assert inventory.inv_nr == 1105
+            assert inventory.inventory_part == ""
+            assert len(inventory) == expected_length
 
     @pytest.mark.parametrize(
         "inv_nr, inv_part, expected, expected_logs",

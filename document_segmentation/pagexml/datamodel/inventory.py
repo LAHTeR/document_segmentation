@@ -1,3 +1,4 @@
+import gzip
 import json
 import logging
 import sys
@@ -371,22 +372,50 @@ class Inventory(BaseModel, Dataset):
         return (directory / inv_nr).with_suffix(".json")
 
     @classmethod
+    def from_file(cls, file: Path) -> "Inventory":
+        if file.suffix in {".gz", ".gzip"}:
+            f = gzip.open(file, "rt")
+        else:
+            f = file.open("rt")
+        try:
+            return cls.model_validate_json(f.read())
+        except ValidationError as e:
+            raise ValidationError(
+                f"Error loading inventory from file {file}: {e}"
+            ) from e
+
+    @classmethod
+    def load(
+        cls, inv_nr: int, inventory_part: str, inventory_dir: Path = INVENTORY_DIR
+    ):
+        local_file: Path = cls.local_file(inv_nr, inventory_part, inventory_dir)
+
+        fallback_suffixes: list[str] = {
+            local_file.suffix + ".gz",
+            local_file.suffix + ".gzip",
+        }
+        local_files: list[Path] = [local_file] + [
+            local_file.with_suffix(suffix) for suffix in fallback_suffixes
+        ]
+
+        if existing_file := next((f for f in local_files if f.exists()), None):
+            inventory = cls.from_file(existing_file)
+        else:
+            raise FileNotFoundError(f"None of {local_files} found.")
+
+        return inventory
+
+    @classmethod
     def load_or_download(
         cls, inv_nr: int, inventory_part: str, inventory_dir: Path = INVENTORY_DIR
     ):
-        local_file = cls.local_file(inv_nr, inventory_part, inventory_dir)
-
         try:
-            inventory = Inventory.model_validate_json(local_file.read_text())
+            inventory = Inventory.load(inv_nr, inventory_part, inventory_dir)
         except FileNotFoundError:
             logging.info(f"Downloading inventory {inv_nr}...")
             inventory = cls.download(
                 inv_nr, inventory_part, target_directory=inventory_dir
             )
-        except ValidationError as e:
-            raise ValidationError(
-                f"Error loading inventory {inv_nr}_{inventory_part} from file {local_file}: {e}"
-            ) from e
         return inventory
 
     @classmethod
