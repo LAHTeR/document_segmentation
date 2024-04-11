@@ -58,10 +58,15 @@ class TestRenateAnalysis:
         inventory = Inventory.load(2542, "", DATA_DIR)
         assert len(inventory) == 2052
 
-        annotated: list[Inventory] = list(
-            test_sheet.preprocess(inventory, min_region_text_length, max_size)
+        expected_labels = [Label.OUT, Label.END_BEGIN, Label.OUT]
+        expected_scan_nrs = [1, 114, 115]
+
+        preprocessed: Inventory = test_sheet.preprocess(
+            inventory, min_region_text_length, max_size
         )
-        assert len(annotated) == 1
+
+        assert preprocessed.labels() == expected_labels
+        assert [page.scan_nr for page in preprocessed.pages] == expected_scan_nrs
 
 
 @pytest.mark.skipif(
@@ -154,7 +159,7 @@ class TestGeneraleMissiven:
 
         expected_inv_nrs = [1068, 1070]
         expected_inv_parts = [""] * 2
-        expected_lengths = [103, 108]
+        expected_lengths = [90, 96]
 
         for inventory, inv_nr, inv_part, length in zip(
             test_sheet.all_annotated_inventories(n=n),
@@ -165,4 +170,6 @@ class TestGeneraleMissiven:
             assert all(page.label != Label.UNK for page in inventory.pages)
             assert inventory.inv_nr == inv_nr
             assert inventory.inventory_part == inv_part
-            assert len(inventory) == length
+            assert (
+                len(inventory) == length
+            ), f"Inventory {inventory} has {len(inventory)} pages, expected {length}."
