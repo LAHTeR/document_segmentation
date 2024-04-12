@@ -123,7 +123,7 @@ class Sheet(abc.ABC):
             begin_scan = row[self._START_PAGE_COLUMN]
             end_scan = row[self._LAST_PAGE_COLUMN]
 
-            if end_scan - begin_scan < MIN_INVENTORY_SIZE:
+            if end_scan - begin_scan >= MIN_INVENTORY_SIZE:
                 try:
                     inventory.annotate_scan(begin_scan, Label.BEGIN)
                     inventory.annotate_scan(end_scan, Label.END)
@@ -133,7 +133,7 @@ class Sheet(abc.ABC):
                     logging.error(str(e))
             else:
                 logging.warning(
-                    f"Skipping document {begin_scan}-{end_scan} for inventory {inventory} in sheet {self}."
+                    f"Skipping document {begin_scan}-{end_scan} for inventory {inventory} in sheet {self} (length { end_scan - begin_scan} < {MIN_INVENTORY_SIZE})."
                 )
 
         return inventory

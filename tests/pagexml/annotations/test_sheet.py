@@ -159,7 +159,7 @@ class TestGeneraleMissiven:
 
         expected_inv_nrs = [1068, 1070]
         expected_inv_parts = [""] * 2
-        expected_lengths = [14, 96]
+        expected_lengths = [78, 96]
 
         for inventory, inv_nr, inv_part, length in zip(
             test_sheet.all_annotated_inventories(n=n),
