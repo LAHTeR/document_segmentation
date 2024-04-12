@@ -194,7 +194,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
             if validation_inventories:
                 for sheet_name, _validation in validation_inventories.items():
-                    self.eval_(_validation, sheet_name, epoch=epoch, log_pages=True)
+                    if _validation:
+                        self.eval_(_validation, sheet_name, epoch=epoch, log_pages=True)
+                    else:
+                        logging.warning(f"Empty validation set for '{sheet_name}'.")
 
                 # FIXME: re-running the validation on all inventories is redundant
                 all_validation_inventories = [
@@ -202,9 +205,15 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     for values in validation_inventories.values()
                     for inventory in values
                 ]
-                self.eval_(
-                    all_validation_inventories, "total", epoch=epoch, log_pages=False
-                )
+                if all_validation_inventories:
+                    self.eval_(
+                        all_validation_inventories,
+                        "total",
+                        epoch=epoch,
+                        log_pages=False,
+                    )
+                else:
+                    logging.warning("All validation sets are empty.")
 
                 self.train()
 

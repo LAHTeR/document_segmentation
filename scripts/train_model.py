@@ -158,36 +158,41 @@ if __name__ == "__main__":
         print(f"Sheet: {name}", file=args.eval_output)
         print(f"Sheet: {name}", file=args.test_output)
 
-        results = model.eval_(validation, name)
-        metrics = results[:4]
-        table = results[4]
+        if validation:
+            results = model.eval_(validation, name)
+            metrics = results[:4]
+            table = results[4]
 
-        for average, _metrics in groupby(metrics, key=lambda m: m.average):
-            if average is None:
-                writer = csv.DictWriter(
-                    args.eval_output,
-                    fieldnames=["Metric"] + [label.name for label in Label],
-                    delimiter="\t",
-                )
-                writer.writeheader()
+            for average, _metrics in groupby(metrics, key=lambda m: m.average):
+                if average is None:
+                    writer = csv.DictWriter(
+                        args.eval_output,
+                        fieldnames=["Metric"] + [label.name for label in Label],
+                        delimiter="\t",
+                    )
+                    writer.writeheader()
 
-                for metric in _metrics:
-                    writer.writerow(
-                        {"Metric": metric.__class__.__name__}
-                        | {
-                            label.name: f"{score:.4f}"
-                            for label, score in zip(Label, metric.compute().tolist())
-                        }
-                    )
-            else:
-                for metric in _metrics:
-                    score: float = metric.compute().item()
-                    print(
-                        f"{metric.__class__.__name__} ({average} average):\t{score:.4f}",
-                        file=args.eval_output,
-                        flush=True,
-                    )
-            args.eval_output.flush()
+                    for metric in _metrics:
+                        writer.writerow(
+                            {"Metric": metric.__class__.__name__}
+                            | {
+                                label.name: f"{score:.4f}"
+                                for label, score in zip(
+                                    Label, metric.compute().tolist()
+                                )
+                            }
+                        )
+                else:
+                    for metric in _metrics:
+                        score: float = metric.compute().item()
+                        print(
+                            f"{metric.__class__.__name__} ({average} average):\t{score:.4f}",
+                            file=args.eval_output,
+                            flush=True,
+                        )
+                args.eval_output.flush()
+        else:
+            logging.warning(f"Empty validation set for '{name}', skipping.")
         print("=" * 80, file=args.eval_output)
 
         results[4].to_csv(
