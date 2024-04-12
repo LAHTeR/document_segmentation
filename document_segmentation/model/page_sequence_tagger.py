@@ -169,7 +169,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 if len(inventory) < 2:
                     logging.warning(f"Skipping single page inventory: {inventory}")
                     continue
-                elif len(inventory) > MAX_INVENTORY_SIZE:
+                elif MAX_INVENTORY_SIZE and (len(inventory) > MAX_INVENTORY_SIZE):
                     logging.error(
                         f"Inventory '{inventory}' larger than {MAX_INVENTORY_SIZE} pages."
                     )
