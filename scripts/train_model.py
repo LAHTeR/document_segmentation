@@ -35,14 +35,14 @@ if __name__ == "__main__":
         "--renate-categorisation-sheet",
         type=Path,
         default=RENATE_TANAP_CATEGORISATION_SHEET,
-        help="The sheet with input annotations (Generale Missiven).",
+        help="The sheet with input annotations (Appendix F Renate Analysis).",
     )
     arg_parser.add_argument(
         "--renate-analysis-sheet",
         nargs="*",
         type=Path,
         default=RENATE_ANALYSIS_SHEETS,
-        help="The sheet with input annotations (Generale Missiven).",
+        help="The sheet with input annotations (Entire inventories from Renate's Analyses).",
     )
 
     arg_parser.add_argument("--split", type=float, default=0.8, help="Train/val split.")
@@ -116,25 +116,32 @@ if __name__ == "__main__":
             split:
         ]
 
-    _inventories = []
-    sheet_name = "renate_analysis_inv"
-    validation_inventories[sheet_name] = []
-
-    for sheet in args.renate_analysis_sheet:
-        sheet = RenateAnalysisInv(sheet)
-        _inventories.extend(list(sheet.all_annotated_inventories(n=args.n)))
+    # args.renate_analysis_sheet:
+    _inventories: list[Inventory] = [
+        inventory
+        for file in args.renate_analysis_sheet
+        for inventory in RenateAnalysisInv(file).all_annotated_inventories(n=args.n)
+    ]
 
     random.shuffle(_inventories)
     split = int(len(_inventories) * args.split)
     training_inventories.extend(_inventories[:split])
-    validation_inventories[sheet_name] = _inventories[split:]
+    validation_inventories["renate_analysis_inv"] = _inventories[split:]
 
     ########################################################################################
     # LOAD OR TRAIN MODEL
     ########################################################################################
     model = PageSequenceTagger(device=args.device)
 
-    model.train_(training_inventories, validation_inventories, epochs=args.epochs)
+    weights = Inventory.total_class_weights(
+        validation_inventories["renate_analysis_inv"]
+    )
+    model.train_(
+        training_inventories,
+        validation_inventories,
+        epochs=args.epochs,
+        weights=weights,
+    )
     model.save(args.model_file)
 
     logging.debug(str(model))
