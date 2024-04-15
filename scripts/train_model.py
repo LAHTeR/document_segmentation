@@ -27,20 +27,20 @@ if __name__ == "__main__":
 
     arg_parser.add_argument(
         "--gm-sheet",
-        type=Path,
+        type=str,
         default=GENERALE_MISSIVEN_SHEET,
         help="The sheet with input annotations (Generale Missiven).",
     )
     arg_parser.add_argument(
         "--renate-categorisation-sheet",
-        type=Path,
+        type=str,
         default=RENATE_TANAP_CATEGORISATION_SHEET,
         help="The sheet with input annotations (Appendix F Renate Analysis).",
     )
     arg_parser.add_argument(
         "--renate-analysis-sheet",
         nargs="*",
-        type=Path,
+        type=str,
         default=RENATE_ANALYSIS_SHEETS,
         help="The sheet with input annotations (Entire inventories from Renate's Analyses).",
     )
@@ -97,30 +97,30 @@ if __name__ == "__main__":
     validation_inventories: dict[str, list[Inventory]] = {}
 
     if args.gm_sheet:
-        sheet = GeneraleMissiven(args.gm_sheet)
+        sheet = GeneraleMissiven(Path(args.gm_sheet))
         _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
         training_inventories.extend(_inventories[:split])
-        validation_inventories[args.gm_sheet.name] = _inventories[split:]
+        validation_inventories[args.gm_sheet] = _inventories[split:]
 
     if args.renate_categorisation_sheet:
-        sheet = RenateAnalysis(args.renate_categorisation_sheet)
+        sheet = RenateAnalysis(Path(args.renate_categorisation_sheet))
         _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
         training_inventories.extend(_inventories[:split])
-        validation_inventories[args.renate_categorisation_sheet.name] = _inventories[
-            split:
-        ]
+        validation_inventories[args.renate_categorisation_sheet] = _inventories[split:]
 
     # args.renate_analysis_sheet:
     _inventories: list[Inventory] = [
         inventory
         for file in args.renate_analysis_sheet
-        for inventory in RenateAnalysisInv(file).all_annotated_inventories(n=args.n)
+        for inventory in RenateAnalysisInv(Path(file)).all_annotated_inventories(
+            n=args.n
+        )
     ]
 
     random.shuffle(_inventories)
