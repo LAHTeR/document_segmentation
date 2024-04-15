@@ -101,7 +101,7 @@ PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
 MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "1024"))
 """The maximum number of pages per inventory. Larger inventories are chunked. Set to 0 to disable chunking.
 This is used to limit (GPU) memory usage."""
-MIN_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "7"))
+MIN_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "0"))
 """The minimum number of pages per inventory. Smaller inventories are skipped.
 This is used because small inventories can be problematic for training and evaluation."""
 
