@@ -49,7 +49,11 @@ class RenateAnalysisInv(Sheet):
     ) -> None:
         super().__init__(inventory_dir=inventory_dir)
 
-        self._data = pd.read_excel(sheet_file, index_col=self._INDEX_COLUMN).fillna("")
+        self._data = pd.read_csv(
+            sheet_file,
+            delimiter=";",
+            index_col=self._INDEX_COLUMN,
+        ).fillna("")
         self._data[self._LABEL_COLUMN] = self._data[self._LABEL_COLUMN].str.replace(
             "START", "BEGIN"
         )
