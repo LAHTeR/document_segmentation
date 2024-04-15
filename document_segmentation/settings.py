@@ -13,7 +13,7 @@ RENATE_TANAP_CATEGORISATION_SHEET: Path = (
     / "Appendix F - Spreadsheet concerning the TANAP document categorisation, Renate Smit, January 2024.xlsx"
 )
 
-RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(DATA_DIR.glob("Analysis Renate ????.xlsx"))
+RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(DATA_DIR.glob("Analysis Renate ????.csv"))
 
 GENERALE_MISSIVEN_SHEET: Path = (
     DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
