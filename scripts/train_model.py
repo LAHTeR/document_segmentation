@@ -97,22 +97,24 @@ if __name__ == "__main__":
     validation_inventories: dict[str, list[Inventory]] = {}
 
     if args.gm_sheet:
-        sheet = GeneraleMissiven(Path(args.gm_sheet))
+        filepath = Path(args.gm_sheet)
+        sheet = GeneraleMissiven(filepath)
         _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
         training_inventories.extend(_inventories[:split])
-        validation_inventories[args.gm_sheet] = _inventories[split:]
+        validation_inventories[filepath.name] = _inventories[split:]
 
     if args.renate_categorisation_sheet:
-        sheet = RenateAnalysis(Path(args.renate_categorisation_sheet))
+        filepath = Path(args.renate_categorisation_sheet)
+        sheet = RenateAnalysis(filepath)
         _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
         training_inventories.extend(_inventories[:split])
-        validation_inventories[args.renate_categorisation_sheet] = _inventories[split:]
+        validation_inventories[filepath.name] = _inventories[split:]
 
     # args.renate_analysis_sheet:
     _inventories: list[Inventory] = [
