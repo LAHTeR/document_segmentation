@@ -4,14 +4,14 @@ from typing import Iterable
 
 import pandas as pd
 
-from document_segmentation.pagexml.datamodel.inventory import Inventory
-
 from ...settings import (
     INVENTORY_DIR,
     MIN_REGION_TEXT_LENGTH,
     RENATE_TANAP_CATEGORISATION_SHEET,
 )
+from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
+from ..datamodel.page import Page
 from .sheet import Sheet
 
 
@@ -87,7 +87,7 @@ class RenateAnalysisInv(Sheet):
 
                 if label == Label.BEGIN:
                     if in_doc:
-                        logging.warning(message)
+                        label = Label.END_BEGIN
                     in_doc = True
                 elif label == Label.END:
                     if not in_doc:
@@ -117,5 +117,16 @@ class RenateAnalysisInv(Sheet):
                     label = Label.OUT
 
             inventory.annotate_scan(scan_nr, label)
+
+        for scan in inventory.pages:
+            unlabelled: list[Page] = [
+                page for page in inventory.pages if page.label == Label.UNK
+            ]
+            if unlabelled:
+                logging.error(
+                    f"Removing un-annotated pages in inventory {inventory}: {unlabelled}"
+                )
+                for page in unlabelled:
+                    inventory.remove_scan(page.scan_nr)
 
         return inventory

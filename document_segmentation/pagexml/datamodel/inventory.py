@@ -1,5 +1,7 @@
+import gzip
 import json
 import logging
+import sys
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -20,6 +22,7 @@ from ...settings import (
     DEFAULT_THUMBNAIL_SIZE,
     INV_NR_UUID_MAPPING_FILE,
     INVENTORY_DIR,
+    MAX_EMPTY_SEQUENCE,
     MIN_REGION_TEXT_LENGTH,
     SERVER_PASSWORD,
     SERVER_USERNAME,
@@ -61,6 +64,14 @@ class Inventory(BaseModel, Dataset):
                 value = default_value
         return value
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, Inventory)
+            and self.inv_nr == other.inv_nr
+            and self.inventory_part == other.inventory_part
+            and self.pages == other.pages
+        )
+
     def __len__(self) -> int:
         """Return the number of pages in the inventory."""
         return len(self.pages)
@@ -93,16 +104,32 @@ class Inventory(BaseModel, Dataset):
                 page.label = new_label
             else:
                 logging.warning(
-                    f"Scan {scan_nr} already has label: {page.label}. Ignoring new label: '{label}'. Inventory: {str(self)}"
+                    f"Scan {scan_nr} already has label: {page.label.name}. Ignoring new label: '{label.name}'. Inventory: {str(self)}"
                 )
         else:
             logging.info(
-                f"Scan {scan_nr} already has label: {page.label}. Ignoring new label: {label}. Inventory: {str(self)}"
+                f"Scan {scan_nr} already has label: {page.label.name}. Ignoring new label: {label.name}. Inventory: {str(self)}"
             )
 
     def get_scan(self, scan_nr: int) -> Page:
         """Get the page with the given scan number."""
-        return self.pages[scan_nr - 1]
+        try:
+            return next((page for page in self.pages if page.scan_nr == scan_nr))
+        except StopIteration as e:
+            raise IndexError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
+
+    def head(self, n: int) -> "Inventory":
+        if (not n) or (len(self) <= n):
+            return self
+        else:
+            return Inventory(
+                inv_nr=self.inv_nr,
+                inventory_part=self.inventory_part,
+                pages=self.pages[:n],
+            )
+
+    def has_labels(self) -> bool:
+        return any(page.label != Label.UNK for page in self.pages)
 
     def full_inv_nr(self, *, delimiter: str = "") -> str:
         """Return the full inventory number plus part if applicable as a string.
@@ -138,6 +165,7 @@ class Inventory(BaseModel, Dataset):
         return [page for page in self.pages if page.label != Label.UNK]
 
     def labelled_inventories(self) -> Iterable["Inventory"]:
+        # TODO: remove this method
         """Split the inventory into segments.
 
         Each segment will have a continuous sequence of labelled pages.
@@ -146,6 +174,7 @@ class Inventory(BaseModel, Dataset):
         Returns:
             Iterable[Inventory]: An iterable of Inventories with labelled pages; singleton if all pages are labelled.
         """
+        logging.warning("Deprecated method labelled_inventories()")
 
         if len(self.labelled()) == 0:
             raise ValueError(f"No labelled pages in inventory: {self}")
@@ -208,13 +237,60 @@ class Inventory(BaseModel, Dataset):
 
         return f"https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/{inv_nr}/file/{doc_id}"
 
-    def preprocess(self) -> "Inventory":
-        """Preprocess the inventory in-place.
+    def empty_unlabelled(self) -> "Inventory":
+        """Post-process labelled inventories.
 
-        Returns:
-            Inventory: The preprocessed inventory.
+        1. Empty all pages with label UNK.
+        2. Label empty pages with OUT.
         """
-        self.remove_short_regions()
+        if not self.has_labels():
+            logging.warning(f"No labels in inventory {self.inv_nr}")
+        for page in self.pages:
+            if page.label == Label.UNK:
+                page.empty()
+        return self
+
+    def remove_scan(self, scan_nr: int) -> "Inventory":
+        """Remove the page with the given scan number."""
+        page = self.get_scan(scan_nr)
+        self.pages.remove(page)
+
+    def remove_empty_pages(
+        self, *, max_length: int = MAX_EMPTY_SEQUENCE, label: Label = Label.OUT
+    ) -> "Inventory":
+        """Remove all unlabelled pages without text.
+
+        Args:
+            max_length (int): The maximum number of blank pages in a sequence. Defaults to 10.
+            label (Label): Only remove empty pages with this label. Defaults to Label.OUT.
+        Returns:
+            Inventory: The inventory with blank pages removed.
+        """
+
+        empty_seq: list[Page] = []
+        """Indices of empty pages in current sequence"""
+        to_delete: list[Page] = []
+
+        for page in self.pages:
+            if page.is_shorter_than() and page.label == label:
+                # Hit empty and unlabelled page
+                empty_seq.append(page)
+            elif empty_seq:
+                # End of sequence
+                if len(empty_seq) > max_length:
+                    to_delete.extend(empty_seq[max_length:])
+                empty_seq = []
+
+        # Final sequence
+        if len(empty_seq) > max_length:
+            # End of sequence
+            # Mark pages for deletion
+            to_delete.extend(empty_seq[max_length:])
+
+        # Delete marked pages
+        for page in to_delete:
+            self.pages.remove(page)
+
         return self
 
     def remove_short_regions(
@@ -230,6 +306,18 @@ class Inventory(BaseModel, Dataset):
         """
         self.pages = [page.filter_short_regions(min_chars) for page in self.pages]
         return self
+
+    def split(self, max_size) -> Iterable["Inventory"]:
+        """Split the inventory into segments of at most `max_size` pages."""
+        if len(self) <= max_size:
+            yield self
+        else:
+            for i in range(0, len(self), max_size):
+                yield Inventory(
+                    inv_nr=self.inv_nr,
+                    inventory_part=self.inventory_part,
+                    pages=self.pages[i : i + max_size],
+                )
 
     def write(self, target_file: Optional[Path] = None, mode="xt") -> Path:
         """Write the a Json representation of the inventory to a file.
@@ -248,6 +336,31 @@ class Inventory(BaseModel, Dataset):
         with target_file.open(mode) as f:
             f.write(self.model_dump_json())
         return target_file
+
+    @staticmethod
+    def total_class_weights(inventories: Iterable["Inventory"]) -> list[float]:
+        """Get the inverse frequency of each label in this dataset.
+
+        Applies add-one smoothing to avoid division by zero.
+
+        Returns:
+            list[float]: List of frequency of each label in dataset divided by dataset length.
+        """
+        counts: Counter[Label] = sum(
+            (inventory.class_counts() for inventory in inventories), start=Counter()
+        )
+        try:
+            total = counts.total()
+        except AttributeError as e:
+            logging.warning(
+                f"Python version: '{sys.version}': {str(e)}. Using sum(counts.values()) instead."
+            )
+            total = sum(counts.values())
+
+        inverse_freq: list[float] = [total / (counts[label] + 1) for label in Label]
+        inverse_freq[Label.UNK] = 0.0
+
+        return inverse_freq
 
     @staticmethod
     def local_file(inv_nr: int, inventory_part: str, directory: Path) -> Path:
@@ -269,22 +382,50 @@ class Inventory(BaseModel, Dataset):
         return (directory / inv_nr).with_suffix(".json")
 
     @classmethod
+    def from_file(cls, file: Path) -> "Inventory":
+        if file.suffix in {".gz", ".gzip"}:
+            f = gzip.open(file, "rt")
+        else:
+            f = file.open("rt")
+        try:
+            return cls.model_validate_json(f.read())
+        except ValidationError as e:
+            raise ValidationError(
+                f"Error loading inventory from file {file}: {e}"
+            ) from e
+
+    @classmethod
+    def load(
+        cls, inv_nr: int, inventory_part: str, inventory_dir: Path = INVENTORY_DIR
+    ):
+        local_file: Path = cls.local_file(inv_nr, inventory_part, inventory_dir)
+
+        fallback_suffixes: list[str] = {
+            local_file.suffix + ".gz",
+            local_file.suffix + ".gzip",
+        }
+        local_files: list[Path] = [local_file] + [
+            local_file.with_suffix(suffix) for suffix in fallback_suffixes
+        ]
+
+        if existing_file := next((f for f in local_files if f.exists()), None):
+            inventory = cls.from_file(existing_file)
+        else:
+            raise FileNotFoundError(f"None of {local_files} found.")
+
+        return inventory
+
+    @classmethod
     def load_or_download(
         cls, inv_nr: int, inventory_part: str, inventory_dir: Path = INVENTORY_DIR
     ):
-        local_file = cls.local_file(inv_nr, inventory_part, inventory_dir)
-
         try:
-            inventory = Inventory.model_validate_json(local_file.read_text())
+            inventory = Inventory.load(inv_nr, inventory_part, inventory_dir)
         except FileNotFoundError:
             logging.info(f"Downloading inventory {inv_nr}...")
             inventory = cls.download(
                 inv_nr, inventory_part, target_directory=inventory_dir
             )
-        except ValidationError as e:
-            raise ValidationError(
-                f"Error loading inventory {inv_nr}_{inventory_part} from file {local_file}: {e}"
-            ) from e
         return inventory
 
     @classmethod

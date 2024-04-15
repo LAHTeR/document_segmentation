@@ -10,6 +10,8 @@ from tqdm import tqdm
 
 from ...settings import (
     INVENTORY_DIR,
+    MAX_INVENTORY_SIZE,
+    MIN_INVENTORY_SIZE,
     MIN_REGION_TEXT_LENGTH,
     SERVER_PASSWORD,
     SERVER_USERNAME,
@@ -95,32 +97,57 @@ class Sheet(abc.ABC):
     def annotate_inventory(self, inventory: Inventory) -> Inventory:
         """Annotate the inventory with the labels from the sheet in-place.
 
+        Pages between BEGIN and END scans are labelled as IN.
+
         Args:
             inventory (Inventory): The inventory to annotate.
         Returns:
             Inventory: The annotated inventory.
         """
         inventory_rows = self._data.loc[
-            (self._data[self._INV_NR_COLUMN] == inventory.inv_nr)
-            & (self._data[self._DEEL_VAN_INVENTARIS_COL] == inventory.inventory_part)
+            self._data[self._INV_NR_COLUMN] == inventory.inv_nr
         ]
+
+        if inventory.inventory_part:
+            inventory_rows = inventory_rows.loc[
+                inventory_rows[self._DEEL_VAN_INVENTARIS_COL]
+                == inventory.inventory_part
+            ]
+
         if len(inventory_rows) == 0:
             logging.warning(
-                f"Inventory {inventory.inv_nr} not found in the sheet. Skipping."
+                f"No entries found for inventory {inventory} in sheet '{self}'. Skipping."
             )
 
         for idx, row in inventory_rows.iterrows():
             begin_scan = row[self._START_PAGE_COLUMN]
             end_scan = row[self._LAST_PAGE_COLUMN]
 
-            try:
-                inventory.annotate_scan(begin_scan, Label.BEGIN)
-                inventory.annotate_scan(end_scan, Label.END)
-                for scan_nr in range(begin_scan + 1, end_scan):
-                    inventory.annotate_scan(scan_nr, Label.IN)
-            except ValueError as e:
-                logging.error(str(e))
+            if end_scan - begin_scan >= MIN_INVENTORY_SIZE:
+                try:
+                    inventory.annotate_scan(begin_scan, Label.BEGIN)
+                    inventory.annotate_scan(end_scan, Label.END)
+                    for scan_nr in range(begin_scan + 1, end_scan):
+                        inventory.annotate_scan(scan_nr, Label.IN)
+                except ValueError as e:
+                    logging.error(str(e))
+            else:
+                logging.warning(
+                    f"Skipping document {begin_scan}-{end_scan} for inventory {inventory} in sheet {self} (length { end_scan - begin_scan} < {MIN_INVENTORY_SIZE})."
+                )
+
         return inventory
+
+    def preprocess(
+        self, inventory: Inventory, min_region_text_length, max_size: int
+    ) -> Inventory:
+        return (
+            self.annotate_inventory(inventory)
+            .remove_short_regions(min_chars=min_region_text_length)
+            .empty_unlabelled()
+            .remove_empty_pages()
+            .head(max_size)
+        )
 
     def all_annotated_inventories(
         self,
@@ -128,7 +155,9 @@ class Sheet(abc.ABC):
         *,
         min_region_text_length=MIN_REGION_TEXT_LENGTH,
         skip_errors: bool = True,
-    ) -> Iterable[Inventory]:
+        max_size: int = MAX_INVENTORY_SIZE,
+        min_size: int = MIN_INVENTORY_SIZE,
+    ) -> Iterable["Inventory"]:
         """Load, label, and preprocess all inventories in the sheet.
 
         Args:
@@ -137,19 +166,28 @@ class Sheet(abc.ABC):
             min_region_text_length ([type], optional): The minimum length of text in a region.
                 Defaults to MIN_REGION_TEXT_LENGTH.
             skip_errors (bool, optional): If True (default), errors are logged, otherwise they are raised.
+            max_size (Optional[int], optional): The maximum number of pages per inventory. Larger inventories are cut off.
+                Defaults to MAX_INVENTORY_SIZE. Set to 0 or None to disable.
         """
-
+        inventories = (
+            inventory for inventory in self.inventories() if len(inventory) >= min_size
+        )
         for inventory in tqdm(
-            islice(self.inventories(), n),
-            desc="Loading Inventories",
+            islice(inventories, n),
+            desc=f"Loading Inventories ({self.__class__.__name__})",
             total=n or len(list(self.inventory_numbers())),
             unit="inventory",
         ):
-            self.annotate_inventory(inventory)
-
             try:
-                for labelled in inventory.labelled_inventories():
-                    yield labelled.remove_short_regions(min_region_text_length)
+                preprocessed: Inventory = self.preprocess(
+                    inventory, min_region_text_length, max_size
+                )
+                if len(preprocessed) >= min_size:
+                    yield preprocessed
+                else:
+                    logging.warning(
+                        f"Inventory {inventory} is too small after preprocessing. Skipping."
+                    )
             except ValueError as e:
                 if skip_errors:
                     logging.error(str(e))

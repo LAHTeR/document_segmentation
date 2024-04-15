@@ -1,4 +1,5 @@
 import logging
+from contextlib import nullcontext as does_not_raise
 from uuid import UUID
 
 import pytest
@@ -10,8 +11,9 @@ from document_segmentation.pagexml.datamodel.inventory import (
 )
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.pagexml.datamodel.page import Page
+from document_segmentation.pagexml.datamodel.region import Region
 
-from ...conftest import TEST_THUMBNAIL_FILE
+from ...conftest import DATA_DIR, TEST_THUMBNAIL_FILE
 
 
 class TestInventory:
@@ -96,6 +98,47 @@ class TestInventory:
         )
 
     @pytest.mark.parametrize(
+        "inventory, expected",
+        [
+            (
+                Inventory(inv_nr=1201, inventory_part="", pages=[]),
+                Inventory(inv_nr=1201, inventory_part="", pages=[]),
+            ),
+            (
+                Inventory(
+                    inv_nr=1201,
+                    inventory_part="",
+                    pages=[
+                        Page(
+                            label=Label.UNK,
+                            scan_nr=1,
+                            external_ref="test_ref",
+                            regions=[
+                                Region(id="test_id", types=[], coordinates=[], lines=[])
+                            ],
+                        )
+                    ],
+                ),
+                Inventory(
+                    inv_nr=1201,
+                    inventory_part="",
+                    pages=[
+                        Page(
+                            label=Label.OUT,
+                            scan_nr=1,
+                            external_ref="test_ref",
+                            regions=[],
+                        )
+                    ],
+                ),
+            ),
+        ],
+    )
+    def test_empty_unlabelled(self, inventory, expected):
+        assert inventory.empty_unlabelled().pages == expected.pages
+        assert inventory.empty_unlabelled() == expected
+
+    @pytest.mark.parametrize(
         "inv_nr, inv_part, expected",
         [(1201, "", "1201"), (1201, "A", "1201A"), (1201, "1", "1201"), (1, "", "1")],
     )
@@ -104,6 +147,17 @@ class TestInventory:
             Inventory(inv_nr=inv_nr, inventory_part=inv_part, pages=[]).full_inv_nr()
             == expected
         )
+
+    @pytest.mark.parametrize(
+        "inventory_nr, expected_length",
+        [(1105, 1092), (2542, 2052)],
+    )
+    def test_get_scan(self, inventory_nr, expected_length):
+        inventory = Inventory.load(inventory_nr, "", DATA_DIR)
+
+        for scan_nr in range(1, expected_length + 1):
+            assert inventory.get_scan(scan_nr).scan_nr == scan_nr
+            assert inventory.get_scan(scan_nr) == inventory.pages[scan_nr - 1]
 
     @pytest.mark.parametrize(
         "inventory_nr, doc_id, expected",
@@ -138,6 +192,22 @@ class TestInventory:
         assert inventory.link(page) == expected
 
     @pytest.mark.parametrize(
+        "inventory_nr, expected_length, expected_exception",
+        [
+            (1105, 1092, does_not_raise()),
+            (2542, 2052, does_not_raise()),
+            (1, 1092, pytest.raises(FileNotFoundError)),
+        ],
+    )
+    def test_load(self, inventory_nr, expected_length, expected_exception):
+        with expected_exception:
+            inventory = Inventory.load(inventory_nr, "", DATA_DIR)
+
+            assert inventory.inv_nr == inventory_nr
+            assert inventory.inventory_part == ""
+            assert len(inventory) == expected_length
+
+    @pytest.mark.parametrize(
         "inv_nr, inv_part, expected, expected_logs",
         [
             (1201, "", "1201.json", []),
@@ -154,6 +224,124 @@ class TestInventory:
                 Inventory.local_file(inv_nr, inv_part, tmp_path) == tmp_path / expected
             )
             assert caplog.messages == expected_logs, "Unexpected log messages"
+
+    @pytest.mark.parametrize(
+        "pages, max_length, expected",
+        [
+            ([], 10, []),
+            (
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+                1,
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])],
+            ),
+            (
+                [Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+                1,
+                [Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+            ),
+            (
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+                2,
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2,
+            ),
+            (
+                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
+                * 2
+                + [Page(label=Label.IN, scan_nr=2, external_ref="test_ref", regions=[])]
+                + [
+                    Page(
+                        label=Label.OUT, scan_nr=3, external_ref="test_ref", regions=[]
+                    )
+                ]
+                * 2,
+                1,
+                [
+                    Page(
+                        label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]
+                    ),
+                    Page(
+                        label=Label.IN, scan_nr=2, external_ref="test_ref", regions=[]
+                    ),
+                    Page(
+                        label=Label.OUT, scan_nr=3, external_ref="test_ref", regions=[]
+                    ),
+                ],
+            ),
+        ],
+    )
+    def test_remove_empty_pages(self, pages, max_length, expected):
+        assert (
+            Inventory(inv_nr=1201, inventory_part="", pages=pages)
+            .remove_empty_pages(max_length=max_length)
+            .pages
+            == expected
+        )
+
+    @pytest.mark.parametrize(
+        "inventories, expected",
+        [
+            ([], [0.0] * 6),
+            (
+                [
+                    Inventory(
+                        inv_nr=1,
+                        inventory_part="",
+                        pages=[
+                            Page(
+                                label=Label.OUT,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            )
+                        ],
+                    )
+                ],
+                [0.0, 1.0, 1.0, 1.0, 0.5, 1.0],
+            ),
+            (
+                [
+                    Inventory(
+                        inv_nr=1,
+                        inventory_part="",
+                        pages=[
+                            Page(
+                                label=Label.OUT,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            )
+                        ],
+                    ),
+                    Inventory(
+                        inv_nr=1,
+                        inventory_part="",
+                        pages=[
+                            Page(
+                                label=Label.OUT,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            ),
+                            Page(
+                                label=Label.BEGIN,
+                                scan_nr=1,
+                                external_ref="test_ref",
+                                regions=[],
+                            ),
+                        ],
+                    ),
+                ],
+                [0.0, 1.5, 3.0, 3.0, 1.0, 3.0],
+            ),
+        ],
+    )
+    def test_total_class_weights(self, inventories, expected):
+        assert Inventory.total_class_weights(inventories) == expected
 
 
 class TestThumbnailDownloader:

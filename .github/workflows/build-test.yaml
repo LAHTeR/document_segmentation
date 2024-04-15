@@ -29,4 +29,4 @@ jobs:
       - name: Install the project dependencies
         run: poetry install
       - name: Python tests
-        run: poetry run pytest -v
+        run: poetry run pytest -v --cov document_segmentation/

@@ -66,7 +66,9 @@ class PageEmbedding(nn.Module, DeviceModule):
                 padding_value=0.0,
             )
         else:
-            logging.warning("No regions found in the batch, using zero tensor")
+            logging.debug(
+                f"No regions found in any of the {len(pages)} pages, defaulting to zero tensor"
+            )
             region_inputs = torch.zeros(
                 len(regions_batch), len(pages), self._region_model.output_size
             ).to(self._device)

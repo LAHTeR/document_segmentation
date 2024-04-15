@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -96,3 +97,22 @@ PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
     "bidirectional": True,
 }
 """Default configuration for the RNN module in the PageSequenceTagger"""
+
+MAX_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "1024"))
+"""The maximum number of pages per inventory. Larger inventories are chunked. Set to 0 to disable chunking.
+This is used to limit (GPU) memory usage."""
+MIN_INVENTORY_SIZE: int = int(os.getenv("MAX_INVENTORY_SIZE", "0"))
+"""The minimum number of pages per inventory. Smaller inventories are skipped.
+This is used because small inventories can be problematic for training and evaluation."""
+
+MAX_EMPTY_SEQUENCE: int = 1
+"""If an annotated inventory has more than this number of subsequent empty OUT pages, they are replaced with a single OUT page."""
+
+
+def as_dict():
+    excluded_keys = {"SERVER_USERNAME", "SERVER_PASSWORD"}
+    return {
+        key: "*" * 8 if key in excluded_keys else value
+        for key, value in sys.modules[__name__].__dict__.items()
+        if key.isupper()
+    }

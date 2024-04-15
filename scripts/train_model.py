@@ -27,22 +27,22 @@ if __name__ == "__main__":
 
     arg_parser.add_argument(
         "--gm-sheet",
-        type=Path,
+        type=str,
         default=GENERALE_MISSIVEN_SHEET,
         help="The sheet with input annotations (Generale Missiven).",
     )
     arg_parser.add_argument(
         "--renate-categorisation-sheet",
-        type=Path,
+        type=str,
         default=RENATE_TANAP_CATEGORISATION_SHEET,
-        help="The sheet with input annotations (Generale Missiven).",
+        help="The sheet with input annotations (Appendix F Renate Analysis).",
     )
     arg_parser.add_argument(
         "--renate-analysis-sheet",
         nargs="*",
-        type=Path,
+        type=str,
         default=RENATE_ANALYSIS_SHEETS,
-        help="The sheet with input annotations (Generale Missiven).",
+        help="The sheet with input annotations (Entire inventories from Renate's Analyses).",
     )
 
     arg_parser.add_argument("--split", type=float, default=0.8, help="Train/val split.")
@@ -97,81 +97,102 @@ if __name__ == "__main__":
     validation_inventories: dict[str, list[Inventory]] = {}
 
     if args.gm_sheet:
-        sheet = GeneraleMissiven(args.gm_sheet)
+        sheet = GeneraleMissiven(Path(args.gm_sheet))
         _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
         training_inventories.extend(_inventories[:split])
-        validation_inventories[args.gm_sheet.name] = _inventories[split:]
+        validation_inventories[args.gm_sheet] = _inventories[split:]
 
     if args.renate_categorisation_sheet:
-        sheet = RenateAnalysis(args.renate_categorisation_sheet)
+        sheet = RenateAnalysis(Path(args.renate_categorisation_sheet))
         _inventories = list(sheet.all_annotated_inventories(n=args.n))
 
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
         training_inventories.extend(_inventories[:split])
-        validation_inventories[args.renate_categorisation_sheet.name] = _inventories[
-            split:
-        ]
+        validation_inventories[args.renate_categorisation_sheet] = _inventories[split:]
 
-    for i, _sheet in enumerate(args.renate_analysis_sheet):
-        sheet = RenateAnalysisInv(_sheet)
-        _inventories = list(sheet.all_annotated_inventories(n=args.n))
-        if i == 0:
-            # TODO: randomize when there are more than two sheets
-            training_inventories.extend(_inventories)
-        else:
-            validation_inventories[_sheet.stem] = _inventories
+    # args.renate_analysis_sheet:
+    _inventories: list[Inventory] = [
+        inventory
+        for file in args.renate_analysis_sheet
+        for inventory in RenateAnalysisInv(Path(file)).all_annotated_inventories(
+            n=args.n
+        )
+    ]
+
+    random.shuffle(_inventories)
+    split = int(len(_inventories) * args.split)
+    training_inventories.extend(_inventories[:split])
+    validation_inventories["renate_analysis_inv"] = _inventories[split:]
 
     ########################################################################################
     # LOAD OR TRAIN MODEL
     ########################################################################################
     model = PageSequenceTagger(device=args.device)
 
-    model.train_(training_inventories, validation_inventories, epochs=args.epochs)
+    weights = Inventory.total_class_weights(
+        validation_inventories["renate_analysis_inv"]
+    )
+    model.train_(
+        training_inventories,
+        validation_inventories,
+        epochs=args.epochs,
+        weights=weights,
+    )
     model.save(args.model_file)
 
     logging.debug(str(model))
+    model.wandb_run.finish()
 
     ########################################################################################
     # EVALUATE MODEL
+    # Log to local files, skip W&B logging
     ########################################################################################
+
+    model.wandb_run = None
+
     for name, validation in validation_inventories.items():
         print(f"Sheet: {name}", file=args.eval_output)
         print(f"Sheet: {name}", file=args.test_output)
 
-        results = model.eval_(validation)
-        metrics = results[:4]
-        table = results[4]
+        if validation:
+            results = model.eval_(validation, name)
+            metrics = results[:4]
+            table = results[4]
 
-        for average, _metrics in groupby(metrics, key=lambda m: m.average):
-            if average is None:
-                writer = csv.DictWriter(
-                    args.eval_output,
-                    fieldnames=["Metric"] + [label.name for label in Label],
-                    delimiter="\t",
-                )
-                writer.writeheader()
+            for average, _metrics in groupby(metrics, key=lambda m: m.average):
+                if average is None:
+                    writer = csv.DictWriter(
+                        args.eval_output,
+                        fieldnames=["Metric"] + [label.name for label in Label],
+                        delimiter="\t",
+                    )
+                    writer.writeheader()
 
-                for metric in _metrics:
-                    writer.writerow(
-                        {"Metric": metric.__class__.__name__}
-                        | {
-                            label.name: f"{score:.4f}"
-                            for label, score in zip(Label, metric.compute().tolist())
-                        }
-                    )
-            else:
-                for metric in _metrics:
-                    score: float = metric.compute().item()
-                    print(
-                        f"{metric.__class__.__name__} ({average} average):\t{score:.4f}",
-                        file=args.eval_output,
-                        flush=True,
-                    )
-            args.eval_output.flush()
+                    for metric in _metrics:
+                        writer.writerow(
+                            {"Metric": metric.__class__.__name__}
+                            | {
+                                label.name: f"{score:.4f}"
+                                for label, score in zip(
+                                    Label, metric.compute().tolist()
+                                )
+                            }
+                        )
+                else:
+                    for metric in _metrics:
+                        score: float = metric.compute().item()
+                        print(
+                            f"{metric.__class__.__name__} ({average} average):\t{score:.4f}",
+                            file=args.eval_output,
+                            flush=True,
+                        )
+                args.eval_output.flush()
+        else:
+            logging.warning(f"Empty validation set for '{name}', skipping.")
         print("=" * 80, file=args.eval_output)
 
         results[4].to_csv(
