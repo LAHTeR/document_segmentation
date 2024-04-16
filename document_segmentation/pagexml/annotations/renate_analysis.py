@@ -7,6 +7,7 @@ import pandas as pd
 from ...settings import INVENTORY_DIR, RENATE_TANAP_CATEGORISATION_SHEET
 from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
+from ..datamodel.page import Page
 from .sheet import Sheet
 
 
@@ -93,7 +94,13 @@ class RenateAnalysisInv(Sheet):
             inventory.annotate_scan(scan_nr, label)
 
         for scan in inventory.pages:
-            if scan.label == Label.UNK:
-                logging.error(f"Un-annotated scan in inventory {inventory}: {scan}")
-
+            unlabelled: list[Page] = [
+                page for page in inventory.pages if page.label == Label.UNK
+            ]
+            if unlabelled:
+                logging.error(
+                    f"Removing un-annotated pages in inventory {inventory}: {unlabelled}"
+                )
+                for page in unlabelled:
+                    inventory.remove_scan(page.scan_nr)
         return inventory
