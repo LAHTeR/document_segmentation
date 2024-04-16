@@ -14,7 +14,6 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
 from document_segmentation.pagexml.datamodel.inventory import Inventory
 from document_segmentation.pagexml.datamodel.label import Label
 from document_segmentation.settings import (
-    GENERALE_MISSIVEN_SHEET,
     RENATE_ANALYSIS_SHEETS,
     RENATE_TANAP_CATEGORISATION_SHEET,
 )
@@ -28,8 +27,8 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--gm-sheet",
         type=str,
-        default=GENERALE_MISSIVEN_SHEET,
-        help="The sheet with input annotations (Generale Missiven).",
+        required=False,
+        help="The sheet with input annotations (Generale Missiven). None by default",
     )
     arg_parser.add_argument(
         "--renate-categorisation-sheet",
