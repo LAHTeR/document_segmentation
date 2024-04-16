@@ -24,7 +24,7 @@ INVENTORY_DIR: Path = DATA_DIR / "inventories"
 
 DEFAULT_SERVER: str = "https://hucdrive.huc.knaw.nl/"
 """The default server URL."""
-DEFAULT_BASE_PATH: str = "HTR/obp-v2-pagexml-leon-metadata-trimmed-2023-11/"
+DEFAULT_BASE_PATH: str = "HTR/obp-v2-pagexml-leon-metadata-trimmed-2024-03/"
 """The default base path for the server directory that contains the inventory files."""
 
 SERVER_USERNAME: str = os.getenv("HUC_USERNAME", "")
