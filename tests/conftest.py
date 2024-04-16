@@ -9,7 +9,7 @@ TEST_SHEET_SIZE = 192681
 
 @pytest.fixture
 def mock_request(inventory_nr: int = TEST_INV_NR):
-    test_url = f"https://hucdrive.huc.knaw.nl/HTR/obp-v2-pagexml-leon-metadata-trimmed-2023-11/{inventory_nr}.zip"
+    test_url = f"https://hucdrive.huc.knaw.nl/HTR/obp-v2-pagexml-leon-metadata-trimmed-2024-03/{inventory_nr}.zip"
 
     test_file: Path = (DATA_DIR / str(inventory_nr)).with_suffix(".zip")
     with requests_mock.Mocker() as mocker:
