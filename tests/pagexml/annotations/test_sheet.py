@@ -63,8 +63,8 @@ class TestRenateAnalysis:
         inventory = Inventory.load(2542, "", DATA_DIR)
         assert len(inventory) == 2052
 
-        expected_labels = [Label.OUT]
-        expected_scan_nrs = [1]
+        expected_labels = [Label.OUT, Label.END_BEGIN, Label.OUT]
+        expected_scan_nrs = [1, 114, 115]
 
         preprocessed: Inventory = test_sheet.preprocess(
             inventory, min_region_text_length, max_size
@@ -166,7 +166,7 @@ class TestGeneraleMissiven:
 
         expected_inv_nrs = [1068, 1070]
         expected_inv_parts = [""] * 2
-        expected_lengths = [78, 96]
+        expected_lengths = [90, 96]
 
         for inventory, inv_nr, inv_part, length in zip(
             test_sheet.all_annotated_inventories(n=n),
