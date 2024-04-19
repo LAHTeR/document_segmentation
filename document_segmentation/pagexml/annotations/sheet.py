@@ -123,7 +123,7 @@ class Sheet(abc.ABC):
             begin_scan = row[self._START_PAGE_COLUMN]
             end_scan = row[self._LAST_PAGE_COLUMN]
 
-            if end_scan - begin_scan >= MIN_INVENTORY_SIZE:
+            if MIN_INVENTORY_SIZE and end_scan - begin_scan >= MIN_INVENTORY_SIZE:
                 try:
                     inventory.annotate_scan(begin_scan, Label.BEGIN)
                     inventory.annotate_scan(end_scan, Label.END)
@@ -170,7 +170,9 @@ class Sheet(abc.ABC):
                 Defaults to MAX_INVENTORY_SIZE. Set to 0 or None to disable.
         """
         inventories = (
-            inventory for inventory in self.inventories() if len(inventory) >= min_size
+            inventory
+            for inventory in self.inventories()
+            if (not MIN_INVENTORY_SIZE) or (len(inventory) >= min_size)
         )
         for inventory in tqdm(
             islice(inventories, n),
@@ -182,7 +184,7 @@ class Sheet(abc.ABC):
                 preprocessed: Inventory = self.preprocess(
                     inventory, min_region_text_length, max_size
                 )
-                if len(preprocessed) >= min_size:
+                if (not MIN_INVENTORY_SIZE) or (len(preprocessed) >= min_size):
                     yield preprocessed
                 else:
                     logging.warning(
