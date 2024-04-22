@@ -50,15 +50,13 @@ if __name__ == "__main__":
     model = PageSequenceTagger(device=args.device)
     model.load(args.model)
 
-    inventory_nrs: list[list[str]] = [
-        inv.split("_") if "_" in inv else [inv, ""] for inv in args.inventory
-    ]
-    try:
-        inventories: list[Inventory] = [
-            Inventory.load_or_download(*inv_nr) for inv_nr in inventory_nrs
-        ]
-    except HTTPError as e:
-        logging.error(f"Failed to download inventory: {e}")
+    inventories: list[Inventory] = []
+    for inv in args.inventory:
+        inv_nr: list[str] = inv.split("_") if "_" in inv else [inv, ""]
+        try:
+            inventories.append(Inventory.load_or_download(*inv_nr))
+        except HTTPError as e:
+            logging.error(f"Failed to download inventory: {e}")
 
     results: pd.DataFrame = pd.concat(
         model.predict(inventory)
