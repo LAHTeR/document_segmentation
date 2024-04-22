@@ -77,7 +77,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
         Weights of the language model are not updated.
         """
         # TODO: caching only works on the batch level, individual regions are not cached
-        with torch.no_grad:
+        with torch.no_grad():
             return self._compute_text_embeddings(region_batch)
 
     def _compute_text_embeddings(
