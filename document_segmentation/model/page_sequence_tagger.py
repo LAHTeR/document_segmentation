@@ -196,7 +196,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     if not settings.UPDATE_LM_WEIGHTS:
                         self.wandb_run.log(
                             {
-                                "cache": self._page_embedding._region_model._text_embeddings.cache_info()._asdict()
+                                "cache": self._page_embedding._region_model._text_embeddings_cached.cache_info()._asdict()
                             },
                             commit=False,
                         )
