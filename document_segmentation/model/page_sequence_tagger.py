@@ -186,12 +186,18 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 optimizer.step()
 
                 if self.wandb_run:
+                    if not settings.UPDATE_LM_WEIGHTS:
+                        self.wandb_run.log(
+                            {
+                                "cache": self._page_embedding._region_model._text_embeddings.cache_info()._asdict()
+                            },
+                            commit=False,
+                        )
                     self.wandb_run.log(
                         {
                             "loss": loss.item(),
                             "inventory length": len(inventory),
                             "inventory": inventory.inv_nr,
-                            "cache": self._page_embedding._region_model._text_embeddings.cache_info()._asdict(),
                         }
                     )
 

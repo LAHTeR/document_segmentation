@@ -9,6 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 
+from .. import settings
 from ..pagexml.datamodel.region import Region, RegionType
 from ..settings import (
     LANGUAGE_MODEL,
@@ -63,9 +64,25 @@ class RegionEmbedding(nn.Module, DeviceModule):
         """Return the size of the embeddings."""
         return self._transformer_model.config.hidden_size
 
-    @cache
-    @torch.no_grad()
     def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
+        """Embed the text of a page using a Transformers model."""
+        if settings.UPDATE_LM_WEIGHTS:
+            return self._compute_text_embeddings(region_batch)
+        else:
+            return self._text_embeddings_cached(region_batch)
+
+    @cache
+    def _text_embeddings_cached(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
+        """Compute the text embeddings for the regions and cache them.
+        Weights of the language model are not updated.
+        """
+        # TODO: caching only works on the batch level, individual regions are not cached
+        with torch.no_grad:
+            return self._compute_text_embeddings(region_batch)
+
+    def _compute_text_embeddings(
+        self, region_batch: tuple[Region, ...]
+    ) -> torch.Tensor:
         """Embed the text of a page using a Transformers model.
 
         Args:
@@ -74,7 +91,6 @@ class RegionEmbedding(nn.Module, DeviceModule):
         Returns:
             A tensor of shape (1, embedding_size).
         """
-        # FIXME: caching only works on the batch level, individual regions are not cached
 
         if region_batch:
             region_texts: list[str] = [
@@ -169,9 +185,9 @@ class RegionEmbeddingSentenceTransformer(RegionEmbedding):
     def _init_transformer(self, transformer_model_name):
         self._transformer_model = SentenceTransformer(transformer_model_name)
 
-    @cache
-    @torch.no_grad()
-    def _text_embeddings(self, region_batch: tuple[Region, ...]) -> torch.Tensor:
+    def _compute_text_embeddings(
+        self, region_batch: tuple[Region, ...]
+    ) -> torch.Tensor:
         if region_batch:
             region_texts: list[str] = [
                 self._line_separator.join(region.lines) for region in region_batch
