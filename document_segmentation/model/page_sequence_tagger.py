@@ -130,7 +130,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 self.wandb_run = wandb.init(
                     project=self.__class__.__name__,
                     config={
-                        "training size": len(training_inventories),
+                        "training size": {
+                            "inventories": len(training_inventories),
+                            "pages": sum(len(inv) for inv in training_inventories),
+                        },
                         "validation sets": {
                             key: len(invs)
                             for key, invs in (validation_inventories or {}).items()

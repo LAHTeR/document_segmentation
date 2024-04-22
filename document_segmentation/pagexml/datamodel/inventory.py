@@ -87,29 +87,11 @@ class Inventory(BaseModel, Dataset):
         return self.__repr__()
 
     def annotate_scan(self, scan_nr: int, label: Label):
-        page = None
         try:
             page: Page = self.get_scan(scan_nr)
+            page.annotate(label)
         except IndexError as e:
             raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
-
-        if label != page.label:
-            if page.label == Label.UNK:
-                page.label = label
-            elif {page.label, label} == {Label.BEGIN, Label.END}:
-                new_label = Label.END_BEGIN
-                logging.info(
-                    f"Scan {scan_nr} already has label: {page.label.name}. Changing to {new_label.name}. Inventory: {str(self)}"
-                )
-                page.label = new_label
-            else:
-                logging.warning(
-                    f"Scan {scan_nr} already has label: {page.label.name}. Ignoring new label: '{label.name}'. Inventory: {str(self)}"
-                )
-        else:
-            logging.info(
-                f"Scan {scan_nr} already has label: {page.label.name}. Ignoring new label: {label.name}. Inventory: {str(self)}"
-            )
 
     def get_scan(self, scan_nr: int) -> Page:
         """Get the page with the given scan number."""

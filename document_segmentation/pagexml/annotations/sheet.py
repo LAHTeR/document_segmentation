@@ -18,6 +18,7 @@ from ...settings import (
 )
 from ..datamodel.inventory import Inventory
 from ..datamodel.label import Label
+from ..datamodel.page import Page
 
 
 class Sheet(abc.ABC):
@@ -95,48 +96,95 @@ class Sheet(abc.ABC):
                 logging.error(f"Failed to load inventory {inv_nr}: {e}")
 
     def annotate_inventory(self, inventory: Inventory) -> Inventory:
-        """Annotate the inventory with the labels from the sheet in-place.
+        """Annotate the inventory with the labels from the sheet and generate new inventory.
 
         Pages between BEGIN and END scans are labelled as IN.
+
+        Before the first and after each document, an empty page is added.
 
         Args:
             inventory (Inventory): The inventory to annotate.
         Returns:
             Inventory: The annotated inventory.
         """
-        inventory_rows = self._data.loc[
+        annotated_rows: pd.DataFrame = self._data.loc[
             self._data[self._INV_NR_COLUMN] == inventory.inv_nr
         ]
 
         if inventory.inventory_part:
-            inventory_rows = inventory_rows.loc[
-                inventory_rows[self._DEEL_VAN_INVENTARIS_COL]
+            annotated_rows = annotated_rows.loc[
+                annotated_rows[self._DEEL_VAN_INVENTARIS_COL]
                 == inventory.inventory_part
             ]
 
-        if len(inventory_rows) == 0:
+        if len(annotated_rows) == 0:
             logging.warning(
                 f"No entries found for inventory {inventory} in sheet '{self}'. Skipping."
             )
 
-        for idx, row in inventory_rows.iterrows():
+        documents: list[list[Page]] = []
+        for _, row in annotated_rows.sort_values(self._START_PAGE_COLUMN).iterrows():
             begin_scan = row[self._START_PAGE_COLUMN]
             end_scan = row[self._LAST_PAGE_COLUMN]
 
-            if end_scan - begin_scan >= MIN_INVENTORY_SIZE:
-                try:
-                    inventory.annotate_scan(begin_scan, Label.BEGIN)
-                    inventory.annotate_scan(end_scan, Label.END)
-                    for scan_nr in range(begin_scan + 1, end_scan):
-                        inventory.annotate_scan(scan_nr, Label.IN)
-                except ValueError as e:
-                    logging.error(str(e))
-            else:
-                logging.warning(
-                    f"Skipping document {begin_scan}-{end_scan} for inventory {inventory} in sheet {self} (length { end_scan - begin_scan} < {MIN_INVENTORY_SIZE})."
+            try:
+                document: list[Page] = (
+                    [inventory.get_scan(begin_scan).annotate(Label.BEGIN)]
+                    + [
+                        inventory.get_scan(scan_nr).annotate(Label.IN)
+                        for scan_nr in range(begin_scan + 1, end_scan)
+                    ]
+                    + [inventory.get_scan(end_scan).annotate(Label.END)]
                 )
+                # remove redundant BEGIN_END pages
+                redundant: list[int] = []
+                for i, page in enumerate(document[:-1]):
+                    if page.label == Label.END_BEGIN:
+                        next_page = document[i + 1]
+                        if next_page.scan_nr == page.scan_nr:
+                            assert (
+                                next_page.label == Label.END_BEGIN
+                            ), f"Expected two subsequent END_BEGIN labels, got '{page}', '{next_page}'"
+                            redundant.append(i)
+                for i in reversed(redundant):
+                    document.pop(i)
 
-        return inventory
+                documents.append(document)
+            except ValueError as e:
+                logging.error(str(e))
+
+        # Merge documents to inventory with empty pages in between
+        if documents:
+            pages: list[Page] = []
+            last_scan: int = 0
+            for document in documents:
+                if last_scan == 0 or document[0].scan_nr - 1 > last_scan:
+                    # Insert empty page between documents
+                    pages.append(
+                        Page(
+                            label=Label.OUT,
+                            scan_nr=last_scan + 1,
+                            external_ref="",
+                            regions=[],
+                        )
+                    )
+                pages.extend(document)
+                last_scan = pages[-1].scan_nr if pages else 0
+
+            # Insert empty page at the end
+            pages.append(
+                Page(
+                    label=Label.OUT, scan_nr=last_scan + 1, external_ref="", regions=[]
+                )
+            )
+        else:
+            pages = []
+
+        return Inventory(
+            inv_nr=inventory.inv_nr,
+            inventory_part=inventory.inventory_part,
+            pages=pages,
+        )
 
     def preprocess(
         self, inventory: Inventory, min_region_text_length, max_size: int
@@ -145,7 +193,6 @@ class Sheet(abc.ABC):
             self.annotate_inventory(inventory)
             .remove_short_regions(min_chars=min_region_text_length)
             .empty_unlabelled()
-            .remove_empty_pages()
             .head(max_size)
         )
 
@@ -170,7 +217,9 @@ class Sheet(abc.ABC):
                 Defaults to MAX_INVENTORY_SIZE. Set to 0 or None to disable.
         """
         inventories = (
-            inventory for inventory in self.inventories() if len(inventory) >= min_size
+            inventory
+            for inventory in self.inventories()
+            if (not MIN_INVENTORY_SIZE) or (len(inventory) >= min_size)
         )
         for inventory in tqdm(
             islice(inventories, n),
@@ -182,7 +231,7 @@ class Sheet(abc.ABC):
                 preprocessed: Inventory = self.preprocess(
                     inventory, min_region_text_length, max_size
                 )
-                if len(preprocessed) >= min_size:
+                if (not MIN_INVENTORY_SIZE) or (len(preprocessed) >= min_size):
                     yield preprocessed
                 else:
                     logging.warning(

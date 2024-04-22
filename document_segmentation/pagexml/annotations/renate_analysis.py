@@ -66,10 +66,12 @@ class RenateAnalysisInv(Sheet):
         return [(self._inventory.inv_nr, self._inventory.inventory_part)]
 
     def annotate_inventory(self, inventory: Inventory) -> "Inventory":
+        """Assume all pages in a document have been annotated."""
+
         in_doc: bool = False
         """Inside a document or not."""
 
-        for idx, row in self._data.iterrows():
+        for idx, row in self._data.sort_index().iterrows():
             scan_nr = int(idx[-4:])
 
             if annotation := row[self._LABEL_COLUMN].strip():
