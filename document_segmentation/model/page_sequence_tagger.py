@@ -139,7 +139,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                             for key, invs in (validation_inventories or {}).items()
                         },
                         "epochs": epochs,
-                        "weights": weights,
+                        "weights": {
+                            label.name: weight for label, weight in zip(Label, weights)
+                        },
                         "shuffle": shuffle,
                         "optimizer": optimizer.__class__.__name__,
                         "criterion": criterion.__class__.__name__,
