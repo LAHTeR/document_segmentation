@@ -121,7 +121,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             )
 
         criterion = nn.CrossEntropyLoss(
-            weight=torch.Tensor(weights).to(self._device)
+            reduction="sum", weight=torch.Tensor(weights).to(self._device)
         ).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
