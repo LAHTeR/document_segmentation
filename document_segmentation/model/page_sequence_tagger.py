@@ -121,7 +121,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             )
 
         criterion = nn.CrossEntropyLoss(
-            weight=torch.Tensor(weights).to(self._device)
+            reduction="sum", weight=torch.Tensor(weights).to(self._device)
         ).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
@@ -139,10 +139,17 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                             for key, invs in (validation_inventories or {}).items()
                         },
                         "epochs": epochs,
-                        "weights": weights,
+                        "weights": {
+                            label.name: weight for label, weight in zip(Label, weights)
+                        },
                         "shuffle": shuffle,
                         "optimizer": optimizer.__class__.__name__,
                         "criterion": criterion.__class__.__name__,
+                        "criteron_config": {
+                            key: value
+                            for key, value in criterion.__dict__.items()
+                            if not key.startswith("_")
+                        },
                         # TODO: convert to nested dict
                         "modules": self.__dict__["_modules"],
                         "settings": settings.as_dict(),
