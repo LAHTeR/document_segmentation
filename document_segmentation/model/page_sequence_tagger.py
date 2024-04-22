@@ -145,6 +145,11 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         "shuffle": shuffle,
                         "optimizer": optimizer.__class__.__name__,
                         "criterion": criterion.__class__.__name__,
+                        "criteron_config": {
+                            key: value
+                            for key, value in criterion.__dict__.items()
+                            if not key.startswith("_")
+                        },
                         # TODO: convert to nested dict
                         "modules": self.__dict__["_modules"],
                         "settings": settings.as_dict(),
