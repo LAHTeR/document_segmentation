@@ -32,6 +32,12 @@ if __name__ == "__main__":
         help="The output file.",
     )
     parser.add_argument(
+        "--format",
+        choices=["google", "wandb"],
+        required=False,
+        help="The output format; add platform-specific formatting.",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         required=False,
@@ -56,4 +62,10 @@ if __name__ == "__main__":
             inventories, total=len(args.inventory), desc="Predicting", unit="inventory"
         )
     )
+
+    if args.format == "google":
+        results["Thumbnail"] = results["Thumbnail"].apply(lambda x: f'=IMAGE("{x}", 3)')
+    elif args.format == "wandb":
+        raise NotImplementedError()
+
     results.to_csv(args.output)
