@@ -1,7 +1,6 @@
 import argparse
 import logging
 
-import pandas as pd
 from requests import HTTPError
 from tqdm import tqdm
 
@@ -50,27 +49,32 @@ if __name__ == "__main__":
     model = PageSequenceTagger(device=args.device)
     model.load(args.model)
 
-    inventories: list[Inventory] = []
-    for inv in args.inventory:
+    is_first_inventory: bool = True
+
+    for inv in tqdm(args.inventory, desc="Predicting", unit="inventory"):
         inv_nr: list[str] = inv.split("_") if "_" in inv else [inv, ""]
+        inventory: Inventory = None
+
         try:
-            inventories.append(Inventory.load_or_download(*inv_nr))
+            inventory = Inventory.load_or_download(*inv_nr)
         except HTTPError as e:
             logging.error(f"Failed to download inventory: {e}")
+            continue
 
-    results: pd.DataFrame = pd.concat(
-        model.predict(inventory)
-        for inventory in tqdm(
-            inventories, total=len(args.inventory), desc="Predicting", unit="inventory"
+        results = model.predict(inventory)
+
+        if args.format == "google":
+            MODE = 3
+            results["Thumbnail"] = results["Thumbnail"].apply(
+                lambda link: f'=IMAGE("{link}"; {MODE})'
+            )
+        elif args.format == "wandb":
+            raise NotImplementedError()
+
+        results.to_csv(
+            args.output,
+            mode="w" if is_first_inventory else "a",
+            header=is_first_inventory,
         )
-    )
 
-    if args.format == "google":
-        MODE = 3
-        results["Thumbnail"] = results["Thumbnail"].apply(
-            lambda link: f'=IMAGE("{link}"; {MODE})'
-        )
-    elif args.format == "wandb":
-        raise NotImplementedError()
-
-    results.to_csv(args.output)
+        is_first_inventory = False
