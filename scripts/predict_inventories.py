@@ -58,15 +58,18 @@ if __name__ == "__main__":
         inventories: Iterable[Inventory] = (
             Inventory.load_or_download(*inv_nr) for inv_nr in inventory_nrs
         )
+
+        results: pd.DataFrame = pd.concat(
+            model.predict(inventory)
+            for inventory in tqdm(
+                inventories,
+                total=len(args.inventory),
+                desc="Predicting",
+                unit="inventory",
+            )
+        )
     except HTTPError as e:
         logging.error(f"Failed to download inventory: {e}")
-
-    results: pd.DataFrame = pd.concat(
-        model.predict(inventory)
-        for inventory in tqdm(
-            inventories, total=len(args.inventory), desc="Predicting", unit="inventory"
-        )
-    )
 
     if args.format == "google":
         MODE = 3
