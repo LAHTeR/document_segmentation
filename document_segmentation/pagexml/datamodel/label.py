@@ -1,5 +1,7 @@
 from enum import IntEnum
 
+import torch
+
 
 class Label(IntEnum):
     """Labels for pages in a sequence."""
@@ -24,3 +26,15 @@ class Label(IntEnum):
             list[int]: A list of integers representing the label.
         """
         return [int(self == label) for label in Label]
+
+    @staticmethod
+    def to_tensor(labels: list["Label"]) -> torch.Tensor:
+        """Convert a list of labels to a tensor.
+
+        Args:
+            labels (list[Label]): The labels to convert.
+
+        Returns:
+            torch.Tensor: A tensor of length (len(labels)).
+        """
+        return torch.Tensor([label.value for label in labels]).to(int)

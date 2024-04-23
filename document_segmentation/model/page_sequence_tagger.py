@@ -317,24 +317,29 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         Returns:
             pd.DataFrame: A DataFrame containing the results per row.
         """
-        predicted = self(inventory.pages)
-        labels = inventory.labels()
+        model_output: torch.Tensor = self(inventory.pages)
+        predicted: list[Label] = PageSequenceTagger._prediction_heuristics(model_output)
 
-        _labels = torch.Tensor([label.value for label in labels]).to(int)
+        actual: list[Label] = inventory.labels()
 
         for metric in metrics:
-            metric.update(predicted, _labels)
+            metric.update(Label.to_tensor(predicted), Label.to_tensor(actual))
 
         rows: list[dict[str, str]] = []
 
-        for page, pred, label in zip(inventory.pages, predicted, labels, strict=True):
+        output_chars: int = 100
+        for page, _prediction, output_row, _actual in zip(
+            inventory.pages, predicted, model_output, actual, strict=True
+        ):
             row = {
                 "Inventory": inventory.full_inv_nr(),
-                "Predicted": Label(pred.argmax().item()).name,
-                "Actual": label.name,
+                "Predicted": _prediction.name,
+                "Actual": "" if _actual == Label.UNK else _actual.name,
                 "Page ID": page.doc_id,
-                "Text": page.text(delimiter="; ")[:50],
-                "Scores": str(pred.tolist()),
+                f"Text (first {output_chars} characters)": page.text(delimiter="; ")[
+                    :output_chars
+                ],
+                "Scores": str(output_row.tolist()),
             }
             if self._thumbnail_downloader:
                 thumbnail_url = self._thumbnail_downloader.thumbnail_url(
@@ -355,6 +360,53 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         ), f"Expected {len(inventory.pages)} rows, got {len(rows)}."
 
         return pd.DataFrame(rows)
+
+    @staticmethod
+    def _prediction_heuristics(model_output: torch.Tensor) -> list[Label]:
+        """Convert model output tensor to the predicted labels, using argmax and heuristics.
+
+        Args:
+            labels (torch.Tensor): The predicted labels.
+        Returns:
+            list[Label]: The labels.
+        """
+        labels: list[Label] = [Label(model_output[0].argmax().item())]
+        # TODO: fix first and last
+
+        for i in range(1, len(model_output) - 1):
+            pred = Label(model_output[i - 1].argmax().item())
+            curr = Label(model_output[i].argmax().item())
+            next = Label(model_output[i + 1].argmax().item())
+
+            if pred == Label.OUT and next == Label.IN:
+                correct: Label = Label.BEGIN
+                if curr != correct:
+                    logging.info(
+                        f"Correcting label from '{curr.name}' to '{correct.name}'."
+                    )
+                    curr = correct
+            elif pred == Label.IN and next == Label.OUT:
+                correct: Label = Label.END
+                if curr != correct:
+                    logging.info(
+                        f"Correcting label from '{curr.name}' to '{correct.name}'."
+                    )
+                    curr = correct
+            elif (
+                pred == Label.OUT
+                and curr in {Label.BEGIN, Label.END}
+                and next == Label.OUT
+            ):
+                correct = Label.END_BEGIN
+                if curr != correct:
+                    logging.info(
+                        f"Correcting label from '{curr.name}' to '{correct.name}'."
+                    )
+                    curr = correct
+            labels.append(curr)
+        labels.append(Label(model_output[-1, :].argmax().item()))
+
+        return labels
 
     def save(self, path: Path) -> None:
         """Save the model to the given path.
