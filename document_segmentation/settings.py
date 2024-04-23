@@ -10,7 +10,7 @@ DATA_DIR: Path = CWD / "data"
 
 RENATE_TANAP_CATEGORISATION_SHEET: Path = (
     DATA_DIR
-    / "Appendix F - Spreadsheet concerning the TANAP document categorisation, Renate Smit, January 2024.xlsx"
+    / "Spreadsheet concerning the TANAP document categorisation (student assistant), Renate Smit.xlsx"
 )
 
 RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(DATA_DIR.glob("Analysis Renate ????.csv"))
