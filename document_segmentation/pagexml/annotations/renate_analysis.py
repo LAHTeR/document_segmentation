@@ -74,7 +74,8 @@ class RenateAnalysisInv(Sheet):
         for idx, row in self._data.sort_index().iterrows():
             scan_nr = int(idx[-4:])
 
-            if annotation := row[self._LABEL_COLUMN].strip():
+            annotation = row[self._LABEL_COLUMN].strip()
+            if annotation and not annotation.startswith("SAME AS"):
                 # sheet provides annotation for page (BEGIN or END)
                 label: Label = Label[annotation]
 
