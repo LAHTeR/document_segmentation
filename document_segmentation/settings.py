@@ -108,7 +108,7 @@ This is used because small inventories can be problematic for training and evalu
 MAX_EMPTY_SEQUENCE: int = 1
 """If an annotated inventory has more than this number of subsequent empty OUT pages, they are replaced with a single OUT page."""
 
-UPDATE_LM_WEIGHTS: bool = bool(os.getenv("UPDATE_LM_WEIGHTS", "True"))
+UPDATE_LM_WEIGHTS: bool = bool(os.getenv("UPDATE_LM_WEIGHTS", ""))
 """If True, the weights of the language model are updated during training.
 If False, the text embeddings are cached and never updated.
 
