@@ -1,5 +1,6 @@
 import logging
 import random
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -96,6 +97,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         weights: list[float] = None,
         shuffle: bool = True,
         log_wandb: bool = True,
+        log_interval: float = 2.0,
     ):
         """Train the model on the given dataset.
 
@@ -108,6 +110,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 If None (default), the class weights are computed from the training dataset.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
+            log_interval (float, optional): The minimum interval in seconds to log to Weights & Biases. Defaults to 2.0.
         """
         self.train()
 
@@ -166,6 +169,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         else:
             self.wandb_run = None
 
+        log_time: float = 0
         for epoch in range(1, epochs + 1):
             if shuffle:
                 random.shuffle(training_inventories)
@@ -200,13 +204,17 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                             },
                             commit=False,
                         )
+                    commit = time.time() - log_time > log_interval
                     self.wandb_run.log(
                         {
                             "loss": loss.item(),
                             "inventory length": len(inventory),
                             "inventory": inventory.inv_nr,
-                        }
+                        },
+                        commit=commit,
                     )
+                    if commit:
+                        log_time = time.time()
 
             if validation_inventories:
                 for sheet_name, _validation in validation_inventories.items():

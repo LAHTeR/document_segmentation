@@ -1,7 +1,7 @@
 import argparse
-from typing import Iterable
+import logging
 
-import pandas as pd
+from requests import HTTPError
 from tqdm import tqdm
 
 from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
@@ -32,6 +32,12 @@ if __name__ == "__main__":
         help="The output file.",
     )
     parser.add_argument(
+        "--format",
+        choices=["google", "wandb"],
+        required=False,
+        help="The output format; add platform-specific formatting.",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         required=False,
@@ -43,17 +49,32 @@ if __name__ == "__main__":
     model = PageSequenceTagger(device=args.device)
     model.load(args.model)
 
-    inventory_nrs: list[list[str]] = [
-        inv.split("_") if "_" in inv else [inv, ""] for inv in args.inventory
-    ]
-    inventories: Iterable[Inventory] = (
-        Inventory.load_or_download(*inv_nr) for inv_nr in inventory_nrs
-    )
+    is_first_inventory: bool = True
 
-    results: pd.DataFrame = pd.concat(
-        model.predict(inventory)
-        for inventory in tqdm(
-            inventories, total=len(args.inventory), desc="Predicting", unit="inventory"
+    for inv in tqdm(args.inventory, desc="Predicting", unit="inventory"):
+        inv_nr: list[str] = inv.split("_") if "_" in inv else [inv, ""]
+        inventory: Inventory = None
+
+        try:
+            inventory = Inventory.load_or_download(*inv_nr)
+        except HTTPError as e:
+            logging.error(f"Failed to download inventory: {e}")
+            continue
+
+        results = model.predict(inventory)
+
+        if args.format == "google":
+            MODE = 3
+            results["Thumbnail"] = results["Thumbnail"].apply(
+                lambda link: f'=IMAGE("{link}"; {MODE})'
+            )
+        elif args.format == "wandb":
+            raise NotImplementedError()
+
+        results.to_csv(
+            args.output,
+            mode="w" if is_first_inventory else "a",
+            header=is_first_inventory,
         )
-    )
-    results.to_csv(args.output)
+
+        is_first_inventory = False
