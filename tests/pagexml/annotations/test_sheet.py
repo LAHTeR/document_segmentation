@@ -37,24 +37,13 @@ class TestRenateAnalysis:
     def test_sheet(self) -> Path:
         return RenateAnalysis()
 
-    @pytest.mark.skip(
-        "Reason: use an inventory that has annotation even after filtering"
-    )
     def test_annotate_inventory(self, test_sheet):
-        annotated_inventory = test_sheet.annotate_inventory(
+        expected_labels = {1: Label.OUT, 114: Label.END_BEGIN, 115: Label.OUT}
+
+        for page in test_sheet.annotate_inventory(
             Inventory.load(2542, "", DATA_DIR)
-        )
-        assert len(annotated_inventory) == 2052
-
-        # FIXME: this is not correct after preprocessing (hence the test is skipped)
-        expected_labels = {114: Label.END_BEGIN}
-
-        for page in annotated_inventory.pages:
-            expected: Label = expected_labels.get(page.scan_nr, Label.UNK)
-
-            assert (
-                page.label == expected
-            ), f"Expected label '{expected.name}' but got '{page.label.name}' for page {page}"
+        ).pages:
+            assert page.label == expected_labels[page.scan_nr]
 
     def test_preprocess(self, test_sheet):
         """Test the preprocessing of the RenateAnalysis sheet."""
@@ -107,21 +96,13 @@ class TestGeneraleMissiven:
     def test_sheet(self, tmp_path):
         return GeneraleMissiven(GENERALE_MISSIVEN_CSV, inventory_dir=tmp_path)
 
-    @pytest.mark.skip("Fix expected output labels.")
     def test_annotate_inventory(self, test_sheet):
-        inventory = Inventory.load(1105, "", DATA_DIR)
-        annotated_inventory = test_sheet.annotate_inventory(inventory)
+        expected_labels = {1: Label.OUT, 919: Label.END_BEGIN, 920: Label.OUT}
 
-        assert len(annotated_inventory) == 1092
-
-        # FIXME: this is not correct
-        expected_labels = {919: Label.END_BEGIN}
-
-        for page in annotated_inventory.pages:
-            expected: Label = expected_labels.get(page.scan_nr, Label.UNK)
-            assert (
-                page.label == expected
-            ), f"Expected label '{expected.name}' but got '{page.label.name}' for page {page}"
+        for page in test_sheet.annotate_inventory(
+            Inventory.load(1105, "", DATA_DIR)
+        ).pages:
+            assert page.label == expected_labels[page.scan_nr]
 
     @pytest.mark.skipif(
         not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
