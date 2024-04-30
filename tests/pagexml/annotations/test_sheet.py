@@ -72,7 +72,7 @@ class TestRenateAnalysisInv:
 
     @pytest.fixture()
     def test_sheet(self) -> Path:
-        return settings.DATA_DIR / "Analysis Renate 1547.csv"
+        return settings.ANNOTATIONS_DIR / "Analysis Renate 1547.csv"
 
     def test_init(self, test_sheet, tmp_path):
         """Test the initialization of the RenateAnalysisInv class."""
