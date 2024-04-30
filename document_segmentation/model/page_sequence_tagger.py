@@ -289,7 +289,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         if self.wandb_run is not None:
             if log_pages:
                 # FIXME: this changes the Image column permanently in-place
-                results["Image"] = results["Image"].apply(wandb.Html)
+                results["Image"] = results["Image"].dropna().apply(wandb.Html)
                 table = wandb.Table(
                     dataframe=results.drop(columns=["Thumbnail", "Link"])
                 )
@@ -348,7 +348,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 ],
                 "Scores": str(output_row.tolist()),
             }
-            if self._thumbnail_downloader:
+            if self._thumbnail_downloader and page.doc_id:
                 thumbnail_url = self._thumbnail_downloader.thumbnail_url(
                     inventory, page
                 )
