@@ -65,8 +65,10 @@ if __name__ == "__main__":
 
         if args.format == "google":
             MODE = 3
-            results["Thumbnail"] = results["Thumbnail"].apply(
-                lambda link: f'=IMAGE("{link}"; {MODE})'
+            results["Thumbnail"] = (
+                results["Thumbnail"]
+                .dropna()
+                .apply(lambda url: f'=IMAGE("{url}"; {MODE})')
             )
         elif args.format == "wandb":
             raise NotImplementedError()
