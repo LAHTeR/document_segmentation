@@ -25,7 +25,12 @@ from ..pagexml.datamodel.inventory import (
 )
 from ..pagexml.datamodel.label import Label
 from ..pagexml.datamodel.page import Page
-from ..settings import MAX_INVENTORY_SIZE, PAGE_SEQUENCE_TAGGER_RNN_CONFIG
+from ..settings import (
+    LEARNING_RATE,
+    MAX_INVENTORY_SIZE,
+    PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
+    WEIGHT_DECAY,
+)
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
@@ -126,7 +131,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         criterion = nn.CrossEntropyLoss(
             reduction="sum", weight=torch.Tensor(weights).to(self._device)
         ).to(self._device)
-        optimizer = optim.Adam(self.parameters(), lr=0.001)
+        optimizer = optim.Adam(
+            self.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+        )
 
         if log_wandb:
             if self.wandb_run is None:

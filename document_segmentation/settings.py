@@ -60,18 +60,6 @@ The type of model needs to be with the RegionClassifier class:
 - use RegionClassifierSentenceTransformer for SentenceTransformer models
 """
 
-# TODO: list all document types and their spelling variants
-DOCUMENT_TYPES: dict[str, set[str]] = {
-    "Journaal": {"Journaal", "Journael"},
-    "Resolutie": {"Resolutie", "resolutien"},
-    "Dagregister": {"Daghregister", "Dagregister", "Dag Register", "dag-register"},
-    "Notulen": {"Notulen"},
-    # "Register": {"Register"},
-    "Monsterrol": {"Monsterrol", "Monsterrolle", "Monster Rolle"},
-}
-"""A mapping from document types to all spelling variants of that type."""
-
-
 MIN_REGION_TEXT_LENGTH: int = 20
 """The minimum number of characters of the text(s) in a region.
 Shorter regions are filtered out during training and inference."""
@@ -110,6 +98,11 @@ This is used because small inventories can be problematic for training and evalu
 
 MAX_EMPTY_SEQUENCE: int = 1
 """If an annotated inventory has more than this number of subsequent empty OUT pages, they are replaced with a single OUT page."""
+
+LEARNING_RATE: float = float(os.environ.get("LEARNING_RATE", "0.1"))
+"""The default learning rate for the optimizer."""
+WEIGHT_DECAY: float = float(os.environ.get("WEIGHT_DECAY", "1e-4"))
+"""The default weight decay for the optimizer."""
 
 UPDATE_LM_WEIGHTS: bool = bool(os.getenv("UPDATE_LM_WEIGHTS", ""))
 """If True, the weights of the language model are updated during training.
