@@ -60,18 +60,6 @@ The type of model needs to be with the RegionClassifier class:
 - use RegionClassifierSentenceTransformer for SentenceTransformer models
 """
 
-# TODO: list all document types and their spelling variants
-DOCUMENT_TYPES: dict[str, set[str]] = {
-    "Journaal": {"Journaal", "Journael"},
-    "Resolutie": {"Resolutie", "resolutien"},
-    "Dagregister": {"Daghregister", "Dagregister", "Dag Register", "dag-register"},
-    "Notulen": {"Notulen"},
-    # "Register": {"Register"},
-    "Monsterrol": {"Monsterrol", "Monsterrolle", "Monster Rolle"},
-}
-"""A mapping from document types to all spelling variants of that type."""
-
-
 MIN_REGION_TEXT_LENGTH: int = 20
 """The minimum number of characters of the text(s) in a region.
 Shorter regions are filtered out during training and inference."""
