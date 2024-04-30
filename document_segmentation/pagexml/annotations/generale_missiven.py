@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from ...settings import GENERALE_MISSIVEN_SHEET, INVENTORY_DIR
+from ..datamodel.label import Combined, FrontMatter, Label, Tanap
 from .sheet import Sheet
 
 
@@ -41,3 +42,10 @@ class GeneraleMissiven(Sheet):
         self._data[self._DEEL_VAN_INVENTARIS_COL] = self._data[
             self._DEEL_VAN_INVENTARIS_COL
         ].fillna("")
+
+    def combined_label(self, label: Label, row: int = None) -> Combined:
+        """For Generale Missive all documents are in the same category."""
+        if label == Label.OUT:
+            return label.combined(FrontMatter.EMPTY)
+        else:
+            return label.combined(Tanap.CORRESPONDENTIE_GOUVERNEUR)

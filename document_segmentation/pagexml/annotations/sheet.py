@@ -17,7 +17,7 @@ from ...settings import (
     SERVER_USERNAME,
 )
 from ..datamodel.inventory import Inventory
-from ..datamodel.label import Label
+from ..datamodel.label import Combined, Label
 from ..datamodel.page import Page
 
 
@@ -57,6 +57,10 @@ class Sheet(abc.ABC):
 
     def __len__(self):
         return len(self._data)
+
+    @abc.abstractmethod
+    def combined_label(self, label: Label, doc_id: int = None) -> Combined:
+        pass
 
     def download_inventories(
         self, *, username: str = SERVER_USERNAME, password: str = SERVER_PASSWORD
@@ -133,21 +137,31 @@ class Sheet(abc.ABC):
 
             try:
                 document: list[Page] = (
-                    [inventory.get_scan(begin_scan).annotate(Label.BEGIN)]
+                    [
+                        inventory.get_scan(begin_scan, row).annotate(
+                            self.combined_label(Label.BEGIN)
+                        )
+                    ]
                     + [
-                        inventory.get_scan(scan_nr).annotate(Label.IN)
+                        inventory.get_scan(scan_nr, row).annotate(
+                            self.combined_label(Label.IN)
+                        )
                         for scan_nr in range(begin_scan + 1, end_scan)
                     ]
-                    + [inventory.get_scan(end_scan).annotate(Label.END)]
+                    + [
+                        inventory.get_scan(end_scan, row).annotate(
+                            self.combined_label(Label.END)
+                        )
+                    ]
                 )
                 # remove redundant BEGIN_END pages
                 redundant: list[int] = []
                 for i, page in enumerate(document[:-1]):
-                    if page.label == Label.END_BEGIN:
+                    if Label.from_combined(page.label) is Label.END_BEGIN:
                         next_page = document[i + 1]
                         if next_page.scan_nr == page.scan_nr:
                             assert (
-                                next_page.label == Label.END_BEGIN
+                                next_page.label == self.combined_label(Label.BEGIN, row)
                             ), f"Expected two subsequent END_BEGIN labels, got '{page}', '{next_page}'"
                             redundant.append(i)
                 for i in reversed(redundant):
@@ -166,7 +180,7 @@ class Sheet(abc.ABC):
                     # Insert empty page between documents
                     pages.append(
                         Page(
-                            label=Label.OUT,
+                            label=self.combined_label(Label.OUT, row),
                             scan_nr=last_scan + 1,
                             external_ref="",
                             regions=[],
@@ -178,7 +192,10 @@ class Sheet(abc.ABC):
             # Insert empty page at the end
             pages.append(
                 Page(
-                    label=Label.OUT, scan_nr=last_scan + 1, external_ref="", regions=[]
+                    label=self.combined_label(Label.OUT, row),
+                    scan_nr=last_scan + 1,
+                    external_ref="",
+                    regions=[],
                 )
             )
         else:

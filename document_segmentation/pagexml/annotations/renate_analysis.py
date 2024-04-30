@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 from typing import Iterable
 
@@ -6,12 +7,14 @@ import pandas as pd
 
 from ...settings import INVENTORY_DIR, RENATE_TANAP_CATEGORISATION_SHEET
 from ..datamodel.inventory import Inventory
-from ..datamodel.label import Label
+from ..datamodel.label import Combined, FrontMatter, Label
 from ..datamodel.page import Page
 from .sheet import Sheet
 
 
 class RenateAnalysis(Sheet):
+    _RUBRIEK_PATTERN = re.compile(r"^RUBRIEK:(.*);ARCHIEFSTUK")
+
     def __init__(
         self,
         sheet_file: Path = RENATE_TANAP_CATEGORISATION_SHEET,
@@ -38,13 +41,37 @@ class RenateAnalysis(Sheet):
         # TODO: use child documents where available
         return super().annotated_rows(inventory)
 
+        self._categories = pd.read_excel(
+            sheet_file, sheet_name="Categoriecodes", index_col="Code"
+        )
+        self._tanap = pd.read_excel(sheet_file, sheet_name="TANAP", index_col="ID")
+
+    def combined_label(self, label: Label, row: int = None) -> Combined:
+        if label == Label.OUT:
+            return label.combined(FrontMatter.EMPTY)
+        else:
+            tanap_id = row["ID in TANAP database"]  # noqa: F841
+
+    def lookup_type(self, tanap_id: int):
+        row = self._tanap.iloc[tanap_id]
+        if match := self._RUBRIEK_PATTERN.match(row["TYPE"]):
+            rubriek = match.group(1).strip()  # noqa: F841
+        else:
+            raise RuntimeError(
+                f"Failed to extract rubriek from {row['TYPE']} for TANAP ID {tanap_id}"
+            )
+
+        # TODO: lookup rubriek in self._categories
+
 
 class RenateAnalysisInv(Sheet):
     _INDEX_COLUMN = "Scan File_Name"
     _PAGE_COLUMN = "Page"
     _LABEL_COLUMN = "TANAP Boundaries"
     _SUB_DOC_COLUMN = "Subdocument boundaries"
+    _TYPE_COLUMN = "Type of non-document page"
 
+    # TODO: add RenameAnalysisInv for looking up TANAP categories
     def __init__(
         self, sheet_file: Path, *, inventory_dir: Path = INVENTORY_DIR
     ) -> None:
@@ -60,6 +87,13 @@ class RenateAnalysisInv(Sheet):
         self._inventory = Inventory.load_or_download(
             int(self._id[-4:]), "", self._inventory_dir
         )
+
+    def combined_label(self, label: Label) -> Combined:
+        if label is Label.OUT:
+            return label.combined(FrontMatter.EMPTY)
+        else:
+            # TODO: look up TANAP id and call ReneteAnalysis.lookup_type() with Tanap IP
+            pass
 
     def inventories(self) -> Iterable[Inventory]:
         yield self._inventory
@@ -107,20 +141,27 @@ class RenateAnalysisInv(Sheet):
                     in_doc = annotation[-5:] in {"START", "BEGIN"}
                 else:
                     raise ValueError(error_message)
-            else:
+            elif in_doc:
                 # No annotation for scan
-                label = Label.IN if in_doc else Label.OUT
+                label = Label.IN
+            else:
+                if _type := row[self._TYPE_COLUMN].strip():
+                    front_matter = FrontMatter[_type]
+                else:
+                    front_matter = FrontMatter.EMPTY
+
+                label = Label.OUT.combined(front_matter)
 
             inventory.annotate_scan(scan_nr, label)
 
-        for scan in inventory.pages:
-            unlabelled: list[Page] = [
-                page for page in inventory.pages if page.label == Label.UNK
-            ]
-            if unlabelled:
-                logging.error(
-                    f"Removing un-annotated pages in inventory {inventory}: {unlabelled}"
-                )
-                for page in unlabelled:
-                    inventory.remove_scan(page.scan_nr)
+        # Remove unlabelled pages
+        unlabelled: list[Page] = [
+            page for page in inventory.pages if page.label == Label.UNK
+        ]
+        if unlabelled:
+            logging.error(
+                f"Removing un-annotated pages in inventory {inventory}: {unlabelled}"
+            )
+            for page in unlabelled:
+                inventory.remove_scan(page.scan_nr)
         return inventory
