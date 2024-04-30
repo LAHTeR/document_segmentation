@@ -20,7 +20,7 @@ class TestSheet:
 
     @pytest.mark.parametrize(
         "sheet, length, min_inv, max_inv",
-        [(RenateAnalysis(), 132, 1060, 8935), (GeneraleMissiven(), 914, 1068, 7957)],
+        [(RenateAnalysis(), 139, 1055, 8935), (GeneraleMissiven(), 914, 1068, 7957)],
     )
     def test_init(self, sheet, length, min_inv, max_inv):
         """Read the sheet and check the length and inventory numbers."""
@@ -72,7 +72,7 @@ class TestRenateAnalysisInv:
 
     @pytest.fixture()
     def test_sheet(self) -> Path:
-        return settings.DATA_DIR / "Analysis Renate 1547.csv"
+        return settings.ANNOTATIONS_DIR / "Analysis Renate 1547.csv"
 
     def test_init(self, test_sheet, tmp_path):
         """Test the initialization of the RenateAnalysisInv class."""

@@ -7,16 +7,19 @@ from typing import Any
 CWD: Path = Path(__file__).parent.absolute()
 
 DATA_DIR: Path = CWD / "data"
+ANNOTATIONS_DIR: Path = DATA_DIR / "annotations"
 
 RENATE_TANAP_CATEGORISATION_SHEET: Path = (
-    DATA_DIR
+    ANNOTATIONS_DIR
     / "Spreadsheet concerning the TANAP document categorisation (student assistant), Renate Smit.xlsx"
 )
 
-RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(DATA_DIR.glob("Analysis Renate ????.csv"))
+RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(
+    ANNOTATIONS_DIR.glob("Analysis Renate ????.csv")
+)
 
 GENERALE_MISSIVEN_SHEET: Path = (
-    DATA_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
+    ANNOTATIONS_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
 )
 
 INVENTORY_DIR: Path = DATA_DIR / "inventories"
