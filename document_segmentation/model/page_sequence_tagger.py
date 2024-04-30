@@ -381,7 +381,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         # TODO: fix first and last
 
         for i in range(1, len(model_output) - 1):
-            pred = Label(model_output[i - 1].argmax().item())
+            pred: Label = labels[-1]
             curr = Label(model_output[i].argmax().item())
             next = Label(model_output[i + 1].argmax().item())
 
