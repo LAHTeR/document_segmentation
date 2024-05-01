@@ -34,6 +34,10 @@ class RenateAnalysis(Sheet):
             self._data[self._DEEL_VAN_INVENTARIS_COL].replace({"0": pd.NA}).fillna("")
         )
 
+    def annotated_rows(self, inventory: Inventory) -> pd.DataFrame:
+        # TODO: use child documents where available
+        return super().annotated_rows(inventory)
+
 
 class RenateAnalysisInv(Sheet):
     _INDEX_COLUMN = "Scan File_Name"
