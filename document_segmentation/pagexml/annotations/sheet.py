@@ -77,6 +77,18 @@ class Sheet(abc.ABC):
             except requests.HTTPError as e:
                 logging.error(f"Failed to load inventory {inv_str}: {e}")
 
+    def annotated_rows(self, inventory: Inventory) -> pd.DataFrame:
+        annotated_rows = self._data.loc[
+            self._data[self._INV_NR_COLUMN] == inventory.inv_nr
+        ]
+
+        if inventory.inventory_part:
+            annotated_rows = annotated_rows.loc[
+                annotated_rows[self._DEEL_VAN_INVENTARIS_COL]
+                == inventory.inventory_part
+            ]
+        return annotated_rows
+
     def inventory_numbers(self) -> Iterable[tuple[int, str]]:
         key_fields = [self._INV_NR_COLUMN, self._DEEL_VAN_INVENTARIS_COL]
 
@@ -107,15 +119,7 @@ class Sheet(abc.ABC):
         Returns:
             Inventory: The annotated inventory.
         """
-        annotated_rows: pd.DataFrame = self._data.loc[
-            self._data[self._INV_NR_COLUMN] == inventory.inv_nr
-        ]
-
-        if inventory.inventory_part:
-            annotated_rows = annotated_rows.loc[
-                annotated_rows[self._DEEL_VAN_INVENTARIS_COL]
-                == inventory.inventory_part
-            ]
+        annotated_rows: pd.DataFrame = self.annotated_rows(inventory)
 
         if len(annotated_rows) == 0:
             logging.warning(
