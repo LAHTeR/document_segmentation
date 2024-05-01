@@ -66,7 +66,7 @@ if __name__ == "__main__":
         if args.format == "google":
             MODE = 3
             results["Thumbnail"] = (
-                results["Thumbnail"]
+                results["ThumbnailUrl"]
                 .dropna()
                 .apply(lambda url: f'=IMAGE("{url}"; {MODE})')
             )

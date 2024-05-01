@@ -288,10 +288,11 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         if self.wandb_run is not None:
             if log_pages:
-                # FIXME: this changes the Image column permanently in-place
-                results["Image"] = results["Image"].dropna().apply(wandb.Html)
+                results["Image"] = results["ThumbnailHtml"].dropna().apply(wandb.Html)
                 table = wandb.Table(
-                    dataframe=results.drop(columns=["Thumbnail", "Link"])
+                    dataframe=results.drop(
+                        columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                    )
                 )
                 self.wandb_run.log({f"{sheet_name}_pages": table})
 
@@ -354,10 +355,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 )
                 link: str = inventory.link(page)
 
-                row["Image"] = (
+                row["ThumbnailHtml"] = (
                     f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
                 )
-                row["Thumbnail"] = thumbnail_url
+                row["ThumbnailUrl"] = thumbnail_url
                 row["Link"] = link
 
             rows.append(row)
