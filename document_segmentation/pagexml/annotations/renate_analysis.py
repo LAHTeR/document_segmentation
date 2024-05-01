@@ -39,6 +39,7 @@ class RenateAnalysisInv(Sheet):
     _INDEX_COLUMN = "Scan File_Name"
     _PAGE_COLUMN = "Page"
     _LABEL_COLUMN = "TANAP Boundaries"
+    _SUB_DOC_COLUMN = "Subdocument boundaries"
 
     def __init__(
         self, sheet_file: Path, *, inventory_dir: Path = INVENTORY_DIR
@@ -50,9 +51,6 @@ class RenateAnalysisInv(Sheet):
             delimiter=";",
             index_col=self._INDEX_COLUMN,
         ).fillna("")
-        self._data[self._LABEL_COLUMN] = self._data[self._LABEL_COLUMN].str.replace(
-            "START", "BEGIN"
-        )
 
         self._id = sheet_file.stem
         self._inventory = Inventory.load_or_download(
@@ -65,8 +63,14 @@ class RenateAnalysisInv(Sheet):
     def inventory_numbers(self) -> Iterable[tuple[int, str]]:
         return [(self._inventory.inv_nr, self._inventory.inventory_part)]
 
-    def annotate_inventory(self, inventory: Inventory) -> "Inventory":
+    def annotate_inventory(self, inventory: Inventory = None) -> "Inventory":
         """Assume all pages in a document have been annotated."""
+
+        inventory = inventory or self._inventory
+        if inventory != self._inventory:
+            raise ValueError(
+                f"Inventory {inventory} does not match the expected inventory {self._inventory}."
+            )
 
         in_doc: bool = False
         """Inside a document or not."""
@@ -74,12 +78,17 @@ class RenateAnalysisInv(Sheet):
         for idx, row in self._data.sort_index().iterrows():
             scan_nr = int(idx[-4:])
 
-            annotation = row[self._LABEL_COLUMN].strip()
+            # Sub-document annotation overrides main document annotation
+            annotation = (
+                row[self._SUB_DOC_COLUMN].strip() or row[self._LABEL_COLUMN].strip()
+            )
+
             if annotation and not annotation.startswith("SAME AS"):
                 # sheet provides annotation for page (BEGIN or END)
-                label: Label = Label[annotation]
+                label: Label = Label[annotation.replace("/", "_")]
 
-                error_message = f"Unexpected label: '{label.name}' for scan '{scan_nr}' for inventory '{inventory}' in sheet '{self}."
+                error_message = f"Unexpected label: '{annotation}' ('{label.name}') for scan '{scan_nr}' for inventory '{inventory}' in sheet '{self}."
+
                 if label == Label.BEGIN:
                     if in_doc:
                         label = Label.END_BEGIN
@@ -88,6 +97,10 @@ class RenateAnalysisInv(Sheet):
                     if not in_doc:
                         logging.error(error_message)
                     in_doc = False
+                elif label == Label.END_BEGIN:
+                    if annotation.startswith("END") and not in_doc:
+                        raise ValueError(error_message)
+                    in_doc = annotation[-5:] in {"START", "BEGIN"}
                 else:
                     raise ValueError(error_message)
             else:
