@@ -20,7 +20,10 @@ class Label(IntEnum):
     END_BEGIN = 5
     END_START = 5
     START_END = 5
+    END_START_END = 5
     START_END_START = 5
+    END_START_END_START = 5
+    START_END_START_END = 5
     """Page on which a document ends, and another one begins"""
 
     def to_list(self) -> list[int]:
