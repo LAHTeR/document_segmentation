@@ -84,12 +84,13 @@ class TestInventory:
             inventory.annotate_scan(4, Label.END)
 
     # TODO: test for files with inventory parts (both valid ("A" and invalid ("1"))
+    @pytest.mark.parametrize("mock_request", [1201], indirect=True)
     def test_download(self, mock_request, tmp_path):
         inventory = Inventory.download(
             inv_nr=1201, inventory_part="", target_directory=tmp_path
         )
 
-        # Assert that this does not trigger another remote (mock) request:
+        # Assert that this does not trigger another remote request
         assert (
             Inventory.load_or_download(
                 inv_nr=1201, inventory_part="", inventory_dir=tmp_path

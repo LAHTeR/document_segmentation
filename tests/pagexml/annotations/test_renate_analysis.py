@@ -44,18 +44,13 @@ class TestRenateAnalysis:
         assert [page.scan_nr for page in preprocessed.pages] == expected_scan_nrs
 
 
-@pytest.mark.skipif(
-    not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
-    reason="No server credentials.",
-)
 class TestRenateAnalysisInv:
-    # FIXME: Mock servers requests
-
     @pytest.fixture()
     def sheet_file(self) -> Path:
         return settings.ANNOTATIONS_DIR / "Analysis Renate 1547.csv"
 
-    def test_init(self, sheet_file, tmp_path):
+    @pytest.mark.parametrize("mock_request", [1547], indirect=True)
+    def test_init(self, sheet_file, tmp_path, mock_request):
         """Test the initialization of the RenateAnalysisInv class."""
         sheet = RenateAnalysisInv(sheet_file, inventory_dir=tmp_path)
 
@@ -69,7 +64,8 @@ class TestRenateAnalysisInv:
         assert sheet._id == "Analysis Renate 1547"
         assert sheet.inventory_numbers() == [(1547, "")]
 
-    def test_annotate_inventory(self, sheet_file, tmp_path):
+    @pytest.mark.parametrize("mock_request", [1547], indirect=True)
+    def test_annotate_inventory(self, sheet_file, tmp_path, mock_request):
         """Test the annotation of an inventory with the RenateAnalysisInv class."""
         expected_labels = (
             [Label.OUT] * 14
