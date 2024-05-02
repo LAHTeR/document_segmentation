@@ -290,6 +290,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         if self.wandb_run is not None:
             if log_pages:
+                assert (
+                    results.index.is_unique
+                ), f"Index is not unique: {results.loc[results.index.duplicated()]}"
                 results["Image"] = results["ThumbnailHtml"].dropna().apply(wandb.Html)
                 table = wandb.Table(
                     dataframe=results.drop(
