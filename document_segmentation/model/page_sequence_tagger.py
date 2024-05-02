@@ -178,6 +178,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         log_time: float = 0
         for epoch in range(1, epochs + 1):
+            self.train()
+
             if shuffle:
                 random.shuffle(training_inventories)
 
@@ -232,7 +234,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     else:
                         logging.warning(f"Empty validation set for '{sheet_name}'.")
 
-                # FIXME: re-running the validation on all inventories is redundant
+                # FIXME: re-running the evaluation on all inventories is redundant
                 all_validation_inventories = [
                     inventory
                     for values in validation_inventories.values()
@@ -247,8 +249,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
                 else:
                     logging.warning("All validation sets are empty.")
-
-                self.train()
 
     def eval_(
         self,
@@ -275,6 +275,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             MulticlassF1Score(average=None, num_classes=len(Label)),
             MulticlassAccuracy(),
         )
+        self.eval()
 
         results: pd.DataFrame = pd.concat(
             (
