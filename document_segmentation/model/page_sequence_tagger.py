@@ -199,6 +199,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 outputs = self(inventory.pages).to(self._device)
 
                 loss = criterion(outputs, inventory.label_tensor().to(self._device))
+                if torch.isnan(loss):
+                    logging.error(f"Loss is NaN for inventory: '{inventory}'")
 
                 loss.backward()
                 optimizer.step()
