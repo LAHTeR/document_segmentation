@@ -286,7 +286,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     unit="inventory",
                 )
             )
-        ).reindex()
+        ).reset_index()
 
         if self.wandb_run is not None:
             if log_pages:
