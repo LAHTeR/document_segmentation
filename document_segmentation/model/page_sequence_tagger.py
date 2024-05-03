@@ -101,7 +101,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         weights: list[float] = None,
         shuffle: bool = True,
         log_wandb: bool = True,
-    ):
+    ) -> dict[str, Any]:
         """Train the model on the given dataset.
 
         Args:
@@ -113,6 +113,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 If None (default), the class weights are computed from the training dataset.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
+
+        Returns:
+            dict[str, Any]: The state dictionary of the model; the best model if validation data is given, otherwise the last state.
         """
         self.train()
 
@@ -173,6 +176,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         else:
             self.wandb_run = None
 
+        best_score = 0
+        best_model = None
         for epoch in range(1, epochs + 1):
             self.train()
 
@@ -233,14 +238,26 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     for inventory in values
                 ]
                 if all_validation_inventories:
-                    self.eval_(
+                    _, _, f1, _, _ = self.eval_(
                         all_validation_inventories,
                         "total",
                         epoch=epoch,
                         log_pages=False,
                     )
+                    assert (
+                        f1.__class__ == MulticlassF1Score
+                    ), f"Expected F1 score metric, but got '{f1.__class__.__name__}'."
+
+                    score = f1.compute().mean().item()
+                    if best_model is None or score > best_score:
+                        logging.info(
+                            f"New best model found with average F1 score: {score:.4f} (previous: {best_score:.4f})."
+                        )
+                        best_score = score
+                        best_model = self.state_dict()
                 else:
                     logging.warning("All validation sets are empty.")
+        return best_model or self.state_dict()
 
     def eval_(
         self,
@@ -269,7 +286,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         )
         self.eval()
 
-        results: pd.DataFrame = pd.concat(
+        output: pd.DataFrame = pd.concat(
             (
                 self.predict(inventory, *metrics)
                 for inventory in tqdm(
@@ -284,11 +301,11 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         if self.wandb_run is not None:
             if log_pages:
                 assert (
-                    results.index.is_unique
-                ), f"Index is not unique: {results.loc[results.index.duplicated()]}"
-                results["Image"] = results["ThumbnailHtml"].dropna().apply(wandb.Html)
+                    output.index.is_unique
+                ), f"Index is not unique: {output.loc[output.index.duplicated()]}"
+                output["Image"] = output["ThumbnailHtml"].dropna().apply(wandb.Html)
                 table = wandb.Table(
-                    dataframe=results.drop(
+                    dataframe=output.drop(
                         columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
                     )
                 )
@@ -310,7 +327,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
             self.wandb_run.log({sheet_name: wandb_metrics})
 
-        return metrics + (results,)
+        return metrics + (output,)
 
     @torch.inference_mode()
     def predict(self, inventory: Inventory, *metrics: Metric) -> pd.DataFrame:
