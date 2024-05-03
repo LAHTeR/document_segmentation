@@ -165,6 +165,8 @@ if __name__ == "__main__":
     model.wandb_run = None
     model.load(args.model_file)
 
+    print("Evaluating best model...")
+
     for name, validation in validation_inventories.items():
         print(f"Sheet: {name}", file=args.eval_output)
         print(f"Sheet: {name}", file=args.test_output)

@@ -227,7 +227,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             if validation_inventories:
                 for sheet_name, _validation in validation_inventories.items():
                     if _validation:
-                        self.eval_(_validation, sheet_name, epoch=epoch, log_pages=True)
+                        self.eval_(_validation, sheet_name, epoch=epoch)
                     else:
                         logging.warning(f"Empty validation set for '{sheet_name}'.")
 
@@ -238,11 +238,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     for inventory in values
                 ]
                 if all_validation_inventories:
-                    _, _, f1, _, _ = self.eval_(
-                        all_validation_inventories,
-                        "total",
-                        epoch=epoch,
-                        log_pages=False,
+                    _, _, f1, _, output = self.eval_(
+                        all_validation_inventories, "total", epoch=epoch
                     )
                     assert (
                         f1.__class__ == MulticlassF1Score
@@ -255,17 +252,22 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         )
                         best_score = score
                         best_model = self.state_dict()
+
+                        output["Image"] = (
+                            output["ThumbnailHtml"].dropna().apply(wandb.Html)
+                        )
+                        table = wandb.Table(
+                            dataframe=output.drop(
+                                columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                            )
+                        )
+                        self.wandb_run.log({f"{sheet_name}_pages": table})
                 else:
                     logging.warning("All validation sets are empty.")
         return best_model or self.state_dict()
 
     def eval_(
-        self,
-        inventories: list[Inventory],
-        sheet_name: str,
-        *,
-        epoch: Optional[int] = None,
-        log_pages: bool = True,
+        self, inventories: list[Inventory], sheet_name: str, *, epoch=None
     ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
@@ -273,7 +275,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             inventories (list[Inventory]): The inventories to evaluate.
             sheet_name (str): The name to use for the evaluation logs.
             epoch (Optional[int], optional): The epoch number. Defaults to None.
-            log_pages (bool, optional): Whether to log the pages to Weights & Biases. Defaults to True.
         Returns:
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
@@ -299,18 +300,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         ).reset_index()
 
         if self.wandb_run is not None:
-            if log_pages:
-                assert (
-                    output.index.is_unique
-                ), f"Index is not unique: {output.loc[output.index.duplicated()]}"
-                output["Image"] = output["ThumbnailHtml"].dropna().apply(wandb.Html)
-                table = wandb.Table(
-                    dataframe=output.drop(
-                        columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
-                    )
-                )
-                self.wandb_run.log({f"{sheet_name}_pages": table})
-
             if epoch is not None:
                 self.wandb_run.log({"epoch": epoch}, commit=False)
 
