@@ -388,18 +388,18 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         # TODO: fix first and last
 
         for i in range(1, len(model_output) - 1):
-            pred: Label = labels[-1]
+            prev: Label = labels[-1]
             curr = Label(model_output[i].argmax().item())
             next = Label(model_output[i + 1].argmax().item())
 
-            if pred == Label.OUT and next == Label.IN:
+            if prev == Label.OUT and next == Label.IN:
                 correct: Label = Label.BEGIN
                 if curr != correct:
                     logging.info(
                         f"Correcting label from '{curr.name}' to '{correct.name}'."
                     )
                     curr = correct
-            elif pred == Label.IN and next == Label.OUT:
+            elif prev == Label.IN and next == Label.OUT:
                 correct: Label = Label.END
                 if curr != correct:
                     logging.info(
@@ -407,11 +407,25 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
                     curr = correct
             elif (
-                pred == Label.OUT
+                prev == Label.OUT
                 and curr in {Label.BEGIN, Label.END}
                 and next == Label.OUT
             ):
                 correct = Label.END_BEGIN
+                if curr != correct:
+                    logging.info(
+                        f"Correcting label from '{curr.name}' to '{correct.name}'."
+                    )
+                    curr = correct
+            elif prev == Label.END and curr in {Label.IN, Label.END}:
+                correct = Label.OUT
+                if curr != correct:
+                    logging.info(
+                        f"Correcting label from '{curr.name}' to '{correct.name}'."
+                    )
+                    curr = correct
+            elif prev == Label.BEGIN and curr in {Label.OUT, Label.BEGIN}:
+                correct = Label.BEGIN
                 if curr != correct:
                     logging.info(
                         f"Correcting label from '{curr.name}' to '{correct.name}'."
