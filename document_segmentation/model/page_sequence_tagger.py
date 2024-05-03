@@ -1,6 +1,5 @@
 import logging
 import random
-import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -102,7 +101,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         weights: list[float] = None,
         shuffle: bool = True,
         log_wandb: bool = True,
-        log_interval: float = 2.0,
     ):
         """Train the model on the given dataset.
 
@@ -115,7 +113,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 If None (default), the class weights are computed from the training dataset.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
-            log_interval (float, optional): The minimum interval in seconds to log to Weights & Biases. Defaults to 2.0.
         """
         self.train()
 
@@ -176,7 +173,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         else:
             self.wandb_run = None
 
-        log_time: float = 0
         for epoch in range(1, epochs + 1):
             self.train()
 
@@ -215,17 +211,13 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                             },
                             commit=False,
                         )
-                    commit = time.time() - log_time > log_interval
                     self.wandb_run.log(
                         {
                             "loss": loss.item(),
                             "inventory length": len(inventory),
                             "inventory": inventory.inv_nr,
-                        },
-                        commit=commit,
+                        }
                     )
-                    if commit:
-                        log_time = time.time()
 
             if validation_inventories:
                 for sheet_name, _validation in validation_inventories.items():
@@ -388,18 +380,18 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         # TODO: fix first and last
 
         for i in range(1, len(model_output) - 1):
-            pred: Label = labels[-1]
+            prev: Label = labels[-1]
             curr = Label(model_output[i].argmax().item())
             next = Label(model_output[i + 1].argmax().item())
 
-            if pred == Label.OUT and next == Label.IN:
+            if prev == Label.OUT and next == Label.IN:
                 correct: Label = Label.BEGIN
                 if curr != correct:
                     logging.info(
                         f"Correcting label from '{curr.name}' to '{correct.name}'."
                     )
                     curr = correct
-            elif pred == Label.IN and next == Label.OUT:
+            elif prev == Label.IN and next == Label.OUT:
                 correct: Label = Label.END
                 if curr != correct:
                     logging.info(
@@ -407,11 +399,25 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
                     curr = correct
             elif (
-                pred == Label.OUT
+                prev == Label.OUT
                 and curr in {Label.BEGIN, Label.END}
                 and next == Label.OUT
             ):
                 correct = Label.END_BEGIN
+                if curr != correct:
+                    logging.info(
+                        f"Correcting label from '{curr.name}' to '{correct.name}'."
+                    )
+                    curr = correct
+            elif prev == Label.END and curr in {Label.IN, Label.END}:
+                correct = Label.OUT
+                if curr != correct:
+                    logging.info(
+                        f"Correcting label from '{curr.name}' to '{correct.name}'."
+                    )
+                    curr = correct
+            elif prev == Label.BEGIN and curr in {Label.OUT, Label.BEGIN}:
+                correct = Label.IN
                 if curr != correct:
                     logging.info(
                         f"Correcting label from '{curr.name}' to '{correct.name}'."

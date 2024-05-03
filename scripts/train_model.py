@@ -2,8 +2,9 @@ import argparse
 import csv
 import logging
 import random
-from itertools import groupby
+from itertools import chain, groupby
 from pathlib import Path
+from typing import Iterable
 
 from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
@@ -44,12 +45,15 @@ if __name__ == "__main__":
         default=RENATE_ANALYSIS_SHEETS,
         help="The sheet with input annotations (Entire inventories from Renate's Analyses).",
     )
+    arg_parser.add_argument(
+        "--max-inventories",
+        type=int,
+        required=False,
+        help="The maximum number of inventories to use per category. By default, down-sample to the smallest category.",
+    )
 
     arg_parser.add_argument("--split", type=float, default=0.8, help="Train/val split.")
 
-    arg_parser.add_argument(
-        "-n", type=int, default=None, help="Maximum number of documents to use"
-    )
     arg_parser.add_argument(
         "--model-file",
         type=Path,
@@ -93,42 +97,44 @@ if __name__ == "__main__":
     # LOAD ANNOTATION SHEETS AND DATA
     ########################################################################################
 
-    training_inventories: list[Inventory] = []
-    validation_inventories: dict[str, list[Inventory]] = {}
+    inventories: dict[str, Iterable[Inventory]] = {}
+
+    max_inventories: int = args.max_inventories
+
+    if args.renate_analysis_sheet:
+        inventories["renate_analysis_inv"] = [
+            inventory
+            for file in args.renate_analysis_sheet[:max_inventories]
+            for inventory in RenateAnalysisInv(Path(file)).all_annotated_inventories()
+        ]
+        if max_inventories is None:
+            # assuming this is the smallest category, so we down-sample to this
+            max_inventories = len(inventories["renate_analysis_inv"])
 
     if args.gm_sheet:
         filepath = Path(args.gm_sheet)
         sheet = GeneraleMissiven(filepath)
-        _inventories = list(sheet.all_annotated_inventories(n=args.n))
-
-        random.shuffle(_inventories)
-        split = int(len(_inventories) * args.split)
-        training_inventories.extend(_inventories[:split])
-        validation_inventories[filepath.name] = _inventories[split:]
+        inventories[filepath.name] = list(
+            sheet.all_annotated_inventories(n=max_inventories)
+        )
 
     if args.renate_categorisation_sheet:
         filepath = Path(args.renate_categorisation_sheet)
         sheet = RenateAnalysis(filepath)
-        _inventories = list(sheet.all_annotated_inventories(n=args.n))
+        inventories[filepath.name] = list(
+            sheet.all_annotated_inventories(n=max_inventories)
+        )
 
+    training_inventories = {}
+    validation_inventories = {}
+
+    for sheet, _inventories in inventories.items():
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
-        training_inventories.extend(_inventories[:split])
-        validation_inventories[filepath.name] = _inventories[split:]
+        inventories[sheet] = random.sample(_inventories, max_inventories)
 
-    # args.renate_analysis_sheet:
-    _inventories: list[Inventory] = [
-        inventory
-        for file in args.renate_analysis_sheet
-        for inventory in RenateAnalysisInv(Path(file)).all_annotated_inventories(
-            n=args.n
-        )
-    ]
-
-    random.shuffle(_inventories)
-    split = int(len(_inventories) * args.split)
-    training_inventories.extend(_inventories[:split])
-    validation_inventories["renate_analysis_inv"] = _inventories[split:]
+        training_inventories[sheet] = _inventories[:split]
+        validation_inventories[sheet] = _inventories[split:]
 
     ########################################################################################
     # LOAD OR TRAIN MODEL
@@ -139,7 +145,7 @@ if __name__ == "__main__":
         validation_inventories["renate_analysis_inv"]
     )
     model.train_(
-        training_inventories,
+        list(chain(*training_inventories.values())),
         validation_inventories,
         epochs=args.epochs,
         weights=weights,

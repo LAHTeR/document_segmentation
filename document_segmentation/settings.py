@@ -99,7 +99,7 @@ This is used because small inventories can be problematic for training and evalu
 MAX_EMPTY_SEQUENCE: int = 1
 """If an annotated inventory has more than this number of subsequent empty OUT pages, they are replaced with a single OUT page."""
 
-LEARNING_RATE: float = float(os.environ.get("LEARNING_RATE", "0.1"))
+LEARNING_RATE: float = float(os.environ.get("LEARNING_RATE", "0.001"))
 """The default learning rate for the optimizer."""
 WEIGHT_DECAY: float = float(os.environ.get("WEIGHT_DECAY", "1e-4"))
 """The default weight decay for the optimizer."""
