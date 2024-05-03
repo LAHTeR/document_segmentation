@@ -101,7 +101,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         weights: list[float] = None,
         shuffle: bool = True,
         log_wandb: bool = True,
-    ):
+    ) -> dict[str, Any]:
         """Train the model on the given dataset.
 
         Args:
@@ -113,6 +113,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 If None (default), the class weights are computed from the training dataset.
             shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
             log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
+
+        Returns:
+            dict[str, Any]: The state dictionary of the model; the best model if validation data is given, otherwise the last state.
         """
         self.train()
 
@@ -173,6 +176,8 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         else:
             self.wandb_run = None
 
+        best_score = 0
+        best_model = None
         for epoch in range(1, epochs + 1):
             self.train()
 
@@ -222,7 +227,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             if validation_inventories:
                 for sheet_name, _validation in validation_inventories.items():
                     if _validation:
-                        self.eval_(_validation, sheet_name, epoch=epoch, log_pages=True)
+                        self.eval_(_validation, sheet_name, epoch=epoch)
                     else:
                         logging.warning(f"Empty validation set for '{sheet_name}'.")
 
@@ -233,22 +238,36 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     for inventory in values
                 ]
                 if all_validation_inventories:
-                    self.eval_(
-                        all_validation_inventories,
-                        "total",
-                        epoch=epoch,
-                        log_pages=False,
+                    _, _, f1, _, output = self.eval_(
+                        all_validation_inventories, "total", epoch=epoch
                     )
+                    assert (
+                        f1.__class__ == MulticlassF1Score
+                    ), f"Expected F1 score metric, but got '{f1.__class__.__name__}'."
+
+                    score = f1.compute().mean().item()
+                    if best_model is None or score > best_score:
+                        logging.info(
+                            f"New best model found with average F1 score: {score:.4f} (previous: {best_score:.4f})."
+                        )
+                        best_score = score
+                        best_model = self.state_dict()
+
+                        output["Image"] = (
+                            output["ThumbnailHtml"].dropna().apply(wandb.Html)
+                        )
+                        table = wandb.Table(
+                            dataframe=output.drop(
+                                columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                            )
+                        )
+                        self.wandb_run.log({f"{sheet_name}_pages": table})
                 else:
                     logging.warning("All validation sets are empty.")
+        return best_model or self.state_dict()
 
     def eval_(
-        self,
-        inventories: list[Inventory],
-        sheet_name: str,
-        *,
-        epoch: Optional[int] = None,
-        log_pages: bool = True,
+        self, inventories: list[Inventory], sheet_name: str, *, epoch=None
     ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
@@ -256,7 +275,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             inventories (list[Inventory]): The inventories to evaluate.
             sheet_name (str): The name to use for the evaluation logs.
             epoch (Optional[int], optional): The epoch number. Defaults to None.
-            log_pages (bool, optional): Whether to log the pages to Weights & Biases. Defaults to True.
         Returns:
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
@@ -269,7 +287,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         )
         self.eval()
 
-        results: pd.DataFrame = pd.concat(
+        output: pd.DataFrame = pd.concat(
             (
                 self.predict(inventory, *metrics)
                 for inventory in tqdm(
@@ -282,18 +300,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         ).reset_index()
 
         if self.wandb_run is not None:
-            if log_pages:
-                assert (
-                    results.index.is_unique
-                ), f"Index is not unique: {results.loc[results.index.duplicated()]}"
-                results["Image"] = results["ThumbnailHtml"].dropna().apply(wandb.Html)
-                table = wandb.Table(
-                    dataframe=results.drop(
-                        columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
-                    )
-                )
-                self.wandb_run.log({f"{sheet_name}_pages": table})
-
             if epoch is not None:
                 self.wandb_run.log({"epoch": epoch}, commit=False)
 
@@ -310,7 +316,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
             self.wandb_run.log({sheet_name: wandb_metrics})
 
-        return metrics + (results,)
+        return metrics + (output,)
 
     @torch.inference_mode()
     def predict(self, inventory: Inventory, *metrics: Metric) -> pd.DataFrame:
@@ -384,45 +390,32 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             curr = Label(model_output[i].argmax().item())
             next = Label(model_output[i + 1].argmax().item())
 
+            correction = None
             if prev == Label.OUT and next == Label.IN:
-                correct: Label = Label.BEGIN
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
-            elif prev == Label.IN and next == Label.OUT:
-                correct: Label = Label.END
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction: Label = Label.BEGIN
+            elif prev == Label.IN and curr != Label.END_BEGIN and next == Label.OUT:
+                correction: Label = Label.END
             elif (
                 prev == Label.OUT
                 and curr in {Label.BEGIN, Label.END}
                 and next == Label.OUT
             ):
-                correct = Label.END_BEGIN
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction = Label.END_BEGIN
             elif prev == Label.END and curr in {Label.IN, Label.END}:
-                correct = Label.OUT
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction = Label.OUT
             elif prev == Label.BEGIN and curr in {Label.OUT, Label.BEGIN}:
-                correct = Label.IN
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction = Label.IN
+            elif prev == Label.IN and curr == Label.BEGIN:
+                correction = Label.IN
+            elif prev == Label.OUT and curr == Label.END:
+                correction = Label.OUT
+
+            if correction is not None and curr != correction:
+                logging.info(
+                    f"Correcting label from '{curr.name}' to '{correction.name}'."
+                )
+                curr = correction
+
             labels.append(curr)
         labels.append(Label(model_output[-1, :].argmax().item()))
 

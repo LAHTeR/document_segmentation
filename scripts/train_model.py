@@ -6,6 +6,8 @@ from itertools import chain, groupby
 from pathlib import Path
 from typing import Iterable
 
+import torch
+
 from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
 from document_segmentation.pagexml.annotations.renate_analysis import (
@@ -144,13 +146,13 @@ if __name__ == "__main__":
     weights = Inventory.total_class_weights(
         validation_inventories["renate_analysis_inv"]
     )
-    model.train_(
+    best_model = model.train_(
         list(chain(*training_inventories.values())),
         validation_inventories,
         epochs=args.epochs,
         weights=weights,
     )
-    model.save(args.model_file)
+    torch.save(best_model, args.model_file)
 
     logging.debug(str(model))
     model.wandb_run.finish()
@@ -161,6 +163,9 @@ if __name__ == "__main__":
     ########################################################################################
 
     model.wandb_run = None
+    model.load(args.model_file)
+
+    print("Evaluating best model...")
 
     for name, validation in validation_inventories.items():
         print(f"Sheet: {name}", file=args.eval_output)
