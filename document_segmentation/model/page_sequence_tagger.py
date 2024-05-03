@@ -390,45 +390,32 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             curr = Label(model_output[i].argmax().item())
             next = Label(model_output[i + 1].argmax().item())
 
+            correction = None
             if prev == Label.OUT and next == Label.IN:
-                correct: Label = Label.BEGIN
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
-            elif prev == Label.IN and next == Label.OUT:
-                correct: Label = Label.END
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction: Label = Label.BEGIN
+            elif prev == Label.IN and curr != Label.END_BEGIN and next == Label.OUT:
+                correction: Label = Label.END
             elif (
                 prev == Label.OUT
                 and curr in {Label.BEGIN, Label.END}
                 and next == Label.OUT
             ):
-                correct = Label.END_BEGIN
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction = Label.END_BEGIN
             elif prev == Label.END and curr in {Label.IN, Label.END}:
-                correct = Label.OUT
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction = Label.OUT
             elif prev == Label.BEGIN and curr in {Label.OUT, Label.BEGIN}:
-                correct = Label.IN
-                if curr != correct:
-                    logging.info(
-                        f"Correcting label from '{curr.name}' to '{correct.name}'."
-                    )
-                    curr = correct
+                correction = Label.IN
+            elif prev == Label.IN and curr == Label.BEGIN:
+                correction = Label.IN
+            elif prev == Label.OUT and curr == Label.END:
+                correction = Label.OUT
+
+            if correction is not None and curr != correction:
+                logging.info(
+                    f"Correcting label from '{curr.name}' to '{correction.name}'."
+                )
+                curr = correction
+
             labels.append(curr)
         labels.append(Label(model_output[-1, :].argmax().item()))
 
