@@ -417,7 +417,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
                     curr = correct
             elif prev == Label.BEGIN and curr in {Label.OUT, Label.BEGIN}:
-                correct = Label.BEGIN
+                correct = Label.IN
                 if curr != correct:
                     logging.info(
                         f"Correcting label from '{curr.name}' to '{correct.name}'."
