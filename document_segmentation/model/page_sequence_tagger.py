@@ -74,6 +74,50 @@ class PageSequenceTagger(nn.Module, DeviceModule):
     def wandb_run(self, wandb_run: Optional[wandb.run]) -> None:
         self._wandb_run = wandb_run
 
+    def _log_wandb(
+        self,
+        name: str,
+        epoch: int,
+        *,
+        metrics: tuple[Metric] = None,
+        output: pd.DataFrame = None,
+    ) -> dict[str, Any]:
+        """Log metrics and/or output to Weights & Biases.
+
+        Metrics and output can be None, meaning they are not logged.
+
+        Args:
+            name (str): The name of the dataset.
+            epoch (int): The epoch number.
+            metrics (tuple[Metric], optional): The metrics to log. Defaults to None.
+            output (pd.DataFrame, optional): The output to log. Defaults to None.
+        """
+        if self.wandb_run is None:
+            logging.warning("No Weights & Biases run found. Skipping logging.")
+        else:
+            wandb_metrics: dict[str, Any] = {"epoch": epoch}
+
+            for metric in metrics:
+                if metric.average is not None:
+                    score: float = metric.compute().item()
+                else:
+                    score: dict[str, float] = {
+                        label.name: score
+                        for label, score in zip(Label, metric.compute().tolist())
+                    }
+                wandb_metrics[metric.__class__.__name__] = score
+
+            if output is not None:
+                output["Image"] = output["ThumbnailHtml"].dropna().apply(wandb.Html)
+                table = wandb.Table(
+                    dataframe=output.drop(
+                        columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                    )
+                )
+                wandb_metrics[name + "_pages"] = table
+
+        return self.wandb_run.log({"name": wandb_metrics})
+
     def forward(self, pages: list[Page]) -> torch.Tensor:
         page_embeddings = self._page_embedding(pages)
 
@@ -225,9 +269,16 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
 
             if validation_inventories:
+                validation_results: dict[str, pd.DataFrame] = {}
                 for sheet_name, _validation in validation_inventories.items():
                     if _validation:
-                        self.eval_(_validation, sheet_name, epoch=epoch)
+                        precision, recall, f1, accuracy, output = self.eval_(
+                            _validation, sheet_name
+                        )
+                        self._log_wandb(
+                            sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
+                        )
+                        validation_results[sheet_name] = output
                     else:
                         logging.warning(f"Empty validation set for '{sheet_name}'.")
 
@@ -238,43 +289,36 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     for inventory in values
                 ]
                 if all_validation_inventories:
-                    _, _, f1, _, output = self.eval_(
-                        all_validation_inventories, "total", epoch=epoch
+                    sheet_name = "total"
+                    precision, recall, f1, accuracy, output = self.eval_(
+                        all_validation_inventories, sheet_name
+                    )
+                    self._log_wandb(
+                        sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
                     )
                     assert (
                         f1.__class__ == MulticlassF1Score
                     ), f"Expected F1 score metric, but got '{f1.__class__.__name__}'."
-
                     score = f1.compute().mean().item()
-                    if best_model is None or score > best_score:
+                    if score > best_score:
                         logging.info(
                             f"New best model found with average F1 score: {score:.4f} (previous: {best_score:.4f})."
                         )
                         best_score = score
                         best_model = self.state_dict()
-
-                        output["Image"] = (
-                            output["ThumbnailHtml"].dropna().apply(wandb.Html)
-                        )
-                        table = wandb.Table(
-                            dataframe=output.drop(
-                                columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
-                            )
-                        )
-                        self.wandb_run.log({f"{sheet_name}_pages": table})
+                        self._log_wandb(sheet_name, epoch, output=output)
                 else:
                     logging.warning("All validation sets are empty.")
         return best_model or self.state_dict()
 
     def eval_(
-        self, inventories: list[Inventory], sheet_name: str, *, epoch=None
+        self, inventories: list[Inventory], sheet_name: str
     ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
         """Evaluate the model on the given dataset.
 
         Args:
             inventories (list[Inventory]): The inventories to evaluate.
             sheet_name (str): The name to use for the evaluation logs.
-            epoch (Optional[int], optional): The epoch number. Defaults to None.
         Returns:
             tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
                 and a DataFrame containing the results per row.
@@ -298,23 +342,6 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 )
             )
         ).reset_index()
-
-        if self.wandb_run is not None:
-            if epoch is not None:
-                self.wandb_run.log({"epoch": epoch}, commit=False)
-
-            wandb_metrics: dict[str, Any] = {}
-            for metric in metrics:
-                if metric.average is not None:
-                    score: float = metric.compute().item()
-                else:
-                    score: dict[str, float] = {
-                        label.name: score
-                        for label, score in zip(Label, metric.compute().tolist())
-                    }
-                wandb_metrics[metric.__class__.__name__] = score
-
-            self.wandb_run.log({sheet_name: wandb_metrics})
 
         return metrics + (output,)
 
