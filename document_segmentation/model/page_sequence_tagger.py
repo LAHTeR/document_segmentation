@@ -95,9 +95,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         if self.wandb_run is None:
             logging.warning("No Weights & Biases run found. Skipping logging.")
         else:
+            prefix = name + "/"
             wandb_metrics: dict[str, Any] = {"epoch": epoch}
 
-            for metric in metrics:
+            for metric in metrics or []:
                 if metric.average is not None:
                     score: float = metric.compute().item()
                 else:
@@ -105,7 +106,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         label.name: score
                         for label, score in zip(Label, metric.compute().tolist())
                     }
-                wandb_metrics[metric.__class__.__name__] = score
+                wandb_metrics[prefix + metric.__class__.__name__] = score
 
             if output is not None:
                 output["Image"] = output["ThumbnailHtml"].dropna().apply(wandb.Html)
@@ -114,9 +115,9 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
                     )
                 )
-                wandb_metrics[name + "_pages"] = table
+                wandb_metrics[prefix + "pages"] = table
 
-        return self.wandb_run.log({"name": wandb_metrics})
+        return self.wandb_run.log(wandb_metrics)
 
     def forward(self, pages: list[Page]) -> torch.Tensor:
         page_embeddings = self._page_embedding(pages)
@@ -275,6 +276,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         precision, recall, f1, accuracy, output = self.eval_(
                             _validation, sheet_name
                         )
+                        # log metrics per sheet for each epoch
                         self._log_wandb(
                             sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
                         )
@@ -293,12 +295,11 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     precision, recall, f1, accuracy, output = self.eval_(
                         all_validation_inventories, sheet_name
                     )
+                    # Log total metrics
                     self._log_wandb(
                         sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
                     )
-                    assert (
-                        f1.__class__ == MulticlassF1Score
-                    ), f"Expected F1 score metric, but got '{f1.__class__.__name__}'."
+
                     score = f1.compute().mean().item()
                     if score > best_score:
                         logging.info(
@@ -306,7 +307,10 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                         )
                         best_score = score
                         best_model = self.state_dict()
-                        self._log_wandb(sheet_name, epoch, output=output)
+
+                        # log result tables per sheet for new best model
+                        for sheet_name, output in validation_results.items():
+                            self._log_wandb(sheet_name, epoch, output=output)
                 else:
                     logging.warning("All validation sets are empty.")
         return best_model or self.state_dict()
