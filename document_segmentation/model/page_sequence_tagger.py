@@ -225,9 +225,13 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     )
 
             if validation_inventories:
+                validation_results: dict[str, pd.DataFrame] = {}
                 for sheet_name, _validation in validation_inventories.items():
                     if _validation:
-                        self.eval_(_validation, sheet_name, epoch=epoch)
+                        _, _, _, _, output = self.eval_(
+                            _validation, sheet_name, epoch=epoch
+                        )
+                        validation_results[sheet_name] = output
                     else:
                         logging.warning(f"Empty validation set for '{sheet_name}'.")
 
@@ -246,22 +250,23 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                     ), f"Expected F1 score metric, but got '{f1.__class__.__name__}'."
 
                     score = f1.compute().mean().item()
-                    if best_model is None or score > best_score:
+                    if score > best_score:
                         logging.info(
                             f"New best model found with average F1 score: {score:.4f} (previous: {best_score:.4f})."
                         )
                         best_score = score
                         best_model = self.state_dict()
 
-                        output["Image"] = (
-                            output["ThumbnailHtml"].dropna().apply(wandb.Html)
-                        )
-                        table = wandb.Table(
-                            dataframe=output.drop(
-                                columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                        for sheet_name, output in validation_results.items():
+                            output["Image"] = (
+                                output["ThumbnailHtml"].dropna().apply(wandb.Html)
                             )
-                        )
-                        self.wandb_run.log({f"{sheet_name}_pages": table})
+                            table = wandb.Table(
+                                dataframe=output.drop(
+                                    columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                                )
+                            )
+                            self.wandb_run.log({f"{sheet_name}_pages": table})
                 else:
                     logging.warning("All validation sets are empty.")
         return best_model or self.state_dict()
