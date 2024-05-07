@@ -81,6 +81,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         *,
         metrics: tuple[Metric] = None,
         output: pd.DataFrame = None,
+        commit: bool = False,
     ) -> dict[str, Any]:
         """Log metrics and/or output to Weights & Biases.
 
@@ -91,6 +92,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
             epoch (int): The epoch number.
             metrics (tuple[Metric], optional): The metrics to log. Defaults to None.
             output (pd.DataFrame, optional): The output to log. Defaults to None.
+            commit (bool, optional): Whether to commit the log, incrementing the global step. Defaults to False.
         """
         if self.wandb_run is None:
             logging.warning("No Weights & Biases run found. Skipping logging.")
@@ -117,7 +119,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 )
                 wandb_metrics[prefix + "pages"] = table
 
-        return self.wandb_run.log(wandb_metrics)
+        return self.wandb_run.log(wandb_metrics, commit=commit)
 
     def forward(self, pages: list[Page]) -> torch.Tensor:
         page_embeddings = self._page_embedding(pages)
