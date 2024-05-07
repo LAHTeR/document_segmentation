@@ -14,9 +14,18 @@ RENATE_TANAP_CATEGORISATION_SHEET: Path = (
     / "Spreadsheet concerning the TANAP document categorisation (student assistant), Renate Smit.xlsx"
 )
 
-RENATE_ANALYSIS_SHEETS: tuple[Path] = tuple(
-    ANNOTATIONS_DIR.glob("Analysis Renate ????.csv")
-)
+RENATE_ANALYSIS_SHEETS_INVS = [1120, 1267, 1547, 1557, 2775, 3142, 3891, 8284]
+RENATE_ANALYSIS_SHEETS: tuple[Path] = [
+    Path(f"{ANNOTATIONS_DIR}/Analysis Renate {inv:04d}.csv")
+    for inv in RENATE_ANALYSIS_SHEETS_INVS
+]
+assert all(
+    file.exists() for file in RENATE_ANALYSIS_SHEETS
+), f"Could not find all Renate Analysis sheets in: {RENATE_ANALYSIS_SHEETS}"
+
+for file in ANNOTATIONS_DIR.glob("Analysis Renate ????.csv"):
+    if file not in RENATE_ANALYSIS_SHEETS:
+        logging.warning(f"Ignoring sheet: '{file}'")
 
 GENERALE_MISSIVEN_SHEET: Path = (
     ANNOTATIONS_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
