@@ -133,7 +133,6 @@ if __name__ == "__main__":
     for sheet, _inventories in inventories.items():
         random.shuffle(_inventories)
         split = int(len(_inventories) * args.split)
-        inventories[sheet] = random.sample(_inventories, max_inventories)
 
         training_inventories[sheet] = _inventories[:split]
         validation_inventories[sheet] = _inventories[split:]
