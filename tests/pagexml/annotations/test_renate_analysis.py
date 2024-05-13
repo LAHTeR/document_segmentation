@@ -8,7 +8,7 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysisInv,
 )
 from document_segmentation.pagexml.datamodel.inventory import Inventory
-from document_segmentation.pagexml.datamodel.label import Label
+from document_segmentation.pagexml.datamodel.label import Label, Tanap
 
 from ...conftest import DATA_DIR
 
@@ -42,6 +42,16 @@ class TestRenateAnalysis:
 
         assert preprocessed.labels() == expected_labels
         assert [page.scan_nr for page in preprocessed.pages] == expected_scan_nrs
+
+    def test_documents(self, test_sheet):
+        expected_labels = 3 * [Tanap.DAGREGISTERS]
+        expected_lengths = [60, 42, 68]
+
+        for document, label, length in zip(
+            test_sheet.documents(), expected_labels, expected_lengths
+        ):
+            assert document.label == label
+            assert len(document) == length
 
 
 class TestRenateAnalysisInv:

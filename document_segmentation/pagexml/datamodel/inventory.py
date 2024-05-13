@@ -88,7 +88,7 @@ class Inventory(BaseModel, Dataset):
 
     def annotate_scan(self, scan_nr: int, label: Label):
         try:
-            page: Page = self.get_scan(scan_nr)
+            _, page = self.get_scan(scan_nr)
             page.annotate(label)
         except IndexError as e:
             raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
@@ -159,12 +159,38 @@ class Inventory(BaseModel, Dataset):
             assert doc, f"Empty document in inventory {self.inv_nr}: {documents}"
         return documents
 
-    def get_scan(self, scan_nr: int) -> Page:
+    def get_scan(self, scan_nr: int) -> tuple[int, Page]:
         """Get the page with the given scan number."""
-        try:
-            return next((page for page in self.pages if page.scan_nr == scan_nr))
-        except StopIteration as e:
-            raise IndexError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
+        for i, page in enumerate(self.pages):
+            if page.scan_nr == scan_nr:
+                return i, page
+        else:
+            raise IndexError(f"Scan {scan_nr} not in inventory ({str(self)})")
+
+    def get_scans(self, start_scan_nr: int, end_scan_nr: int) -> list[Page]:
+        """Get the pages with the given scan numbers.
+
+        This assumes that the scans in the given range are a consecutive sequence.
+
+        Args:
+            start_scan_nr (int): The start scan number (inclusive).
+            end_scan_nr (int): The end scan number (exclusive).
+
+        Returns:
+            list[Page]: The pages with the given scan numbers.
+
+        Raises:
+            RuntimeError: If the difference between start and end scan numbers is not equal to the number of consecutive pages.
+        """
+        start_index, _ = self.get_scan(start_scan_nr)
+        pages: list[Page] = self.pages[
+            start_index : start_index + (end_scan_nr - start_scan_nr)
+        ]
+        if not pages[-1].scan_nr == end_scan_nr - 1:
+            raise RuntimeError(
+                f"Scan nr of last page does not match requested end scan nr {end_scan_nr}: {pages[-1]}"
+            )
+        return pages
 
     def head(self, n: int) -> "Inventory":
         if (not n) or (len(self) <= n):
@@ -300,8 +326,8 @@ class Inventory(BaseModel, Dataset):
 
     def remove_scan(self, scan_nr: int) -> "Inventory":
         """Remove the page with the given scan number."""
-        page = self.get_scan(scan_nr)
-        self.pages.remove(page)
+        i, _ = self.get_scan(scan_nr)
+        self.pages.pop(i)
 
     def remove_empty_pages(
         self, *, max_length: int = MAX_EMPTY_SEQUENCE, label: Label = Label.OUT

@@ -157,8 +157,19 @@ class TestInventory:
         inventory = Inventory.load(inventory_nr, "", DATA_DIR)
 
         for scan_nr in range(1, expected_length + 1):
-            assert inventory.get_scan(scan_nr).scan_nr == scan_nr
-            assert inventory.get_scan(scan_nr) == inventory.pages[scan_nr - 1]
+            i, page = inventory.get_scan(scan_nr)
+            assert page.scan_nr == scan_nr
+            assert page == inventory.pages[scan_nr - 1]
+
+    @pytest.mark.parametrize(
+        "inventory_nr, start, end, expected_scan_nrs",
+        [(1105, 667, 670, [667, 668, 669])],
+    )
+    def test_get_scans(self, inventory_nr, start, end, expected_scan_nrs):
+        assert [
+            page.scan_nr
+            for page in Inventory.load(inventory_nr, "", DATA_DIR).get_scans(start, end)
+        ] == expected_scan_nrs
 
     @pytest.mark.parametrize(
         "inventory_nr, doc_id, expected",

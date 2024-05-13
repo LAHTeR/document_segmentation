@@ -1,12 +1,14 @@
 import logging
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 import pandas as pd
+from tqdm import tqdm
 
 from ...settings import INVENTORY_DIR, RENATE_TANAP_CATEGORISATION_SHEET
+from ..datamodel.document import Document
 from ..datamodel.inventory import Inventory
-from ..datamodel.label import Label
+from ..datamodel.label import Label, Tanap
 from ..datamodel.page import Page
 from .sheet import Sheet
 
@@ -34,9 +36,35 @@ class RenateAnalysis(Sheet):
             self._data[self._DEEL_VAN_INVENTARIS_COL].replace({"0": pd.NA}).fillna("")
         )
 
+        # self._categories = pd.read_excel(
+        #     sheet_file, sheet_name="Categoriecodes", index_col="Code"
+        # )
+        # self._tanap = pd.read_excel(sheet_file, sheet_name="TANAP", index_col="ID")
+
     def annotated_rows(self, inventory: Inventory) -> pd.DataFrame:
         # TODO: use child documents where available
         return super().annotated_rows(inventory)
+
+    def documents(self, *, n: Optional[int] = None) -> Iterable[Document]:
+        categories = self._data.loc[
+            pd.notna(self._data["Code TANAP document category"])
+        ].head(n)
+
+        for _, row in tqdm(
+            categories.iterrows(),
+            desc="Reading docs",
+            total=len(categories),
+            unit="row",
+        ):
+            inventory = Inventory.load_or_download(
+                row[self._INV_NR_COLUMN], row[self._DEEL_VAN_INVENTARIS_COL]
+            )
+            yield Document(
+                pages=inventory.get_scans(
+                    row[self._START_PAGE_COLUMN], row[self._LAST_PAGE_COLUMN] + 1
+                ),
+                label=Tanap(int(row["Code TANAP document category"])),
+            )
 
 
 class RenateAnalysisInv(Sheet):
