@@ -48,4 +48,4 @@ class GeneraleMissiven(Sheet):
         if label == Label.OUT:
             return label.combined(FrontMatter.EMPTY)
         else:
-            return label.combined(Tanap.CORRESPONDENTIE_GOUVERNEUR)
+            return label.combined(Tanap.BRIEVEN_BATAVIA)
