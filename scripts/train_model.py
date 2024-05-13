@@ -101,28 +101,32 @@ if __name__ == "__main__":
 
     inventories: dict[str, Iterable[Inventory]] = {}
 
-    max_inventories: int = args.max_inventories
+    # assuming 'renate_analysis_sheet' is the smallest category, so we down-sample to this
+    max_inventories: int = args.max_inventories or len(args.renate_analysis_sheet)
+
+    if args.renate_categorisation_sheet:
+        filepath = Path(args.renate_categorisation_sheet)
+        ra_sheet = RenateAnalysis(filepath)
+        inventories[filepath.name] = list(
+            ra_sheet.all_annotated_inventories(n=max_inventories)
+        )
+    else:
+        raise ValueError(
+            "No Renate Analysis sheet provided, but required for looking up categories."
+        )
 
     if args.renate_analysis_sheet:
         inventories["renate_analysis_inv"] = [
             inventory
             for file in args.renate_analysis_sheet[:max_inventories]
-            for inventory in RenateAnalysisInv(Path(file)).all_annotated_inventories()
+            for inventory in RenateAnalysisInv(
+                Path(file), ra_sheet=ra_sheet
+            ).all_annotated_inventories(skip_errors=False)
         ]
-        if max_inventories is None:
-            # assuming this is the smallest category, so we down-sample to this
-            max_inventories = len(inventories["renate_analysis_inv"])
 
     if args.gm_sheet:
         filepath = Path(args.gm_sheet)
         sheet = GeneraleMissiven(filepath)
-        inventories[filepath.name] = list(
-            sheet.all_annotated_inventories(n=max_inventories)
-        )
-
-    if args.renate_categorisation_sheet:
-        filepath = Path(args.renate_categorisation_sheet)
-        sheet = RenateAnalysis(filepath)
         inventories[filepath.name] = list(
             sheet.all_annotated_inventories(n=max_inventories)
         )

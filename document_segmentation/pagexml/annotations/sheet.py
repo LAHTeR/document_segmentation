@@ -138,19 +138,19 @@ class Sheet(abc.ABC):
             try:
                 document: list[Page] = (
                     [
-                        inventory.get_scan(begin_scan, row).annotate(
-                            self.combined_label(Label.BEGIN)
+                        inventory.get_scan(begin_scan).annotate(
+                            self.combined_label(Label.BEGIN, row)
                         )
                     ]
                     + [
-                        inventory.get_scan(scan_nr, row).annotate(
-                            self.combined_label(Label.IN)
+                        inventory.get_scan(scan_nr).annotate(
+                            self.combined_label(Label.IN, row)
                         )
                         for scan_nr in range(begin_scan + 1, end_scan)
                     ]
                     + [
-                        inventory.get_scan(end_scan, row).annotate(
-                            self.combined_label(Label.END)
+                        inventory.get_scan(end_scan).annotate(
+                            self.combined_label(Label.END, row)
                         )
                     ]
                 )
