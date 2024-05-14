@@ -133,22 +133,24 @@ class Sheet(abc.ABC):
 
             try:
                 document: list[Page] = (
-                    [inventory.get_scan(begin_scan).annotate(Label.BEGIN)]
+                    [inventory.get_scan(begin_scan).annotate(Label.BOUNDARY)]
                     + [
                         inventory.get_scan(scan_nr).annotate(Label.IN)
                         for scan_nr in range(begin_scan + 1, end_scan)
                     ]
-                    + [inventory.get_scan(end_scan).annotate(Label.END)]
+                    + [inventory.get_scan(end_scan).annotate(Label.BOUNDARY)]
                 )
+
                 # remove redundant BEGIN_END pages
+                # TODO: do we still need this?
                 redundant: list[int] = []
                 for i, page in enumerate(document[:-1]):
-                    if page.label == Label.END_BEGIN:
+                    if page.label == Label.BOUNDARY:
                         next_page = document[i + 1]
                         if next_page.scan_nr == page.scan_nr:
                             assert (
-                                next_page.label == Label.END_BEGIN
-                            ), f"Expected two subsequent END_BEGIN labels, got '{page}', '{next_page}'"
+                                next_page.label == Label.BOUNDARY
+                            ), f"Expected two subsequent BOUNDARY labels, got '{page}', '{next_page}'"
                             redundant.append(i)
                 for i in reversed(redundant):
                     document.pop(i)
@@ -164,12 +166,13 @@ class Sheet(abc.ABC):
             for document in documents:
                 if last_scan == 0 or document[0].scan_nr - 1 > last_scan:
                     # Insert empty page between documents
+                    # TODO: randomize number of empty pages (e.g. 0-5)?
                     pages.append(
                         Page(
                             label=Label.OUT,
                             scan_nr=last_scan + 1,
                             external_ref="",
-                            regions=[],
+                            regions=[],  # empty page
                         )
                     )
                 pages.extend(document)

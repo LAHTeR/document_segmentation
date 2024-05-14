@@ -8,23 +8,11 @@ class Label(IntEnum):
 
     UNK = 0
     """No annotation available."""
-    BEGIN = 1
-    START = 1
-    """The beginning of a document."""
+    BOUNDARY = 1
+    """The beginning or end of a document."""
     IN = 2
     """Part of a document."""
-    END = 3
-    """The end of a document."""
-    OUT = 4
-    """Not part of any document."""
-    END_BEGIN = 5
-    END_START = 5
-    START_END = 5
-    END_START_END = 5
-    START_END_START = 5
-    END_START_END_START = 5
-    START_END_START_END = 5
-    """Page on which a document ends, and another one begins"""
+    OUT = 3
 
     def to_list(self) -> list[int]:
         """Convert the label to a list of integers.

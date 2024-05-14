@@ -425,23 +425,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
             correction = None
             if prev == Label.OUT and next == Label.IN:
-                correction: Label = Label.BEGIN
-            elif prev == Label.IN and curr != Label.END_BEGIN and next == Label.OUT:
-                correction: Label = Label.END
-            elif (
-                prev == Label.OUT
-                and curr in {Label.BEGIN, Label.END}
-                and next == Label.OUT
-            ):
-                correction = Label.END_BEGIN
-            elif prev == Label.END and curr in {Label.IN, Label.END}:
-                correction = Label.OUT
-            elif prev == Label.BEGIN and curr in {Label.OUT, Label.BEGIN}:
-                correction = Label.IN
-            elif prev == Label.IN and curr == Label.BEGIN:
-                correction = Label.IN
-            elif prev == Label.OUT and curr == Label.END:
-                correction = Label.OUT
+                correction: Label = Label.BOUNDARY
 
             if correction is not None and curr != correction:
                 logging.info(
