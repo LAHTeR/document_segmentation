@@ -39,8 +39,9 @@ class Page(BaseModel):
         If the label has already been set to BEGIN or END, it is changed to END_BEGIN.
         """
         if self.label:
-            logging.warning(
-                f"Overwriting label '{self.label.name}' with '{label.name}'. Scan: {self}"
+            logging.log(
+                level=logging.INFO if label == self.label else logging.WARNING,
+                msg=f"Overwriting label '{self.label.name}' with '{label.name}'. Scan: {self}",
             )
 
         self.label = label

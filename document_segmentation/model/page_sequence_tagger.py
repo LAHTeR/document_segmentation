@@ -428,7 +428,7 @@ class PageSequenceTagger(nn.Module, DeviceModule):
                 correction: Label = Label.BOUNDARY
 
             if correction is not None and curr != correction:
-                logging.info(
+                logging.warning(
                     f"Correcting label from '{curr.name}' to '{correction.name}'."
                 )
                 curr = correction
