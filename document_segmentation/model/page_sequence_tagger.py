@@ -406,6 +406,19 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         return pd.DataFrame(rows)
 
+    def predict_documents(self, inventory: Inventory) -> list[list[Page]]:
+        """Predict page labels and extract the documents from the inventory.
+
+        Args:
+            inventory (Inventory): The inventory to get the documents from.
+        Returns:
+            list[list[Page]]: A list of documents, each represented as a list of pages.
+        """
+        predictions: pd.DataFrame = self.predict(inventory)
+        for page, label in zip(inventory.pages, predictions["Predicted"]):
+            page.annotate(Label[label])
+        return inventory.get_documents()
+
     @staticmethod
     def _prediction_heuristics(model_output: torch.Tensor) -> list[Label]:
         """Convert model output tensor to the predicted labels, using argmax and heuristics.

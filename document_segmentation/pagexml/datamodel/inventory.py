@@ -93,6 +93,72 @@ class Inventory(BaseModel, Dataset):
         except IndexError as e:
             raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
 
+    def get_documents(self) -> list[list[Page]]:
+        """Get the documents in the inventory based on page labels.
+
+        Returns:
+            list[list[Page]]: A list of documents, where each document is a list of pages.
+        """
+
+        documents: list[list[Page]] = []
+        if self.pages[0].label in {Label.BOUNDARY, Label.IN}:
+            logging.warning(
+                f"First page {self.pages[0]} of inventory {self} is part of a document."
+            )
+            doc = [self.pages[0]]
+        else:
+            doc = None
+
+        # first and last pages ([0],[-1]) are never part of a document
+        for prev, page in zip(self.pages[:-2], self.pages[1:-1], strict=True):
+            # validate current state
+            if prev.label == Label.OUT and doc is not None:
+                raise RuntimeError(
+                    f"Page {page.scan_nr} is inside a document, but no document has been started."
+                )
+
+            if page.label == Label.UNK:
+                logging.warning(
+                    f"Unlabelled page {page.scan_nr} in inventory {self.inv_nr}"
+                )
+
+            # process page label
+            if page.label == Label.BOUNDARY:
+                if prev.label == Label.OUT:
+                    # Start of new document
+                    doc = [page]
+                elif prev.label == Label.IN:
+                    # End of document
+                    doc.append(page)
+                    documents.append(doc)
+                    doc = None
+                elif prev.label == Label.BOUNDARY:
+                    if doc is not None:
+                        documents.append(doc)  # finish previous document
+                    doc = [page]  # start new document
+            if page.label == Label.IN:
+                if doc is None:
+                    raise ValueError(
+                        f"Page {page.scan_nr} is inside a document, but no document has been started. Previous: {prev}"
+                    )
+                if prev.label == Label.OUT:
+                    logging.error(f"Invalid label sequence: {prev} -> {page}.")
+                    doc = []
+                doc.append(page)
+            elif page.label == Label.OUT:
+                if prev.label == Label.IN:
+                    logging.error(f"Invalid label sequence: {prev} -> {page}")
+                    documents.append(doc)
+                    doc = None
+                elif doc and prev.label == Label.BOUNDARY:
+                    # Previous page was a single page document
+                    documents.append(doc)
+                    doc = None
+
+        for doc in documents:
+            assert doc, f"Empty document in inventory {self.inv_nr}: {documents}"
+        return documents
+
     def get_scan(self, scan_nr: int) -> Page:
         """Get the page with the given scan number."""
         try:
