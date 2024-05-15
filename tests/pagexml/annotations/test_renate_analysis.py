@@ -19,7 +19,7 @@ class TestRenateAnalysis:
         return RenateAnalysis()
 
     def test_annotate_inventory(self, test_sheet):
-        expected_labels = {1: Label.OUT, 114: Label.END_BEGIN, 115: Label.OUT}
+        expected_labels = {1: Label.OUT, 114: Label.BOUNDARY, 115: Label.OUT}
 
         for page in test_sheet.annotate_inventory(
             Inventory.load(2542, "", DATA_DIR)
@@ -33,7 +33,7 @@ class TestRenateAnalysis:
         inventory = Inventory.load(2542, "", DATA_DIR)
         assert len(inventory) == 2052
 
-        expected_labels = [Label.OUT, Label.END_BEGIN, Label.OUT]
+        expected_labels = [Label.OUT, Label.BOUNDARY, Label.OUT]
         expected_scan_nrs = [1, 114, 115]
 
         preprocessed: Inventory = test_sheet.preprocess(
@@ -54,12 +54,6 @@ class TestRenateAnalysisInv:
         """Test the initialization of the RenateAnalysisInv class."""
         sheet = RenateAnalysisInv(sheet_file, inventory_dir=tmp_path)
 
-        for label in sheet._data[RenateAnalysisInv._LABEL_COLUMN]:
-            try:
-                Label[label]
-            except KeyError:
-                assert label == ""
-
         assert len(sheet) == 690
         assert sheet._id == "Analysis Renate 1547"
         assert sheet.inventory_numbers() == [(1547, "")]
@@ -69,48 +63,48 @@ class TestRenateAnalysisInv:
         """Test the annotation of an inventory with the RenateAnalysisInv class."""
         expected_labels = (
             [Label.OUT] * 14
-            + [Label.BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 3
-            + [Label.END]
+            + [Label.BOUNDARY]
             + [Label.OUT] * 7
-            + [Label.BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 68
-            + [Label.END]
+            + [Label.BOUNDARY]
             + [Label.OUT] * 2
-            + [Label.BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 6
-            + [Label.END]
-            + [Label.BEGIN]
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
+            + [Label.BOUNDARY]
+            + [Label.BOUNDARY]
             + [Label.IN]
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN]
-            + [Label.END]
+            + [Label.BOUNDARY]
             + [Label.OUT] * 6
-            + [Label.BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 115
-            + [Label.END]
+            + [Label.BOUNDARY]
             + [Label.OUT]
-            + [Label.BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 2
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 3
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN]
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 3
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 5
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN] * 3
-            + [Label.END_BEGIN]
+            + [Label.BOUNDARY]
             + [Label.IN]
-            + [Label.END_BEGIN] * 2
+            + [Label.BOUNDARY] * 2
             + [Label.IN]
-            + [Label.END]
-            + [Label.BEGIN]
+            + [Label.BOUNDARY]
+            + [Label.BOUNDARY]
             + [Label.IN] * 5
-            + [Label.END]
+            + [Label.BOUNDARY]
             + [Label.OUT] * 2
         )
 

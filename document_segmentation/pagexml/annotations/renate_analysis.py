@@ -77,7 +77,7 @@ class RenateAnalysisInv(Sheet):
             )
 
         in_doc: bool = False
-        """Inside a document or not."""
+        """Inside a document?"""
 
         for idx, row in self._data.sort_index().iterrows():
             scan_nr = int(idx[-4:])
@@ -89,38 +89,23 @@ class RenateAnalysisInv(Sheet):
 
             if annotation and not annotation.startswith("SAME AS"):
                 # sheet provides annotation for page (BEGIN or END)
-                label: Label = Label[annotation.replace("/", "_")]
-
-                error_message = f"Unexpected label: '{annotation}' ('{label.name}') for scan '{scan_nr}' for inventory '{inventory}' in sheet '{self}."
-
-                if label == Label.BEGIN:
-                    if in_doc:
-                        label = Label.END_BEGIN
-                    in_doc = True
-                elif label == Label.END:
-                    if not in_doc:
-                        logging.error(error_message)
-                    in_doc = False
-                elif label == Label.END_BEGIN:
-                    if annotation.startswith("END") and not in_doc:
-                        raise ValueError(error_message)
-                    in_doc = annotation[-5:] in {"START", "BEGIN"}
-                else:
-                    raise ValueError(error_message)
+                if "START" in annotation or "END" in annotation:
+                    label = Label.BOUNDARY
+                    # is last element of the annotation "START" or "END"?
+                    in_doc = annotation.split("/")[-1] == "START"
+            elif in_doc:
+                label = Label.IN
             else:
-                # No annotation for scan
-                label = Label.IN if in_doc else Label.OUT
+                label = Label.OUT
 
             inventory.annotate_scan(scan_nr, label)
 
-        for scan in inventory.pages:
-            unlabelled: list[Page] = [
-                page for page in inventory.pages if page.label == Label.UNK
-            ]
-            if unlabelled:
-                logging.error(
-                    f"Removing un-annotated pages in inventory {inventory}: {unlabelled}"
-                )
-                for page in unlabelled:
-                    inventory.remove_scan(page.scan_nr)
+        unlabelled: list[Page] = [
+            page for page in inventory.pages if page.label == Label.UNK
+        ]
+        for page in unlabelled:
+            logging.warning(
+                f"Removing un-annotated page in inventory {inventory}: {page}"
+            )
+            inventory.remove_scan(page.scan_nr)
         return inventory

@@ -38,23 +38,13 @@ class Page(BaseModel):
 
         If the label has already been set to BEGIN or END, it is changed to END_BEGIN.
         """
-        if label != self.label:
-            if self.label == Label.UNK:
-                self.label = label
-            elif (self.label == Label.BEGIN and label == Label.END) or (
-                self.label == Label.END and label == Label.BEGIN
-            ):
-                new_label = Label.END_BEGIN
-                logging.info(
-                    f"Scan {self} already has label: {self.label.name}. Changing to {new_label.name}"
-                )
-                self.label = new_label
-            else:
-                logging.error(
-                    f"Scan {self} already has label: {self.label.name}. Ignoring new label: '{label.name}'"
-                )
-        else:
-            logging.info(f"Scan {self} already has label: {label.name}.")
+        if self.label:
+            logging.log(
+                level=logging.INFO if label == self.label else logging.WARNING,
+                msg=f"Overwriting label '{self.label.name}' with '{label.name}'. Scan: {self}",
+            )
+
+        self.label = label
         return self
 
     def is_shorter_than(self, *, max_chars=MIN_REGION_TEXT_LENGTH) -> bool:

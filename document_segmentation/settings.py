@@ -14,18 +14,9 @@ RENATE_TANAP_CATEGORISATION_SHEET: Path = (
     / "Spreadsheet concerning the TANAP document categorisation (student assistant), Renate Smit.xlsx"
 )
 
-RENATE_ANALYSIS_SHEETS_INVS = [1120, 1267, 1547, 1557, 2775, 3142, 3891, 8284]
-RENATE_ANALYSIS_SHEETS: tuple[Path] = [
-    Path(f"{ANNOTATIONS_DIR}/Analysis Renate {inv:04d}.csv")
-    for inv in RENATE_ANALYSIS_SHEETS_INVS
-]
-assert all(
-    file.exists() for file in RENATE_ANALYSIS_SHEETS
-), f"Could not find all Renate Analysis sheets in: {RENATE_ANALYSIS_SHEETS}"
-
-for file in ANNOTATIONS_DIR.glob("Analysis Renate ????.csv"):
-    if file not in RENATE_ANALYSIS_SHEETS:
-        logging.warning(f"Ignoring sheet: '{file}'")
+RENATE_ANALYSIS_SHEETS: tuple[Path] = list(
+    ANNOTATIONS_DIR.glob("Analysis Renate ????.csv")
+)
 
 GENERALE_MISSIVEN_SHEET: Path = (
     ANNOTATIONS_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
@@ -76,22 +67,22 @@ Shorter regions are filtered out during training and inference."""
 REGION_TYPE_EMBEDDING_SIZE: int = 16
 """Size for the RegionType embedding layer"""
 
-REGION_EMBEDDING_OUTPUT_SIZE: int = 2**9
+REGION_EMBEDDING_OUTPUT_SIZE: int = 2**7
 """Output size for the (linear) RegionEmbedding output layer"""
 
 PAGE_EMBEDDING_RNN_CONFIG: dict[str, Any] = {
-    "hidden_size": 2**8,
+    "hidden_size": 2**6,
     "num_layers": 2,
     "dropout": 0.1,
     "bidirectional": True,
 }
 """Default configuration for the RNN module in the PageEmbedding"""
 
-PAGE_EMBEDDING_OUTPUT_SIZE: int = 2**8
+PAGE_EMBEDDING_OUTPUT_SIZE: int = 2**6
 """Default output size for the PageEmbedding linear output layer"""
 
 PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
-    "hidden_size": 2**8,
+    "hidden_size": 2**6,
     "num_layers": 2,
     "dropout": 0.1,
     "bidirectional": True,

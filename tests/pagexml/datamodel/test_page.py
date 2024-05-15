@@ -18,7 +18,7 @@ class TestPage:
         )
 
         expected_page = Page(
-            label=Label.BEGIN, regions=[], scan_nr=617, external_ref="test_ref"
+            label=Label.BOUNDARY, regions=[], scan_nr=617, external_ref="test_ref"
         )
         page = Page.model_validate_json(json)
 
@@ -29,7 +29,7 @@ class TestPage:
 
     def test_from_pagexml(self, tmp_path):
         expected_page = {
-            "label": Label.BEGIN,
+            "label": Label.BOUNDARY,
             "scan_nr": 1,
             "doc_id": "NL-HaNA_1.04.02_1201_0001.jpg",
             "external_ref": "a37e52e8-c9af-4b0f-8390-df846024830a",
@@ -47,7 +47,7 @@ class TestPage:
         with ZipFile(TEST_FILE, "r") as zip_ref:
             pagexml = parse_pagexml_file(zip_ref.extract(filename, tmp_path))
 
-            page = Page.from_pagexml(Label.BEGIN, 1, pagexml)
+            page = Page.from_pagexml(Label.BOUNDARY, 1, pagexml)
 
             for key, value in expected_page.items():
                 assert getattr(page, key) == value

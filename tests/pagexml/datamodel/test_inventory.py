@@ -68,20 +68,20 @@ class TestInventory:
             ],
         )
 
-        expected_labels = [Label.UNK, Label.BEGIN, Label.UNK]
-        inventory.annotate_scan(2, Label.BEGIN)
+        expected_labels = [Label.UNK, Label.BOUNDARY, Label.UNK]
+        inventory.annotate_scan(2, Label.BOUNDARY)
 
         for page, expected_label in zip(inventory.pages, expected_labels):
             assert page.label == expected_label
 
         # END and BEGIN on the same page:
-        inventory.annotate_scan(2, Label.END)
-        assert inventory.pages[1].label == Label.END_BEGIN
+        inventory.annotate_scan(2, Label.BOUNDARY)
+        assert inventory.pages[1].label == Label.BOUNDARY
 
         # Invalid scan numbers:
         with pytest.raises(ValueError):
-            inventory.annotate_scan(0, Label.END)
-            inventory.annotate_scan(4, Label.END)
+            inventory.annotate_scan(0, Label.BOUNDARY)
+            inventory.annotate_scan(4, Label.BOUNDARY)
 
     # TODO: test for files with inventory parts (both valid ("A" and invalid ("1"))
     @pytest.mark.parametrize("mock_request", [1201], indirect=True)
@@ -286,7 +286,7 @@ class TestInventory:
     @pytest.mark.parametrize(
         "inventories, expected",
         [
-            ([], [0.0] * 6),
+            ([], [0.0] * 4),
             (
                 [
                     Inventory(
@@ -302,7 +302,7 @@ class TestInventory:
                         ],
                     )
                 ],
-                [0.0, 1.0, 1.0, 1.0, 0.5, 1.0],
+                [0.0, 1.0, 1.0, 0.5],
             ),
             (
                 [
@@ -329,7 +329,7 @@ class TestInventory:
                                 regions=[],
                             ),
                             Page(
-                                label=Label.BEGIN,
+                                label=Label.BOUNDARY,
                                 scan_nr=1,
                                 external_ref="test_ref",
                                 regions=[],
@@ -337,7 +337,7 @@ class TestInventory:
                         ],
                     ),
                 ],
-                [0.0, 1.5, 3.0, 3.0, 1.0, 3.0],
+                [0.0, 1.5, 3.0, 1.0],
             ),
         ],
     )
