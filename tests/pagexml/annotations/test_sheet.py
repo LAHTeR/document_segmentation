@@ -16,7 +16,7 @@ class TestSheet:
 
     @pytest.mark.parametrize(
         "sheet, length, min_inv, max_inv",
-        [(RenateAnalysis(), 139, 1055, 8935), (GeneraleMissiven(), 914, 1068, 7957)],
+        [(RenateAnalysis(), 162, 1055, 10426), (GeneraleMissiven(), 914, 1068, 7957)],
     )
     def test_init(self, sheet, length, min_inv, max_inv):
         """Read the sheet and check the length and inventory numbers."""
@@ -36,7 +36,7 @@ class TestGeneraleMissiven:
         return GeneraleMissiven(GENERALE_MISSIVEN_CSV, inventory_dir=tmp_path)
 
     def test_annotate_inventory(self, test_sheet):
-        expected_labels = {1: Label.OUT, 919: Label.END_BEGIN, 920: Label.OUT}
+        expected_labels = {1: Label.OUT, 919: Label.BOUNDARY, 920: Label.OUT}
 
         for page in test_sheet.annotate_inventory(
             Inventory.load(1105, "", DATA_DIR)
