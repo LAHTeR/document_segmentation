@@ -67,22 +67,22 @@ Shorter regions are filtered out during training and inference."""
 REGION_TYPE_EMBEDDING_SIZE: int = 16
 """Size for the RegionType embedding layer"""
 
-REGION_EMBEDDING_OUTPUT_SIZE: int = 2**9
+REGION_EMBEDDING_OUTPUT_SIZE: int = 2**7
 """Output size for the (linear) RegionEmbedding output layer"""
 
 PAGE_EMBEDDING_RNN_CONFIG: dict[str, Any] = {
-    "hidden_size": 2**8,
+    "hidden_size": 2**6,
     "num_layers": 2,
     "dropout": 0.1,
     "bidirectional": True,
 }
 """Default configuration for the RNN module in the PageEmbedding"""
 
-PAGE_EMBEDDING_OUTPUT_SIZE: int = 2**8
+PAGE_EMBEDDING_OUTPUT_SIZE: int = 2**6
 """Default output size for the PageEmbedding linear output layer"""
 
 PAGE_SEQUENCE_TAGGER_RNN_CONFIG: dict[str, Any] = {
-    "hidden_size": 2**8,
+    "hidden_size": 2**6,
     "num_layers": 2,
     "dropout": 0.1,
     "bidirectional": True,
