@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 import torch
+import wandb
 
 from document_segmentation.model.page_sequence_tagger import PageSequenceTagger
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
@@ -154,7 +155,15 @@ if __name__ == "__main__":
     torch.save(best_model, args.model_file)
 
     logging.debug(str(model))
-    model.wandb_run.finish()
+
+    if model.wandb_run:
+        artifact = wandb.Artifact(
+            name=model.__class__.__name__ + "_model", type="model"
+        )
+        artifact.add_file(str(args.model_file))
+        model.wandb_run.log_artifact(artifact)
+
+        model.wandb_run.finish()
 
     ########################################################################################
     # EVALUATE MODEL
