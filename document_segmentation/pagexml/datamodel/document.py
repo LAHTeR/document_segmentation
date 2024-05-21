@@ -1,3 +1,5 @@
+from collections import Counter
+
 from pydantic import BaseModel
 
 from .label import Tanap
@@ -10,3 +12,9 @@ class Document(BaseModel):
 
     def __len__(self):
         return len(self.pages)
+
+    def labels(self):
+        return [page.label for page in self.pages]
+
+    def class_counts(self):
+        return Counter(self.labels())

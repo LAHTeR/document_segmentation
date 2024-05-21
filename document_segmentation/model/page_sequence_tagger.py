@@ -1,40 +1,22 @@
 import logging
-import random
-from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
 import torch
-import torch.nn as nn
 import wandb
-from torch import optim
-from torcheval.metrics import (
-    Metric,
-    MulticlassAccuracy,
-    MulticlassF1Score,
-    MulticlassPrecision,
-    MulticlassRecall,
-)
-from tqdm import tqdm
+from torcheval.metrics import Metric
 
-from .. import settings
 from ..pagexml.datamodel.inventory import (
     Inventory,
     ThumbnailDownloader,
 )
 from ..pagexml.datamodel.label import Label
 from ..pagexml.datamodel.page import Page
-from ..settings import (
-    LEARNING_RATE,
-    MAX_INVENTORY_SIZE,
-    PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
-    WEIGHT_DECAY,
-)
-from .device_module import DeviceModule
-from .page_embedding import PageEmbedding
+from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
+from .page_learner import AbstractPageLearner
 
 
-class PageSequenceTagger(nn.Module, DeviceModule):
+class PageSequenceTagger(AbstractPageLearner):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
     def __init__(
@@ -44,27 +26,12 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         device: Optional[str] = None,
         thumbnail_downloader: ThumbnailDownloader = ThumbnailDownloader.from_file(),
     ) -> None:
-        super().__init__()
-
-        self._thumbnail_downloader = thumbnail_downloader
-
-        self._page_embedding = PageEmbedding(device=device)
-
-        # LSTM, because GRU does not seem not to work on MPS: https://github.com/pytorch/pytorch/issues/94691
-        self._rnn = nn.LSTM(
-            input_size=self._page_embedding.output_size, batch_first=True, **rnn_config
+        super().__init__(
+            label_type=Label,
+            rnn_config=rnn_config,
+            device=device,
+            thumbnail_downloader=thumbnail_downloader,
         )
-
-        self._linear = nn.Linear(
-            self._rnn.hidden_size * (self._rnn.bidirectional + 1), len(Label)
-        )
-        self._softmax = nn.Softmax(dim=1)
-
-        self._eval_args = {"average": None, "num_classes": len(Label)}
-
-        self.to_device(device)
-
-        self._wandb_run: Optional[wandb.run] = None
 
     @property
     def wandb_run(self) -> Optional[wandb.run]:
@@ -139,217 +106,59 @@ class PageSequenceTagger(nn.Module, DeviceModule):
 
         return softmax
 
-    def train_(
+    def _wand_config(
         self,
         training_inventories: list[Inventory],
-        validation_inventories: Optional[dict[str, list[Inventory]]] = None,
-        *,
-        epochs: int = 3,
-        weights: list[float] = None,
-        shuffle: bool = True,
-        log_wandb: bool = True,
+        validation_inventories: dict[str, list[Inventory]],
     ) -> dict[str, Any]:
-        """Train the model on the given dataset.
+        return {
+            "training size": {
+                "inventories": len(training_inventories),
+                "pages": sum(len(inv) for inv in training_inventories),
+            },
+            "validation sets": {
+                key: len(invs) for key, invs in (validation_inventories or {}).items()
+            },
+        }
 
-        Args:
-            training_inventories (list[Inventory]): The dataset to train on.
-            validation_inventories (Optional[dict[str[list[Inventory]]], optional): Validation datasets with name.
-                Defaults to None. If given, will evaluate each dataset separately after each epoch.
-            epochs (int, optional): The number of epochs to train. Defaults to 3.
-            weights (list[float]): The weights for the loss function.
-                If None (default), the class weights are computed from the training dataset.
-            shuffle (bool, optional): Whether to shuffle the dataset for each epoch. Defaults to True.
-            log_wandb (bool, optional): Whether to log the training to Weights & Biases. Defaults to True.
-
-        Returns:
-            dict[str, Any]: The state dictionary of the model; the best model if validation data is given, otherwise the last state.
-        """
-        self.train()
-
-        if weights is None:
-            weights = torch.Tensor(
-                Inventory.total_class_weights(training_inventories)
-            ).to(self._device)
-        if not len(weights) == len(Label):
-            raise ValueError(
-                f"Length of weights ({len(weights)}) does not match number of labels ({len(Label)})"
-            )
-
-        criterion = nn.CrossEntropyLoss(
-            reduction="sum", weight=torch.Tensor(weights).to(self._device)
-        ).to(self._device)
-        optimizer = optim.Adam(
-            self.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
-        )
-
-        if log_wandb:
-            if self.wandb_run is None:
-                self.wandb_run = wandb.init(
-                    project=self.__class__.__name__,
-                    config={
-                        "training size": {
-                            "inventories": len(training_inventories),
-                            "pages": sum(len(inv) for inv in training_inventories),
-                        },
-                        "validation sets": {
-                            key: len(invs)
-                            for key, invs in (validation_inventories or {}).items()
-                        },
-                        "epochs": epochs,
-                        "weights": {
-                            label.name: weight for label, weight in zip(Label, weights)
-                        },
-                        "shuffle": shuffle,
-                        "optimizer": optimizer.__class__.__name__,
-                        "criterion": criterion.__class__.__name__,
-                        "criteron_config": {
-                            key: value
-                            for key, value in criterion.__dict__.items()
-                            if not key.startswith("_")
-                        },
-                        # TODO: convert to nested dict
-                        "modules": self.__dict__["_modules"],
-                        "settings": settings.as_dict(),
-                    },
+    def _validate(
+        self, validation_inventories: dict[str, list[Inventory]], *, epoch: int
+    ) -> float:
+        results: dict[str, pd.DataFrame] = {}
+        for sheet_name, _validation in validation_inventories.items():
+            if _validation:
+                precision, recall, f1, accuracy, output = self.eval_(
+                    _validation, sheet_name
                 )
-                if self.wandb_run is None:
-                    logging.warning(
-                        "Failed to initialize Weights & Biases. Set the WANDB_API_KEY environment variable for logging in."
-                    )
+                # log metrics per sheet for each epoch
+                self._log_wandb(
+                    sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
+                )
+                results[sheet_name] = output
             else:
-                logging.info(
-                    f"Resuming logging on Weights & Biases run: {self.wandb_run}."
-                )
-        else:
-            self.wandb_run = None
+                logging.warning(f"Empty validation set for '{sheet_name}'.")
 
-        best_score = 0
-        best_model = None
-        for epoch in range(1, epochs + 1):
-            self.train()
-
-            if shuffle:
-                random.shuffle(training_inventories)
-
-            for inventory in tqdm(
-                training_inventories,
-                desc="Training",
-                unit="inventory",
-                total=len(training_inventories),
-            ):
-                if len(inventory) < 2:
-                    logging.warning(f"Skipping single page inventory: {inventory}")
-                    continue
-                elif MAX_INVENTORY_SIZE and (len(inventory) > MAX_INVENTORY_SIZE):
-                    logging.error(
-                        f"Inventory '{inventory}' larger than {MAX_INVENTORY_SIZE} pages."
-                    )
-
-                optimizer.zero_grad()
-                outputs = self(inventory.pages).to(self._device)
-
-                loss = criterion(outputs, inventory.label_tensor().to(self._device))
-                if torch.isnan(loss):
-                    logging.error(f"Loss is NaN for inventory: '{inventory}'")
-
-                loss.backward()
-                optimizer.step()
-
-                if self.wandb_run:
-                    if not settings.UPDATE_LM_WEIGHTS:
-                        self.wandb_run.log(
-                            {
-                                "cache": self._page_embedding._region_model._text_embeddings_cached.cache_info()._asdict()
-                            },
-                            commit=False,
-                        )
-                    self.wandb_run.log(
-                        {
-                            "loss": loss.item(),
-                            "inventory length": len(inventory),
-                            "inventory": inventory.inv_nr,
-                        }
-                    )
-
-            if validation_inventories:
-                validation_results: dict[str, pd.DataFrame] = {}
-                for sheet_name, _validation in validation_inventories.items():
-                    if _validation:
-                        precision, recall, f1, accuracy, output = self.eval_(
-                            _validation, sheet_name
-                        )
-                        # log metrics per sheet for each epoch
-                        self._log_wandb(
-                            sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
-                        )
-                        validation_results[sheet_name] = output
-                    else:
-                        logging.warning(f"Empty validation set for '{sheet_name}'.")
-
-                # FIXME: re-running the evaluation on all inventories is redundant
-                all_validation_inventories = [
-                    inventory
-                    for values in validation_inventories.values()
-                    for inventory in values
-                ]
-                if all_validation_inventories:
-                    sheet_name = "total"
-                    precision, recall, f1, accuracy, output = self.eval_(
-                        all_validation_inventories, sheet_name
-                    )
-                    # Log total metrics
-                    self._log_wandb(
-                        sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
-                    )
-
-                    score = f1.compute().mean().item()
-                    if score > best_score:
-                        logging.info(
-                            f"New best model found with average F1 score: {score:.4f} (previous: {best_score:.4f})."
-                        )
-                        best_score = score
-                        best_model = self.state_dict()
-
-                        # log result tables per sheet for new best model
-                        for sheet_name, output in validation_results.items():
-                            self._log_wandb(sheet_name, epoch, output=output)
-                else:
-                    logging.warning("All validation sets are empty.")
-        return best_model or self.state_dict()
-
-    def eval_(
-        self, inventories: list[Inventory], sheet_name: str
-    ) -> tuple[Metric, Metric, Metric, Metric, pd.DataFrame]:
-        """Evaluate the model on the given dataset.
-
-        Args:
-            inventories (list[Inventory]): The inventories to evaluate.
-            sheet_name (str): The name to use for the evaluation logs.
-        Returns:
-            tuple[Metric, Metric, Metric, Metric, pd.DataFrame]: The precision, recall, F1 score and accuracy metrics,
-                and a DataFrame containing the results per row.
-        """
-        metrics: tuple[Metric] = (
-            MulticlassPrecision(average=None, num_classes=len(Label)),
-            MulticlassRecall(average=None, num_classes=len(Label)),
-            MulticlassF1Score(average=None, num_classes=len(Label)),
-            MulticlassAccuracy(),
-        )
-        self.eval()
-
-        output: pd.DataFrame = pd.concat(
-            (
-                self.predict(inventory, *metrics)
-                for inventory in tqdm(
-                    inventories,
-                    desc=f"Evaluating '{sheet_name}'",
-                    total=len(inventories),
-                    unit="inventory",
-                )
+        # FIXME: re-running the evaluation on all inventories is redundant
+        all_validation_inventories = [
+            inventory
+            for values in validation_inventories.values()
+            for inventory in values
+        ]
+        if all_validation_inventories:
+            sheet_name = "total"
+            precision, recall, f1, accuracy, output = self.eval_(
+                all_validation_inventories, sheet_name
             )
-        ).reset_index()
+            # Log total metrics
+            self._log_wandb(
+                sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
+            )
 
-        return metrics + (output,)
+            score = f1.compute().mean().item()
+        else:
+            logging.warning("All validation sets are empty.")
+            score = 0
+        return score, results
 
     @torch.inference_mode()
     def predict(self, inventory: Inventory, *metrics: Metric) -> pd.DataFrame:
@@ -450,19 +259,3 @@ class PageSequenceTagger(nn.Module, DeviceModule):
         labels.append(Label(model_output[-1, :].argmax().item()))
 
         return labels
-
-    def save(self, path: Path) -> None:
-        """Save the model to the given path.
-
-        Args:
-            path (str): The path to save the model to.
-        """
-        torch.save(self.state_dict(), path)
-
-    def load(self, path: Path) -> None:
-        """Load the model from the given path.
-
-        Args:
-            path (str): The path to load the model from.
-        """
-        self.load_state_dict(torch.load(path, map_location=torch.device(self._device)))

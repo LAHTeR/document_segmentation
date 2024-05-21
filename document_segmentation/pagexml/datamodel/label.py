@@ -39,6 +39,7 @@ class Label(IntEnum):
 class Tanap(IntEnum):
     """TANAP categories for documents."""
 
+    UNK = 0
     DAGREGISTERS = 1
     RESOLUTIES = 2
     BRIEVEN_NEDERLAND = 3

@@ -79,7 +79,6 @@ if __name__ == "__main__":
 
     training_args = arg_parser.add_argument_group("Training Arguments")
     training_args.add_argument("--epochs", type=int, default=3, help="Number of epochs")
-    training_args.add_argument("--batch-size", type=int, default=64, help="Batch size")
 
     arg_parser.add_argument(
         "--device",
