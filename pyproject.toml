@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-requests = "^2.31.0"
+requests = "^2.32.0"
 pagexml-tools = "^0.5.0"
 openpyxl = "^3.1.2"
 torch = "^2.2.0"
