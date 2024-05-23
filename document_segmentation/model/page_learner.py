@@ -1,8 +1,11 @@
 import abc
 import logging
 import random
+import sys
+from collections import Counter
+from enum import IntEnum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 import pandas as pd
 import torch
@@ -18,13 +21,20 @@ from torcheval.metrics import (
 )
 from tqdm import tqdm
 
+from document_segmentation.pagexml.datamodel.document import Document
+
 from .. import settings
 from ..pagexml.datamodel.inventory import (
     Inventory,
     ThumbnailDownloader,
 )
 from ..pagexml.datamodel.page import Page
-from ..settings import LEARNING_RATE, MAX_INVENTORY_SIZE, WEIGHT_DECAY
+from ..settings import (
+    LEARNING_RATE,
+    MAX_INVENTORY_SIZE,
+    PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
+    WEIGHT_DECAY,
+)
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
@@ -32,20 +42,29 @@ from .page_embedding import PageEmbedding
 class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
-    _WANDB_CONFIG: dict[str, Any] = {}
-    """Class-specific configuration for Weights & Biases. Can be overriden by sub-classes."""
+    _LOSS_REDUCTION = "mean"
+    """The reduction method for the loss function.
+    See https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
+    Can be overriden by subclasses."""
+
+    _MULTI_LABEL: bool
+    """If True, the model outputs a label per page, otherwise one per document.
+    Must be set by subclasses.
+    """
+
+    _LABEL_TYPE: type[IntEnum]
+    """The type of label used by the model.
+    Must be set by the sub-classes"""
 
     def __init__(
         self,
         *,
-        label_type,
-        rnn_config: dict[str, Any],
+        rnn_config: dict[str, Any] = PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
         device: Optional[str] = None,
         thumbnail_downloader: ThumbnailDownloader = ThumbnailDownloader.from_file(),
     ) -> None:
         super().__init__()
 
-        self._label_type = label_type
         self._thumbnail_downloader = thumbnail_downloader
 
         self._page_embedding = PageEmbedding(device=device)
@@ -56,11 +75,11 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         )
 
         self._linear = nn.Linear(
-            self._rnn.hidden_size * (self._rnn.bidirectional + 1), len(label_type)
+            self._rnn.hidden_size * (self._rnn.bidirectional + 1), len(self._LABEL_TYPE)
         )
-        self._softmax = nn.Softmax(dim=1)
+        self._softmax = nn.Softmax(dim=int(self._MULTI_LABEL))
 
-        self._eval_args = {"average": None, "num_classes": len(label_type)}
+        self._eval_args = {"average": None, "num_classes": len(self._LABEL_TYPE)}
 
         self.to_device(device)
 
@@ -107,18 +126,23 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
                     score: dict[str, float] = {
                         label.name: score
                         for label, score in zip(
-                            self._label_type, metric.compute().tolist()
+                            self._LABEL_TYPE, metric.compute().tolist()
                         )
                     }
                 wandb_metrics[prefix + metric.__class__.__name__] = score
 
             if output is not None:
-                output["Image"] = output["ThumbnailHtml"].dropna().apply(wandb.Html)
-                table = wandb.Table(
-                    dataframe=output.drop(
-                        columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                try:
+                    output["Image"] = output["ThumbnailHtml"].dropna().apply(wandb.Html)
+                    table = wandb.Table(
+                        dataframe=output.drop(
+                            columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
+                        )
                     )
-                )
+                except KeyError:
+                    logging.error("Error transforming output to WandB table: {e}")
+                    table = wandb.Table(dataframe=output)
+
                 wandb_metrics[prefix + "pages"] = table
 
         return self.wandb_run.log(wandb_metrics, commit=commit)
@@ -132,19 +156,9 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         ), "Bad shape: {pages.size()}"
 
         rnn_out, hidden = self._rnn(page_embeddings)
-
-        output = self._linear(rnn_out)
-        assert output.size() == (
-            len(pages),
-            len(self._label_type),
-        ), f"Bad shape: {output.size()}"
-
+        states = rnn_out if self._MULTI_LABEL else rnn_out[-1]
+        output = self._linear(states)
         softmax = self._softmax(output)
-        assert softmax.size() == (
-            len(pages),
-            len(self._label_type),
-        ), f"Bad shape: {output.size()}"
-
         return softmax
 
     def _wandb_config(self, training_data, validation_data) -> dict[str, Any]:
@@ -162,8 +176,8 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
 
     def train_(
         self,
-        training_data: list[Any],
-        validation_data: Optional[dict[str, list[Inventory]]] = None,
+        training_data: list[Inventory | Document],
+        validation_data=None,
         *,
         epochs: int = 3,
         weights: list[float] = None,
@@ -173,7 +187,7 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         """Train the model on the given dataset.
 
         Args:
-            training_inventories (list[Any]): The dataset to train on.
+            training_inventories (list[Inventory | Document]): The dataset to train on.
             validation_inventories (Optional[Any], optional): Validation datasets as expected by the specific class.
                 Defaults to None. If given, will evaluate each dataset separately after each epoch.
             epochs (int, optional): The number of epochs to train. Defaults to 3.
@@ -188,16 +202,17 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         self.train()
 
         if weights is None:
-            weights = torch.Tensor(Inventory.total_class_weights(training_data)).to(
+            weights = torch.Tensor(self._total_class_weights(training_data)).to(
                 self._device
             )
-        if not len(weights) == len(self._label_type):
+        if not len(weights) == len(self._LABEL_TYPE):
             raise ValueError(
-                f"Length of weights ({len(weights)}) does not match number of labels ({len(self._label_type)})"
+                f"Length of weights ({len(weights)}) does not match number of labels ({len(self._LABEL_TYPE)})"
             )
 
         criterion = nn.CrossEntropyLoss(
-            reduction="sum", weight=torch.Tensor(weights).to(self._device)
+            reduction=self._LOSS_REDUCTION,
+            weight=torch.Tensor(weights).to(self._device),
         ).to(self._device)
         optimizer = optim.Adam(
             self.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
@@ -212,7 +227,7 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
                         "epochs": epochs,
                         "weights": {
                             label.name: weight
-                            for label, weight in zip(self._label_type, weights)
+                            for label, weight in zip(self._LABEL_TYPE, weights)
                         },
                         "shuffle": shuffle,
                         "optimizer": optimizer.__class__.__name__,
@@ -247,26 +262,25 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
             if shuffle:
                 random.shuffle(training_data)
 
-            for inventory in tqdm(
-                training_data,
-                desc="Training",
-                unit="inventory",
-                total=len(training_data),
+            for doc in tqdm(
+                training_data, desc="Training", unit="docs", total=len(training_data)
             ):
-                if len(inventory) < 2:
-                    logging.warning(f"Skipping single page inventory: {inventory}")
-                    continue
-                elif MAX_INVENTORY_SIZE and (len(inventory) > MAX_INVENTORY_SIZE):
-                    logging.error(
-                        f"Inventory '{inventory}' larger than {MAX_INVENTORY_SIZE} pages."
-                    )
+                if isinstance(doc, Inventory):
+                    # TODO: move to class-specific filter method
+                    if len(doc) < 2:
+                        logging.warning(f"Skipping single page inventory: {doc}")
+                        continue
+                    elif MAX_INVENTORY_SIZE and (len(doc) > MAX_INVENTORY_SIZE):
+                        logging.error(
+                            f"Inventory '{doc}' larger than {MAX_INVENTORY_SIZE} pages."
+                        )
 
                 optimizer.zero_grad()
-                outputs = self(inventory.pages).to(self._device)
+                outputs = self(doc.pages).to(self._device)
 
-                loss = criterion(outputs, inventory.label_tensor().to(self._device))
+                loss = criterion(outputs, doc.label_tensor().to(self._device))
                 if torch.isnan(loss):
-                    logging.error(f"Loss is NaN for inventory: '{inventory}'")
+                    logging.error(f"Loss is NaN for inventory: '{doc}'")
 
                 loss.backward()
                 optimizer.step()
@@ -279,11 +293,14 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
                             },
                             commit=False,
                         )
+                    if isinstance(doc, Inventory):
+                        # TODO: move logging to class-specific method
+                        self.wandb_run.log({"inventory": doc.inv_nr}, commit=False)
+
                     self.wandb_run.log(
                         {
                             "loss": loss.item(),
-                            "inventory length": len(inventory),
-                            "inventory": inventory.inv_nr,
+                            "document length": len(doc),
                         }
                     )
 
@@ -318,17 +335,17 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
                 and a DataFrame containing the results per row.
         """
         metrics: tuple[Metric] = (
-            MulticlassPrecision(average=None, num_classes=len(self._label_type)),
-            MulticlassRecall(average=None, num_classes=len(self._label_type)),
-            MulticlassF1Score(average=None, num_classes=len(self._label_type)),
+            MulticlassPrecision(average=None, num_classes=len(self._LABEL_TYPE)),
+            MulticlassRecall(average=None, num_classes=len(self._LABEL_TYPE)),
+            MulticlassF1Score(average=None, num_classes=len(self._LABEL_TYPE)),
             MulticlassAccuracy(),
         )
         self.eval()
 
         output: pd.DataFrame = pd.concat(
             (
-                self.predict(inventory, *metrics)
-                for inventory in tqdm(
+                self.predict(doc, *metrics)
+                for doc in tqdm(
                     docs, desc=f"Evaluating '{name}'", total=len(docs), unit="doc"
                 )
             )
@@ -338,14 +355,12 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
 
     @abc.abstractmethod
     @torch.inference_mode()
-    def _validate(
-        self, validation_inventories: dict[str, list[Inventory]], *, epoch: int
-    ):
+    def _validate(self, validation_data, *, epoch: int) -> tuple[float, pd.DataFrame]:
         """Get model predictions for all pages in the given inventory.
         Metrics are updated in-place.
 
         Args:
-            doc: The data to infer label(s) for.
+            validation_data: The data to infer label(s) for.
             metrics (Metric): The metrics to update.
         Returns:
             pd.DataFrame: A DataFrame containing the results per row.
@@ -364,3 +379,49 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
             path (str): The path to load the model from.
         """
         self.load_state_dict(torch.load(path, map_location=torch.device(self._device)))
+
+    def _prediction_heuristics(self, model_output: torch.Tensor) -> list[IntEnum]:
+        """Convert model output tensor to the predicted labels, using argmax and heuristics.
+
+        Args:
+            labels (torch.Tensor): The predicted labels.
+        Returns:
+            list[IntEnum]: The labels
+        """
+        return [self._LABEL_TYPE(arg) for arg in model_output.argmax(dim=1).tolist()]
+
+    @abc.abstractmethod
+    def _class_counts(self, docs: Iterable[Inventory | Document]) -> Counter:
+        """Get the frequency of each label in this dataset.
+
+        To be implemented by subclasses.
+
+        Returns:
+            Counter: Counter of frequency of each label in dataset.
+        """
+        return NotImplemented
+
+    def _total_class_weights(self, docs: Iterable[Inventory | Document]) -> list[float]:
+        """Get the inverse frequency of each label in this dataset.
+
+        Applies add-one smoothing to avoid division by zero.
+
+        Returns:
+            list[float]: List of frequency of each label in dataset divided by dataset length.
+        """
+        counts: Counter[self._LABEL_TYPE] = self._class_counts(docs)
+
+        try:
+            total = counts.total()
+        except AttributeError as e:
+            logging.warning(
+                f"Python version: '{sys.version}': {str(e)}. Using sum(counts.values()) instead."
+            )
+            total = sum(counts.values())
+
+        inverse_frequencies: list[float] = [
+            total / (counts[label] + 1) for label in self._LABEL_TYPE
+        ]
+        inverse_frequencies[self._LABEL_TYPE.UNK] = 0.0
+
+        return inverse_frequencies

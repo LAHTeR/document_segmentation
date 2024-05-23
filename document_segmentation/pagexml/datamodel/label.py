@@ -3,25 +3,8 @@ from enum import IntEnum, unique
 import torch
 
 
+@unique
 class Label(IntEnum):
-    """Labels for pages in a sequence."""
-
-    UNK = 0
-    """No annotation available."""
-    BOUNDARY = 1
-    """The beginning or end of a document."""
-    IN = 2
-    """Part of a document."""
-    OUT = 3
-
-    def to_list(self) -> list[int]:
-        """Convert the label to a list of integers.
-
-        Returns:
-            list[int]: A list of integers representing the label.
-        """
-        return [int(self == label) for label in Label]
-
     @staticmethod
     def to_tensor(labels: list["Label"]) -> torch.Tensor:
         """Convert a list of labels to a tensor.
@@ -32,14 +15,36 @@ class Label(IntEnum):
         Returns:
             torch.Tensor: A tensor of length (len(labels)).
         """
-        return torch.Tensor([label.value for label in labels]).to(int)
+        return torch.Tensor([label.value for label in labels]).to(torch.int64)
+
+    def to_list(self) -> list[int]:
+        """Convert the label to a list of integers.
+
+        Returns:
+            list[int]: A list of integers representing the label.
+        """
+
+        return [int(self == label) for label in self.__class__]
 
 
-@unique
-class Tanap(IntEnum):
+class SequenceLabel(Label):
+    """Labels for pages in a sequence."""
+
+    UNK = 0
+    """No annotation available."""
+    BOUNDARY = 1
+    """The beginning or end of a document."""
+    IN = 2
+    """Part of a document."""
+    OUT = 3
+
+
+class Tanap(Label):
     """TANAP categories for documents."""
 
     UNK = 0
+    """No annotation available."""
+
     DAGREGISTERS = 1
     RESOLUTIES = 2
     BRIEVEN_NEDERLAND = 3
@@ -54,3 +59,5 @@ class Tanap(IntEnum):
     STUKKEN_BOEKHOUDING = 12
     STUKKEN_SCHEPEN = 13
     STUKKEN_OVERIG = 14
+
+    # TODO: add FRONT_MATTER etc

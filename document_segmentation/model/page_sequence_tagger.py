@@ -1,110 +1,22 @@
 import logging
-from typing import Any, Optional
+from collections import Counter
+from typing import Any, Iterable
 
 import pandas as pd
 import torch
-import wandb
 from torcheval.metrics import Metric
 
-from ..pagexml.datamodel.inventory import (
-    Inventory,
-    ThumbnailDownloader,
-)
-from ..pagexml.datamodel.label import Label
+from ..pagexml.datamodel.inventory import Inventory
+from ..pagexml.datamodel.label import Label, SequenceLabel
 from ..pagexml.datamodel.page import Page
-from ..settings import PAGE_SEQUENCE_TAGGER_RNN_CONFIG
 from .page_learner import AbstractPageLearner
 
 
 class PageSequenceTagger(AbstractPageLearner):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
-    def __init__(
-        self,
-        *,
-        rnn_config: dict[str, Any] = PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
-        device: Optional[str] = None,
-        thumbnail_downloader: ThumbnailDownloader = ThumbnailDownloader.from_file(),
-    ) -> None:
-        super().__init__(
-            label_type=Label,
-            rnn_config=rnn_config,
-            device=device,
-            thumbnail_downloader=thumbnail_downloader,
-        )
-
-    @property
-    def wandb_run(self) -> Optional[wandb.run]:
-        return self._wandb_run
-
-    @wandb_run.setter
-    def wandb_run(self, wandb_run: Optional[wandb.run]) -> None:
-        self._wandb_run = wandb_run
-
-    def _log_wandb(
-        self,
-        name: str,
-        epoch: int,
-        *,
-        metrics: tuple[Metric] = None,
-        output: pd.DataFrame = None,
-        commit: bool = False,
-    ) -> dict[str, Any]:
-        """Log metrics and/or output to Weights & Biases.
-
-        Metrics and output can be None, meaning they are not logged.
-
-        Args:
-            name (str): The name of the dataset.
-            epoch (int): The epoch number.
-            metrics (tuple[Metric], optional): The metrics to log. Defaults to None.
-            output (pd.DataFrame, optional): The output to log. Defaults to None.
-            commit (bool, optional): Whether to commit the log, incrementing the global step. Defaults to False.
-        """
-        if self.wandb_run is None:
-            logging.warning("No Weights & Biases run found. Skipping logging.")
-        else:
-            prefix = name + "/"
-            wandb_metrics: dict[str, Any] = {"epoch": epoch}
-
-            for metric in metrics or []:
-                if metric.average is not None:
-                    score: float = metric.compute().item()
-                else:
-                    score: dict[str, float] = {
-                        label.name: score
-                        for label, score in zip(Label, metric.compute().tolist())
-                    }
-                wandb_metrics[prefix + metric.__class__.__name__] = score
-
-            if output is not None:
-                output["Image"] = output["ThumbnailHtml"].dropna().apply(wandb.Html)
-                table = wandb.Table(
-                    dataframe=output.drop(
-                        columns=["ThumbnailUrl", "ThumbnailHtml", "Link"]
-                    )
-                )
-                wandb_metrics[prefix + "pages"] = table
-
-        return self.wandb_run.log(wandb_metrics, commit=commit)
-
-    def forward(self, pages: list[Page]) -> torch.Tensor:
-        page_embeddings = self._page_embedding(pages)
-
-        assert page_embeddings.size() == (
-            len(pages),
-            self._page_embedding.output_size,
-        ), "Bad shape: {pages.size()}"
-
-        rnn_out, hidden = self._rnn(page_embeddings)
-
-        output = self._linear(rnn_out)
-        assert output.size() == (len(pages), len(Label)), f"Bad shape: {output.size()}"
-
-        softmax = self._softmax(output)
-        assert softmax.size() == (len(pages), len(Label)), f"Bad shape: {output.size()}"
-
-        return softmax
+    _LOSS_REDUCTION = "sum"
+    _LABEL_TYPE = SequenceLabel
 
     def _wand_config(
         self,
@@ -123,7 +35,7 @@ class PageSequenceTagger(AbstractPageLearner):
 
     def _validate(
         self, validation_inventories: dict[str, list[Inventory]], *, epoch: int
-    ) -> float:
+    ) -> tuple[float, pd.DataFrame]:
         results: dict[str, pd.DataFrame] = {}
         for sheet_name, _validation in validation_inventories.items():
             if _validation:
@@ -172,9 +84,9 @@ class PageSequenceTagger(AbstractPageLearner):
             pd.DataFrame: A DataFrame containing the results per row.
         """
         model_output: torch.Tensor = self(inventory.pages)
-        predicted: list[Label] = PageSequenceTagger._prediction_heuristics(model_output)
+        predicted: list[SequenceLabel] = self._prediction_heuristics(model_output)
 
-        actual: list[Label] = inventory.labels()
+        actual: list[SequenceLabel] = inventory.labels()
 
         for metric in metrics:
             metric.update(Label.to_tensor(predicted), Label.to_tensor(actual))
@@ -188,7 +100,7 @@ class PageSequenceTagger(AbstractPageLearner):
             row = {
                 "Inventory": inventory.full_inv_nr(),
                 "Predicted": _prediction.name,
-                "Actual": "" if _actual == Label.UNK else _actual.name,
+                "Actual": "" if _actual == SequenceLabel.UNK else _actual.name,
                 "Page ID": page.doc_id,
                 f"Text (first {output_chars} characters)": page.text(delimiter="; ")[
                     :output_chars
@@ -225,11 +137,11 @@ class PageSequenceTagger(AbstractPageLearner):
         """
         predictions: pd.DataFrame = self.predict(inventory)
         for page, label in zip(inventory.pages, predictions["Predicted"]):
-            page.annotate(Label[label])
+            page.annotate(SequenceLabel[label])
         return inventory.get_documents()
 
     @staticmethod
-    def _prediction_heuristics(model_output: torch.Tensor) -> list[Label]:
+    def _prediction_heuristics(model_output: torch.Tensor) -> list[SequenceLabel]:
         """Convert model output tensor to the predicted labels, using argmax and heuristics.
 
         Args:
@@ -237,17 +149,17 @@ class PageSequenceTagger(AbstractPageLearner):
         Returns:
             list[Label]: The labels.
         """
-        labels: list[Label] = [Label(model_output[0].argmax().item())]
+        labels: list[SequenceLabel] = [SequenceLabel(model_output[0].argmax().item())]
         # TODO: fix first and last
 
         for i in range(1, len(model_output) - 1):
-            prev: Label = labels[-1]
-            curr = Label(model_output[i].argmax().item())
-            next = Label(model_output[i + 1].argmax().item())
+            prev: SequenceLabel = labels[-1]
+            curr = SequenceLabel(model_output[i].argmax().item())
+            next = SequenceLabel(model_output[i + 1].argmax().item())
 
             correction = None
-            if prev == Label.OUT and next == Label.IN:
-                correction: Label = Label.BOUNDARY
+            if prev == SequenceLabel.OUT and next == SequenceLabel.IN:
+                correction: SequenceLabel = SequenceLabel.BOUNDARY
 
             if correction is not None and curr != correction:
                 logging.warning(
@@ -256,6 +168,15 @@ class PageSequenceTagger(AbstractPageLearner):
                 curr = correction
 
             labels.append(curr)
-        labels.append(Label(model_output[-1, :].argmax().item()))
+        labels.append(SequenceLabel(model_output[-1, :].argmax().item()))
 
         return labels
+
+    def _class_counts(self, inventories: Iterable[Inventory]) -> Counter[SequenceLabel]:
+        """
+        Count the number of labels in the given inventories.
+
+        Returns:
+            Counter[Label]: Frequency of each label in dataset.
+        """
+        return sum((doc.class_counts() for doc in inventories), start=Counter())

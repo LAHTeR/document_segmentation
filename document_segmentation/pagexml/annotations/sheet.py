@@ -17,7 +17,7 @@ from ...settings import (
     SERVER_USERNAME,
 )
 from ..datamodel.inventory import Inventory
-from ..datamodel.label import Label
+from ..datamodel.label import SequenceLabel
 from ..datamodel.page import Page
 
 
@@ -141,21 +141,21 @@ class Sheet(abc.ABC):
             try:
                 document: list[Page] = inventory.get_scans(begin_scan, end_scan + 1)
 
-                document[0].annotate(Label.BOUNDARY)
+                document[0].annotate(SequenceLabel.BOUNDARY)
                 if len(document) > 1:
                     for page in document[1:-1]:
-                        page.annotate(Label.IN)
-                    document[-1].annotate(Label.BOUNDARY)
+                        page.annotate(SequenceLabel.IN)
+                    document[-1].annotate(SequenceLabel.BOUNDARY)
 
                 # remove redundant boundary pages
                 # TODO: do we still need this?
                 redundant: list[int] = []
                 for i, page in enumerate(document[:-1]):
-                    if page.label == Label.BOUNDARY:
+                    if page.label == SequenceLabel.BOUNDARY:
                         next_page = document[i + 1]
                         if next_page.scan_nr == page.scan_nr:
                             assert (
-                                next_page.label == Label.BOUNDARY
+                                next_page.label == SequenceLabel.BOUNDARY
                             ), f"Expected two subsequent BOUNDARY labels, got '{page}', '{next_page}'"
                             redundant.append(i)
                 for i in reversed(redundant):
@@ -175,7 +175,7 @@ class Sheet(abc.ABC):
                     # TODO: randomize number of empty pages (e.g. 0-5)?
                     pages.append(
                         Page(
-                            label=Label.OUT,
+                            label=SequenceLabel.OUT,
                             scan_nr=last_scan + 1,
                             external_ref="",
                             regions=[],  # empty page
@@ -187,7 +187,10 @@ class Sheet(abc.ABC):
             # Insert empty page at the end
             pages.append(
                 Page(
-                    label=Label.OUT, scan_nr=last_scan + 1, external_ref="", regions=[]
+                    label=SequenceLabel.OUT,
+                    scan_nr=last_scan + 1,
+                    external_ref="",
+                    regions=[],
                 )
             )
         else:

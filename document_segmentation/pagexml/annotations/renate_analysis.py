@@ -8,7 +8,7 @@ from tqdm import tqdm
 from ...settings import INVENTORY_DIR, RENATE_TANAP_CATEGORISATION_SHEET
 from ..datamodel.document import Document
 from ..datamodel.inventory import Inventory
-from ..datamodel.label import Label, Tanap
+from ..datamodel.label import SequenceLabel, Tanap
 from ..datamodel.page import Page
 from .sheet import Sheet
 
@@ -118,18 +118,18 @@ class RenateAnalysisInv(Sheet):
             if annotation and not annotation.startswith("SAME AS"):
                 # sheet provides annotation for page (BEGIN or END)
                 if "START" in annotation or "END" in annotation:
-                    label = Label.BOUNDARY
+                    label = SequenceLabel.BOUNDARY
                     # is last element of the annotation "START" or "END"?
                     in_doc = annotation.split("/")[-1] == "START"
             elif in_doc:
-                label = Label.IN
+                label = SequenceLabel.IN
             else:
-                label = Label.OUT
+                label = SequenceLabel.OUT
 
             inventory.annotate_scan(scan_nr, label)
 
         unlabelled: list[Page] = [
-            page for page in inventory.pages if page.label == Label.UNK
+            page for page in inventory.pages if page.label == SequenceLabel.UNK
         ]
         for page in unlabelled:
             logging.warning(

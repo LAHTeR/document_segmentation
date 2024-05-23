@@ -1,7 +1,6 @@
 import gzip
 import json
 import logging
-import sys
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -28,7 +27,7 @@ from ...settings import (
     SERVER_USERNAME,
     THUMBNAILS_DIR,
 )
-from .label import Label
+from .label import SequenceLabel
 from .page import Page
 
 
@@ -86,7 +85,7 @@ class Inventory(BaseModel, Dataset):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def annotate_scan(self, scan_nr: int, label: Label):
+    def annotate_scan(self, scan_nr: int, label: SequenceLabel):
         try:
             _, page = self.get_scan(scan_nr)
             page.annotate(label)
@@ -101,7 +100,7 @@ class Inventory(BaseModel, Dataset):
         """
 
         documents: list[list[Page]] = []
-        if self.pages[0].label in {Label.BOUNDARY, Label.IN}:
+        if self.pages[0].label in {SequenceLabel.BOUNDARY, SequenceLabel.IN}:
             logging.warning(
                 f"First page {self.pages[0]} of inventory {self} is part of a document."
             )
@@ -112,45 +111,45 @@ class Inventory(BaseModel, Dataset):
         # first and last pages ([0],[-1]) are never part of a document
         for prev, page in zip(self.pages[:-2], self.pages[1:-1], strict=True):
             # validate current state
-            if prev.label == Label.OUT and doc is not None:
+            if prev.label == SequenceLabel.OUT and doc is not None:
                 raise RuntimeError(
                     f"Page {page.scan_nr} is inside a document, but no document has been started."
                 )
 
-            if page.label == Label.UNK:
+            if page.label == SequenceLabel.UNK:
                 logging.warning(
                     f"Unlabelled page {page.scan_nr} in inventory {self.inv_nr}"
                 )
 
             # process page label
-            if page.label == Label.BOUNDARY:
-                if prev.label == Label.OUT:
+            if page.label == SequenceLabel.BOUNDARY:
+                if prev.label == SequenceLabel.OUT:
                     # Start of new document
                     doc = [page]
-                elif prev.label == Label.IN:
+                elif prev.label == SequenceLabel.IN:
                     # End of document
                     doc.append(page)
                     documents.append(doc)
                     doc = None
-                elif prev.label == Label.BOUNDARY:
+                elif prev.label == SequenceLabel.BOUNDARY:
                     if doc is not None:
                         documents.append(doc)  # finish previous document
                     doc = [page]  # start new document
-            if page.label == Label.IN:
+            if page.label == SequenceLabel.IN:
                 if doc is None:
                     raise ValueError(
                         f"Page {page.scan_nr} is inside a document, but no document has been started. Previous: {prev}"
                     )
-                if prev.label == Label.OUT:
+                if prev.label == SequenceLabel.OUT:
                     logging.error(f"Invalid label sequence: {prev} -> {page}.")
                     doc = []
                 doc.append(page)
-            elif page.label == Label.OUT:
-                if prev.label == Label.IN:
+            elif page.label == SequenceLabel.OUT:
+                if prev.label == SequenceLabel.IN:
                     logging.error(f"Invalid label sequence: {prev} -> {page}")
                     documents.append(doc)
                     doc = None
-                elif doc and prev.label == Label.BOUNDARY:
+                elif doc and prev.label == SequenceLabel.BOUNDARY:
                     # Previous page was a single page document
                     documents.append(doc)
                     doc = None
@@ -203,7 +202,7 @@ class Inventory(BaseModel, Dataset):
             )
 
     def has_labels(self) -> bool:
-        return any(page.label != Label.UNK for page in self.pages)
+        return any(page.label != SequenceLabel.UNK for page in self.pages)
 
     def full_inv_nr(self, *, delimiter: str = "") -> str:
         """Return the full inventory number plus part if applicable as a string.
@@ -215,10 +214,10 @@ class Inventory(BaseModel, Dataset):
         """
         return delimiter.join([str(self.inv_nr), self.inventory_part]).rstrip(delimiter)
 
-    def labels(self) -> list[Label]:
+    def labels(self) -> list[SequenceLabel]:
         return [page.label for page in self.pages]
 
-    def class_counts(self) -> Counter[Label]:
+    def class_counts(self) -> Counter[SequenceLabel]:
         return Counter(self.labels())
 
     def class_weights(self) -> list[float]:
@@ -230,13 +229,13 @@ class Inventory(BaseModel, Dataset):
             list[float]: List of frequency of each label in dataset divided by dataset length.
         """
         counts = self.class_counts()
-        weights = [len(self) / (counts[label] + 1) for label in Label]
-        weights[Label.UNK] = 0.0
+        weights = [len(self) / (counts[label] + 1) for label in SequenceLabel]
+        weights[SequenceLabel.UNK] = 0.0
         return weights
 
     def labelled(self) -> list[Page]:
         """Return the labelled pages in the inventory."""
-        return [page for page in self.pages if page.label != Label.UNK]
+        return [page for page in self.pages if page.label != SequenceLabel.UNK]
 
     def labelled_inventories(self) -> Iterable["Inventory"]:
         # TODO: remove this method
@@ -261,14 +260,14 @@ class Inventory(BaseModel, Dataset):
             for page in self.pages:
                 if pages is None:
                     # outside of any document
-                    if page.label != Label.UNK:
+                    if page.label != SequenceLabel.UNK:
                         # new document starting
                         pages = [page]
                     else:
                         pass
                 else:
                     # inside a document
-                    if page.label != Label.UNK:
+                    if page.label != SequenceLabel.UNK:
                         # document continues
                         pages.append(page)
                     else:
@@ -320,7 +319,7 @@ class Inventory(BaseModel, Dataset):
         if not self.has_labels():
             logging.warning(f"No labels in inventory {self.inv_nr}")
         for page in self.pages:
-            if page.label == Label.UNK:
+            if page.label == SequenceLabel.UNK:
                 page.empty()
         return self
 
@@ -330,7 +329,10 @@ class Inventory(BaseModel, Dataset):
         self.pages.pop(i)
 
     def remove_empty_pages(
-        self, *, max_length: int = MAX_EMPTY_SEQUENCE, label: Label = Label.OUT
+        self,
+        *,
+        max_length: int = MAX_EMPTY_SEQUENCE,
+        label: SequenceLabel = SequenceLabel.OUT,
     ) -> "Inventory":
         """Remove all unlabelled pages without text.
 
@@ -410,31 +412,6 @@ class Inventory(BaseModel, Dataset):
         with target_file.open(mode) as f:
             f.write(self.model_dump_json())
         return target_file
-
-    @staticmethod
-    def total_class_weights(inventories: Iterable["Inventory"]) -> list[float]:
-        """Get the inverse frequency of each label in this dataset.
-
-        Applies add-one smoothing to avoid division by zero.
-
-        Returns:
-            list[float]: List of frequency of each label in dataset divided by dataset length.
-        """
-        counts: Counter[Label] = sum(
-            (inventory.class_counts() for inventory in inventories), start=Counter()
-        )
-        try:
-            total = counts.total()
-        except AttributeError as e:
-            logging.warning(
-                f"Python version: '{sys.version}': {str(e)}. Using sum(counts.values()) instead."
-            )
-            total = sum(counts.values())
-
-        inverse_freq: list[float] = [total / (counts[label] + 1) for label in Label]
-        inverse_freq[Label.UNK] = 0.0
-
-        return inverse_freq
 
     @staticmethod
     def local_file(inv_nr: int, inventory_part: str, directory: Path) -> Path:
@@ -555,7 +532,9 @@ class Inventory(BaseModel, Dataset):
                     try:
                         pagexml = parse_pagexml_file(tmp_file)
                         scan_nr: int = int(tmp_file.stem.split("_")[-1])
-                        pages.append(Page.from_pagexml(Label.UNK, scan_nr, pagexml))
+                        pages.append(
+                            Page.from_pagexml(SequenceLabel.UNK, scan_nr, pagexml)
+                        )
                     except IsADirectoryError:
                         continue
         inventory = cls(
