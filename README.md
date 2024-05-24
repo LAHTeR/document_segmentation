@@ -36,7 +36,7 @@ poetry install
 
 ## Usage
 
-To *train* a model run the [`scripts/train_model.py`](scripts/train_model.py) script.
+To *train* a model run the [`scripts/train_model.py`](scripts/train_segmentation_model.py) script.
 It downloads the necessary data from the HUC server into the local temporary directory.
 
 Set your HUC credentials in the `HUC_USER` and `HUC_PASSWORD` environment variables or in [`settings.py`](document_segmentation/settings.py), and run the script.
