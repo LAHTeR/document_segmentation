@@ -99,3 +99,6 @@ __pypackages__/
 document_segmentation/data/inventories
 
 wandb/
+
+# Model directories with naming following WandB pattern
+[a-z]*-[a-z]*-[0-9]*/*
