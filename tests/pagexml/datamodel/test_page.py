@@ -4,7 +4,7 @@ from zipfile import ZipFile
 import pytest
 from pagexml.parser import parse_pagexml_file
 
-from document_segmentation.pagexml.datamodel.label import Label
+from document_segmentation.pagexml.datamodel.label import SequenceLabel
 from document_segmentation.pagexml.datamodel.page import Page
 from document_segmentation.pagexml.datamodel.region import Region
 
@@ -18,18 +18,21 @@ class TestPage:
         )
 
         expected_page = Page(
-            label=Label.BOUNDARY, regions=[], scan_nr=617, external_ref="test_ref"
+            label=SequenceLabel.BOUNDARY,
+            regions=[],
+            scan_nr=617,
+            external_ref="test_ref",
         )
         page = Page.model_validate_json(json)
 
         assert page == expected_page
         assert isinstance(
-            page.label, Label
+            page.label, SequenceLabel
         ), f"label should be of type Label, but was {type(page.label)}"
 
     def test_from_pagexml(self, tmp_path):
         expected_page = {
-            "label": Label.BOUNDARY,
+            "label": SequenceLabel.BOUNDARY,
             "scan_nr": 1,
             "doc_id": "NL-HaNA_1.04.02_1201_0001.jpg",
             "external_ref": "a37e52e8-c9af-4b0f-8390-df846024830a",
@@ -47,7 +50,7 @@ class TestPage:
         with ZipFile(TEST_FILE, "r") as zip_ref:
             pagexml = parse_pagexml_file(zip_ref.extract(filename, tmp_path))
 
-            page = Page.from_pagexml(Label.BOUNDARY, 1, pagexml)
+            page = Page.from_pagexml(SequenceLabel.BOUNDARY, 1, pagexml)
 
             for key, value in expected_page.items():
                 assert getattr(page, key) == value
@@ -63,7 +66,7 @@ class TestPage:
     def test_guess_doc_id(self, caplog, scan_nr, inv_nr, expected):
         with caplog.at_level(logging.WARNING):
             page = Page(
-                label=Label.UNK,
+                label=SequenceLabel.UNK,
                 scan_nr=scan_nr,
                 doc_id=None,
                 external_ref="test_ref",
@@ -77,23 +80,48 @@ class TestPage:
         "page, expected, expected_warnings",
         [
             (
-                Page(label=Label.UNK, scan_nr=1, external_ref="test_ref", regions=[]),
-                Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]),
+                Page(
+                    label=SequenceLabel.UNK,
+                    scan_nr=1,
+                    external_ref="test_ref",
+                    regions=[],
+                ),
+                Page(
+                    label=SequenceLabel.OUT,
+                    scan_nr=1,
+                    external_ref="test_ref",
+                    regions=[],
+                ),
                 [],
             ),
             (
                 Page(
-                    label=Label.UNK,
+                    label=SequenceLabel.UNK,
                     scan_nr=1,
                     external_ref="test_ref",
                     regions=[Region(id="test_id", types=[], coordinates=[], lines=[])],
                 ),
-                Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]),
+                Page(
+                    label=SequenceLabel.OUT,
+                    scan_nr=1,
+                    external_ref="test_ref",
+                    regions=[],
+                ),
                 [],
             ),
             (
-                Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[]),
-                Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]),
+                Page(
+                    label=SequenceLabel.IN,
+                    scan_nr=1,
+                    external_ref="test_ref",
+                    regions=[],
+                ),
+                Page(
+                    label=SequenceLabel.OUT,
+                    scan_nr=1,
+                    external_ref="test_ref",
+                    regions=[],
+                ),
                 ["Emptying page with label 'IN'."],
             ),
         ],

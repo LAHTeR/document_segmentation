@@ -9,7 +9,7 @@ from document_segmentation.pagexml.datamodel.inventory import (
     Inventory,
     ThumbnailDownloader,
 )
-from document_segmentation.pagexml.datamodel.label import Label
+from document_segmentation.pagexml.datamodel.label import SequenceLabel
 from document_segmentation.pagexml.datamodel.page import Page
 from document_segmentation.pagexml.datamodel.region import Region
 
@@ -45,21 +45,21 @@ class TestInventory:
             inventory_part="A",
             pages=[
                 Page(
-                    label=Label.UNK,
+                    label=SequenceLabel.UNK,
                     scan_nr=1,  # Scans start at 1
                     doc_id="doc1",
                     external_ref="ref1",
                     regions=[],
                 ),
                 Page(
-                    label=Label.UNK,
+                    label=SequenceLabel.UNK,
                     scan_nr=2,
                     doc_id="doc1",
                     external_ref="ref1",
                     regions=[],
                 ),
                 Page(
-                    label=Label.UNK,
+                    label=SequenceLabel.UNK,
                     scan_nr=3,
                     doc_id="doc1",
                     external_ref="ref1",
@@ -68,20 +68,20 @@ class TestInventory:
             ],
         )
 
-        expected_labels = [Label.UNK, Label.BOUNDARY, Label.UNK]
-        inventory.annotate_scan(2, Label.BOUNDARY)
+        expected_labels = [SequenceLabel.UNK, SequenceLabel.BOUNDARY, SequenceLabel.UNK]
+        inventory.annotate_scan(2, SequenceLabel.BOUNDARY)
 
         for page, expected_label in zip(inventory.pages, expected_labels):
             assert page.label == expected_label
 
         # END and BEGIN on the same page:
-        inventory.annotate_scan(2, Label.BOUNDARY)
-        assert inventory.pages[1].label == Label.BOUNDARY
+        inventory.annotate_scan(2, SequenceLabel.BOUNDARY)
+        assert inventory.pages[1].label == SequenceLabel.BOUNDARY
 
         # Invalid scan numbers:
         with pytest.raises(ValueError):
-            inventory.annotate_scan(0, Label.BOUNDARY)
-            inventory.annotate_scan(4, Label.BOUNDARY)
+            inventory.annotate_scan(0, SequenceLabel.BOUNDARY)
+            inventory.annotate_scan(4, SequenceLabel.BOUNDARY)
 
     # TODO: test for files with inventory parts (both valid ("A" and invalid ("1"))
     @pytest.mark.parametrize("mock_request", [1201], indirect=True)
@@ -111,7 +111,7 @@ class TestInventory:
                     inventory_part="",
                     pages=[
                         Page(
-                            label=Label.UNK,
+                            label=SequenceLabel.UNK,
                             scan_nr=1,
                             external_ref="test_ref",
                             regions=[
@@ -125,7 +125,7 @@ class TestInventory:
                     inventory_part="",
                     pages=[
                         Page(
-                            label=Label.OUT,
+                            label=SequenceLabel.OUT,
                             scan_nr=1,
                             external_ref="test_ref",
                             regions=[],
@@ -193,7 +193,7 @@ class TestInventory:
     )
     def test_link(self, inventory_nr, doc_id, expected):
         page = Page(
-            label=Label.UNK,
+            label=SequenceLabel.UNK,
             scan_nr=26,
             doc_id=doc_id,
             external_ref="test_ref",
@@ -242,45 +242,113 @@ class TestInventory:
         [
             ([], 10, []),
             (
-                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
-                * 2,
-                1,
-                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])],
-            ),
-            (
-                [Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[])]
-                * 2,
-                1,
-                [Page(label=Label.IN, scan_nr=1, external_ref="test_ref", regions=[])]
-                * 2,
-            ),
-            (
-                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
-                * 2,
-                2,
-                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
-                * 2,
-            ),
-            (
-                [Page(label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[])]
-                * 2
-                + [Page(label=Label.IN, scan_nr=2, external_ref="test_ref", regions=[])]
-                + [
+                [
                     Page(
-                        label=Label.OUT, scan_nr=3, external_ref="test_ref", regions=[]
+                        label=SequenceLabel.OUT,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
                     )
                 ]
                 * 2,
                 1,
                 [
                     Page(
-                        label=Label.OUT, scan_nr=1, external_ref="test_ref", regions=[]
+                        label=SequenceLabel.OUT,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ],
+            ),
+            (
+                [
+                    Page(
+                        label=SequenceLabel.IN,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ]
+                * 2,
+                1,
+                [
+                    Page(
+                        label=SequenceLabel.IN,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ]
+                * 2,
+            ),
+            (
+                [
+                    Page(
+                        label=SequenceLabel.OUT,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ]
+                * 2,
+                2,
+                [
+                    Page(
+                        label=SequenceLabel.OUT,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ]
+                * 2,
+            ),
+            (
+                [
+                    Page(
+                        label=SequenceLabel.OUT,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ]
+                * 2
+                + [
+                    Page(
+                        label=SequenceLabel.IN,
+                        scan_nr=2,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ]
+                + [
+                    Page(
+                        label=SequenceLabel.OUT,
+                        scan_nr=3,
+                        external_ref="test_ref",
+                        regions=[],
+                    )
+                ]
+                * 2,
+                1,
+                [
+                    Page(
+                        label=SequenceLabel.OUT,
+                        scan_nr=1,
+                        external_ref="test_ref",
+                        regions=[],
                     ),
                     Page(
-                        label=Label.IN, scan_nr=2, external_ref="test_ref", regions=[]
+                        label=SequenceLabel.IN,
+                        scan_nr=2,
+                        external_ref="test_ref",
+                        regions=[],
                     ),
                     Page(
-                        label=Label.OUT, scan_nr=3, external_ref="test_ref", regions=[]
+                        label=SequenceLabel.OUT,
+                        scan_nr=3,
+                        external_ref="test_ref",
+                        regions=[],
                     ),
                 ],
             ),
@@ -294,67 +362,6 @@ class TestInventory:
             == expected
         )
 
-    @pytest.mark.parametrize(
-        "inventories, expected",
-        [
-            ([], [0.0] * 4),
-            (
-                [
-                    Inventory(
-                        inv_nr=1,
-                        inventory_part="",
-                        pages=[
-                            Page(
-                                label=Label.OUT,
-                                scan_nr=1,
-                                external_ref="test_ref",
-                                regions=[],
-                            )
-                        ],
-                    )
-                ],
-                [0.0, 1.0, 1.0, 0.5],
-            ),
-            (
-                [
-                    Inventory(
-                        inv_nr=1,
-                        inventory_part="",
-                        pages=[
-                            Page(
-                                label=Label.OUT,
-                                scan_nr=1,
-                                external_ref="test_ref",
-                                regions=[],
-                            )
-                        ],
-                    ),
-                    Inventory(
-                        inv_nr=1,
-                        inventory_part="",
-                        pages=[
-                            Page(
-                                label=Label.OUT,
-                                scan_nr=1,
-                                external_ref="test_ref",
-                                regions=[],
-                            ),
-                            Page(
-                                label=Label.BOUNDARY,
-                                scan_nr=1,
-                                external_ref="test_ref",
-                                regions=[],
-                            ),
-                        ],
-                    ),
-                ],
-                [0.0, 1.5, 3.0, 1.0],
-            ),
-        ],
-    )
-    def test_total_class_weights(self, inventories, expected):
-        assert Inventory.total_class_weights(inventories) == expected
-
 
 class TestThumbnailDownloader:
     @pytest.fixture
@@ -366,7 +373,7 @@ class TestThumbnailDownloader:
 
     def test_thumbnail_url(self, thumbnail_downloader):
         page = Page(
-            label=Label.UNK,
+            label=SequenceLabel.UNK,
             scan_nr=1,
             external_ref="aa84f770-f5d7-40ac-bfda-db3d06f204c9",
             regions=[],
@@ -379,7 +386,7 @@ class TestThumbnailDownloader:
 
     def test_download(self, thumbnail_downloader):
         page = Page(
-            label=Label.UNK,
+            label=SequenceLabel.UNK,
             scan_nr=1,
             external_ref="aa84f770-f5d7-40ac-bfda-db3d06f204c9",
             regions=[],

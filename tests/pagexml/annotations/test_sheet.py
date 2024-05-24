@@ -6,7 +6,7 @@ from document_segmentation import settings
 from document_segmentation.pagexml.annotations.generale_missiven import GeneraleMissiven
 from document_segmentation.pagexml.annotations.renate_analysis import RenateAnalysis
 from document_segmentation.pagexml.datamodel.inventory import Inventory
-from document_segmentation.pagexml.datamodel.label import Label
+from document_segmentation.pagexml.datamodel.label import SequenceLabel
 
 from ...conftest import DATA_DIR, GENERALE_MISSIVEN_CSV
 
@@ -36,7 +36,11 @@ class TestGeneraleMissiven:
         return GeneraleMissiven(GENERALE_MISSIVEN_CSV, inventory_dir=tmp_path)
 
     def test_annotate_inventory(self, test_sheet):
-        expected_labels = {1: Label.OUT, 919: Label.BOUNDARY, 920: Label.OUT}
+        expected_labels = {
+            1: SequenceLabel.OUT,
+            919: SequenceLabel.BOUNDARY,
+            920: SequenceLabel.OUT,
+        }
 
         for page in test_sheet.annotate_inventory(
             Inventory.load(1105, "", DATA_DIR)
@@ -94,7 +98,7 @@ class TestGeneraleMissiven:
             expected_inv_parts,
             expected_lengths,
         ):
-            assert all(page.label != Label.UNK for page in inventory.pages)
+            assert all(page.label != SequenceLabel.UNK for page in inventory.pages)
             assert inventory.inv_nr == inv_nr
             assert inventory.inventory_part == inv_part
             assert (

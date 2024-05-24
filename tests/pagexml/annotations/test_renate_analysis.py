@@ -8,7 +8,7 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysisInv,
 )
 from document_segmentation.pagexml.datamodel.inventory import Inventory
-from document_segmentation.pagexml.datamodel.label import Label, Tanap
+from document_segmentation.pagexml.datamodel.label import SequenceLabel, Tanap
 
 from ...conftest import DATA_DIR
 
@@ -19,7 +19,11 @@ class TestRenateAnalysis:
         return RenateAnalysis()
 
     def test_annotate_inventory(self, test_sheet):
-        expected_labels = {1: Label.OUT, 114: Label.BOUNDARY, 115: Label.OUT}
+        expected_labels = {
+            1: SequenceLabel.OUT,
+            114: SequenceLabel.BOUNDARY,
+            115: SequenceLabel.OUT,
+        }
 
         for page in test_sheet.annotate_inventory(
             Inventory.load(2542, "", DATA_DIR)
@@ -33,7 +37,7 @@ class TestRenateAnalysis:
         inventory = Inventory.load(2542, "", DATA_DIR)
         assert len(inventory) == 2052
 
-        expected_labels = [Label.OUT, Label.BOUNDARY, Label.OUT]
+        expected_labels = [SequenceLabel.OUT, SequenceLabel.BOUNDARY, SequenceLabel.OUT]
         expected_scan_nrs = [1, 114, 115]
 
         preprocessed: Inventory = test_sheet.preprocess(
@@ -72,50 +76,50 @@ class TestRenateAnalysisInv:
     def test_annotate_inventory(self, sheet_file, tmp_path, mock_request):
         """Test the annotation of an inventory with the RenateAnalysisInv class."""
         expected_labels = (
-            [Label.OUT] * 14
-            + [Label.BOUNDARY]
-            + [Label.IN] * 3
-            + [Label.BOUNDARY]
-            + [Label.OUT] * 7
-            + [Label.BOUNDARY]
-            + [Label.IN] * 68
-            + [Label.BOUNDARY]
-            + [Label.OUT] * 2
-            + [Label.BOUNDARY]
-            + [Label.IN] * 6
-            + [Label.BOUNDARY]
-            + [Label.BOUNDARY]
-            + [Label.BOUNDARY]
-            + [Label.IN]
-            + [Label.BOUNDARY]
-            + [Label.IN]
-            + [Label.BOUNDARY]
-            + [Label.OUT] * 6
-            + [Label.BOUNDARY]
-            + [Label.IN] * 115
-            + [Label.BOUNDARY]
-            + [Label.OUT]
-            + [Label.BOUNDARY]
-            + [Label.IN] * 2
-            + [Label.BOUNDARY]
-            + [Label.IN] * 3
-            + [Label.BOUNDARY]
-            + [Label.IN]
-            + [Label.BOUNDARY]
-            + [Label.IN] * 3
-            + [Label.BOUNDARY]
-            + [Label.IN] * 5
-            + [Label.BOUNDARY]
-            + [Label.IN] * 3
-            + [Label.BOUNDARY]
-            + [Label.IN]
-            + [Label.BOUNDARY] * 2
-            + [Label.IN]
-            + [Label.BOUNDARY]
-            + [Label.BOUNDARY]
-            + [Label.IN] * 5
-            + [Label.BOUNDARY]
-            + [Label.OUT] * 2
+            [SequenceLabel.OUT] * 14
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 3
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.OUT] * 7
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 68
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.OUT] * 2
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 6
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.OUT] * 6
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 115
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.OUT]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 2
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 3
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 3
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 5
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 3
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN]
+            + [SequenceLabel.BOUNDARY] * 2
+            + [SequenceLabel.IN]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.IN] * 5
+            + [SequenceLabel.BOUNDARY]
+            + [SequenceLabel.OUT] * 2
         )
 
         sheet = RenateAnalysisInv(sheet_file, inventory_dir=tmp_path)
