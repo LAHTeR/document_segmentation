@@ -231,7 +231,7 @@ class TestInventory:
     def test_localfile(
         self, tmp_path, caplog, inv_nr, inv_part, expected, expected_logs
     ):
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.INFO):
             assert (
                 Inventory.local_file(inv_nr, inv_part, tmp_path) == tmp_path / expected
             )

@@ -29,12 +29,7 @@ from ..pagexml.datamodel.inventory import (
     ThumbnailDownloader,
 )
 from ..pagexml.datamodel.page import Page
-from ..settings import (
-    LEARNING_RATE,
-    MAX_INVENTORY_SIZE,
-    PAGE_SEQUENCE_TAGGER_RNN_CONFIG,
-    WEIGHT_DECAY,
-)
+from ..settings import LEARNING_RATE, PAGE_SEQUENCE_TAGGER_RNN_CONFIG, WEIGHT_DECAY
 from .device_module import DeviceModule
 from .page_embedding import PageEmbedding
 
@@ -237,7 +232,6 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
                             for key, value in criterion.__dict__.items()
                             if not key.startswith("_")
                         },
-                        # TODO: convert to nested dict
                         "modules": self.__dict__["_modules"],
                         "settings": settings.as_dict(),
                     },
@@ -265,15 +259,9 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
             for doc in tqdm(
                 training_data, desc="Training", unit="docs", total=len(training_data)
             ):
-                if isinstance(doc, Inventory):
-                    # TODO: move to class-specific filter method
-                    if len(doc) < 2:
-                        logging.warning(f"Skipping single page inventory: {doc}")
-                        continue
-                    elif MAX_INVENTORY_SIZE and (len(doc) > MAX_INVENTORY_SIZE):
-                        logging.error(
-                            f"Inventory '{doc}' larger than {MAX_INVENTORY_SIZE} pages."
-                        )
+                if not self._filter_training_data(doc):
+                    logging.warning(f"Skipping training sample: {doc}")
+                    continue
 
                 optimizer.zero_grad()
                 outputs = self(doc.pages).to(self._device)
@@ -293,12 +281,10 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
                             },
                             commit=False,
                         )
-                    if isinstance(doc, Inventory):
-                        # TODO: move logging to class-specific method
-                        self.wandb_run.log({"inventory": doc.inv_nr}, commit=False)
 
                     self.wandb_run.log(
                         {
+                            "inventory": doc.inv_nr,
                             "loss": loss.item(),
                             "document length": len(doc),
                         }
@@ -321,6 +307,18 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
                 best_model = self.state_dict()
 
         return best_model or self.state_dict()
+
+    def _filter_training_data(self, doc: Inventory) -> bool:
+        """Filter out training data samples.
+
+        To be overriden by subclasses.
+
+        Args:
+            doc (Inventory): The document to filter.
+        Returns:
+            bool: Whether to keep the document.
+        """
+        return True
 
     def eval_(
         self, docs: list[Any], name: str

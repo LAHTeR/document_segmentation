@@ -9,6 +9,7 @@ from torcheval.metrics import Metric
 from ..pagexml.datamodel.inventory import Inventory
 from ..pagexml.datamodel.label import Label, SequenceLabel
 from ..pagexml.datamodel.page import Page
+from ..settings import MAX_INVENTORY_SIZE
 from .page_learner import AbstractPageLearner
 
 
@@ -33,6 +34,22 @@ class PageSequenceTagger(AbstractPageLearner):
                 key: len(invs) for key, invs in (validation_inventories or {}).items()
             },
         }
+
+    def _filter_training_data(self, inventory: Inventory) -> bool:
+        """Filter out training data samples.
+
+        Filters out short inventories. Issues error on large inventories.
+
+        Args:
+            inventory (Inventory): The inventory to filter.
+        Returns:
+            bool: True if inventory should be skipped.
+        """
+        if MAX_INVENTORY_SIZE and (len(inventory) > MAX_INVENTORY_SIZE):
+            logging.error(
+                f"Inventory '{inventory}' larger than {MAX_INVENTORY_SIZE} pages."
+            )
+        return len(inventory) > 1
 
     def _validate(
         self, validation_inventories: dict[str, list[Inventory]], *, epoch: int
@@ -92,41 +109,16 @@ class PageSequenceTagger(AbstractPageLearner):
         for metric in metrics:
             metric.update(Label.to_tensor(predicted), Label.to_tensor(actual))
 
-        rows: list[dict[str, str]] = []
-
-        output_chars: int = 100
-        for page, _prediction, output_row, _actual in zip(
-            inventory.pages, predicted, model_output, actual, strict=True
-        ):
-            row = {
-                "Inventory": inventory.full_inv_nr(),
-                "Predicted": _prediction.name,
-                "Actual": "" if _actual == SequenceLabel.UNK else _actual.name,
-                "Page ID": page.doc_id,
-                f"Text (first {output_chars} characters)": page.text(delimiter="; ")[
-                    :output_chars
-                ],
-                "Scores": str(output_row.tolist()),
-            }
-            if self._thumbnail_downloader and page.doc_id:
-                thumbnail_url = self._thumbnail_downloader.thumbnail_url(
-                    inventory, page
+        return pd.DataFrame(
+            [
+                inventory.output_row(
+                    _prediction, _actual, page, output_row, self._thumbnail_downloader
                 )
-                link: str = inventory.link(page)
-
-                row["ThumbnailHtml"] = (
-                    f"<a href='{link}'><img src='{thumbnail_url}' alt='{thumbnail_url}'/></a>"
+                for page, _prediction, output_row, _actual in zip(
+                    inventory.pages, predicted, model_output, actual, strict=True
                 )
-                row["ThumbnailUrl"] = thumbnail_url
-                row["Link"] = link
-
-            rows.append(row)
-
-        assert len(rows) == len(
-            inventory.pages
-        ), f"Expected {len(inventory.pages)} rows, got {len(rows)}."
-
-        return pd.DataFrame(rows)
+            ]
+        )
 
     def predict_documents(self, inventory: Inventory) -> list[list[Page]]:
         """Predict page labels and extract the documents from the inventory.

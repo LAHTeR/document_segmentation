@@ -60,10 +60,12 @@ class RenateAnalysis(Sheet):
                 row[self._INV_NR_COLUMN], row[self._DEEL_VAN_INVENTARIS_COL]
             )
             yield Document(
+                inv_nr=inventory.inv_nr,
+                inventory_part=inventory.inventory_part,
+                label=Tanap(int(row["Code TANAP document category"])),
                 pages=inventory.get_scans(
                     row[self._START_PAGE_COLUMN], row[self._LAST_PAGE_COLUMN] + 1
                 ),
-                label=Tanap(int(row["Code TANAP document category"])),
             )
 
 

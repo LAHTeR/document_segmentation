@@ -47,13 +47,12 @@ class DocumentClassifier(AbstractPageLearner):
             metrics (Metric): Metrics to calculate.
 
         Returns:
-            pd.DataFrame: The model predictions.
+            pd.DataFrame: A DataFrame containing the results per row.
         """
         model_output: torch.Tensor = self(document.pages)
         predicted: Tanap = Tanap(model_output.argmax().item())
         actual: Tanap = document.label
 
-        # TODO: add thumbnails etc
         for metric in metrics:
             metric.update(
                 torch.tensor([predicted]).to(torch.int64).to(self._device),
@@ -61,15 +60,19 @@ class DocumentClassifier(AbstractPageLearner):
             )
 
         return pd.DataFrame(
-            data=[
-                (
-                    predicted.name,
-                    document.label.name,
-                    document.pages[0].external_ref,
-                    document.pages[-1].external_ref,
+            [
+                {
+                    "First Page Scan": document.pages[0].scan_nr,
+                    "Last Page Scan": document.pages[-1].scan_nr,
+                }
+                | document.output_row(
+                    predicted,
+                    actual,
+                    document.pages[0],
+                    model_output,
+                    self._thumbnail_downloader,
                 )
-            ],
-            columns=["Predicted", "Actual", "First Page", "Last Page"],
+            ]
         )
 
     def _class_counts(self, docs: Iterable[Document]) -> Counter[Tanap]:

@@ -27,7 +27,7 @@ from ...settings import (
     SERVER_USERNAME,
     THUMBNAILS_DIR,
 )
-from .label import SequenceLabel
+from .label import Label, SequenceLabel
 from .page import Page
 
 
@@ -59,7 +59,7 @@ class Inventory(BaseModel, Dataset):
                 # Not an integer
                 pass
             else:
-                logging.warning("Removing invalid inventory part: '%s'", value)
+                logging.info("Removing invalid inventory part: '%s'", value)
                 value = default_value
         return value
 
@@ -215,6 +215,7 @@ class Inventory(BaseModel, Dataset):
         return delimiter.join([str(self.inv_nr), self.inventory_part]).rstrip(delimiter)
 
     def labels(self) -> list[SequenceLabel]:
+        """Get the labels of all pages in this dataset."""
         return [page.label for page in self.pages]
 
     def class_counts(self) -> Counter[SequenceLabel]:
@@ -546,6 +547,32 @@ class Inventory(BaseModel, Dataset):
 
         return inventory
 
+    def output_row(
+        self,
+        prediction: Label,
+        actual: Label,
+        page: Page,
+        output: torch.Tensor,
+        thumbnail_downloader: Optional["ThumbnailDownloader"] = None,
+        *,
+        output_chars: int = 100,
+    ):
+        row = {
+            "Inventory": self.full_inv_nr(),
+            "Predicted": prediction.name,
+            "Actual": actual.name if actual else "",
+            "Page ID": page.doc_id,
+            f"Text (first {output_chars} characters)": page.text(delimiter="; ")[
+                :output_chars
+            ],
+            "Scores": str(output.tolist()),
+        }
+
+        if thumbnail_downloader and page.doc_id is not None:
+            row.update(thumbnail_downloader.get_metadata(self, page))
+
+        return row
+
 
 class ThumbnailDownloader:
     """Retrieve thumbnails for scans in an inventory."""
@@ -565,6 +592,27 @@ class ThumbnailDownloader:
         self._thumbnails_dir = thumbnails_dir
 
         self._session = requests.Session()
+
+    def get_metadata(self, inventory: Inventory, page: Page) -> dict:
+        """Get a dictionary with thumbnail metadata for the given page.
+
+        Args:
+            inventory (Inventory): The inventory.
+            page (Page): The page.
+        Returns:
+            dict: A dictionary with thumbnail metadata fields.
+        """
+        if not page.doc_id:
+            raise ValueError(f"Page {page.scan_nr} has no doc_id")
+
+        thumbnail_url = self.thumbnail_url(inventory, page)
+        link: str = inventory.link(page)
+
+        return {
+            "ThumbnailHtml": f"<a href='{link}'><img src='{thumbnail_url}' alt='Thumbnail of the page'/></a>",
+            "ThumbnailUrl": thumbnail_url,
+            "Link": link,
+        }
 
     def get_uuid(self, inventory: Inventory) -> UUID:
         return self._mapping[inventory.full_inv_nr()]
