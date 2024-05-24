@@ -56,15 +56,15 @@ class DocumentClassifier(AbstractPageLearner):
         # TODO: add thumbnails etc
         for metric in metrics:
             metric.update(
-                torch.Tensor(predicted.to_list()).to(torch.int64).to(self._device),
-                torch.Tensor(actual.to_list()).to(torch.int64).to(self._device),
+                torch.tensor([predicted]).to(torch.int64).to(self._device),
+                torch.tensor([actual]).to(torch.int64).to(self._device),
             )
 
         return pd.DataFrame(
             data=[
                 (
-                    predicted,
-                    document.label,
+                    predicted.name,
+                    document.label.name,
                     document.pages[0].external_ref,
                     document.pages[-1].external_ref,
                 )
