@@ -47,8 +47,8 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
     See https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
     Can be overriden by subclasses."""
 
-    _MULTI_LABEL: bool
-    """If True, the model outputs a label per page, otherwise one per document.
+    _MULTI_LABEL: bool = NotImplemented
+    """If True, the model outputs one label per page, otherwise one per document.
     Must be set by subclasses.
     """
 
@@ -202,7 +202,7 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         self.train()
 
         if weights is None:
-            weights = torch.Tensor(self._total_class_weights(training_data)).to(
+            weights = torch.Tensor(self.total_class_weights(training_data)).to(
                 self._device
             )
         if not len(weights) == len(self._LABEL_TYPE):
@@ -401,7 +401,7 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         """
         return NotImplemented
 
-    def _total_class_weights(self, docs: Iterable[Inventory | Document]) -> list[float]:
+    def total_class_weights(self, docs: Iterable[Inventory | Document]) -> list[float]:
         """Get the inverse frequency of each label in this dataset.
 
         Applies add-one smoothing to avoid division by zero.

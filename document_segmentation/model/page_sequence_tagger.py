@@ -17,6 +17,7 @@ class PageSequenceTagger(AbstractPageLearner):
 
     _LOSS_REDUCTION = "sum"
     _LABEL_TYPE = SequenceLabel
+    _MULTI_LABEL = True
 
     def _wand_config(
         self,
