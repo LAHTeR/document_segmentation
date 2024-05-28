@@ -60,4 +60,5 @@ class Tanap(Label):
     STUKKEN_SCHEPEN = 13
     STUKKEN_OVERIG = 14
 
-    # TODO: add FRONT_MATTER etc
+    FRONT_MATTER = 15
+    """Front or back matter of a document."""

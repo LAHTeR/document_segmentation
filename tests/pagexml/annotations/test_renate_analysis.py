@@ -47,6 +47,7 @@ class TestRenateAnalysis:
         assert preprocessed.labels() == expected_labels
         assert [page.scan_nr for page in preprocessed.pages] == expected_scan_nrs
 
+    # FIXME: mock request
     def test_documents(self, test_sheet):
         expected_labels = 3 * [Tanap.DAGREGISTERS]
         expected_lengths = [60, 42, 68]
@@ -56,6 +57,18 @@ class TestRenateAnalysis:
         ):
             assert document.label == label
             assert len(document) == length
+
+    @pytest.mark.parametrize(
+        "tanap_id,expected_category",
+        [
+            (1, Tanap.BRIEVEN_BINNEN),
+            (5084.0, Tanap.BRIEVEN_NEDERLAND),
+            (83347, Tanap.STUKKEN_SCHEPEN),
+            (170132, Tanap.STUKKEN_BOEKHOUDING),
+        ],
+    )
+    def test_tanap_category(self, test_sheet, tanap_id: int, expected_category: Tanap):
+        assert test_sheet._tanap_category(tanap_id) == expected_category
 
 
 class TestRenateAnalysisInv:
