@@ -1,6 +1,6 @@
 import logging
 from collections import Counter
-from typing import Any, Iterable
+from typing import Iterable
 
 import pandas as pd
 import torch
@@ -20,21 +20,6 @@ class PageSequenceTagger(AbstractPageLearner):
     _LABEL_TYPE = SequenceLabel
     _MULTI_LABEL = True
 
-    def _wand_config(
-        self,
-        training_inventories: list[Inventory],
-        validation_inventories: dict[str, list[Inventory]],
-    ) -> dict[str, Any]:
-        return {
-            "training size": {
-                "inventories": len(training_inventories),
-                "pages": sum(len(inv) for inv in training_inventories),
-            },
-            "validation sets": {
-                key: len(invs) for key, invs in (validation_inventories or {}).items()
-            },
-        }
-
     def _filter_training_data(self, inventory: Inventory) -> bool:
         """Filter out training data samples.
 
@@ -50,45 +35,6 @@ class PageSequenceTagger(AbstractPageLearner):
                 f"Inventory '{inventory}' larger than {MAX_INVENTORY_SIZE} pages."
             )
         return len(inventory) > 1
-
-    def _validate(
-        self, validation_inventories: dict[str, list[Inventory]], *, epoch: int
-    ) -> tuple[float, pd.DataFrame]:
-        results: dict[str, pd.DataFrame] = {}
-        for sheet_name, _validation in validation_inventories.items():
-            if _validation:
-                precision, recall, f1, accuracy, output = self.eval_(
-                    _validation, sheet_name
-                )
-                # log metrics per sheet for each epoch
-                self._log_wandb(
-                    sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
-                )
-                results[sheet_name] = output
-            else:
-                logging.warning(f"Empty validation set for '{sheet_name}'.")
-
-        # FIXME: re-running the evaluation on all inventories is redundant
-        all_validation_inventories = [
-            inventory
-            for values in validation_inventories.values()
-            for inventory in values
-        ]
-        if all_validation_inventories:
-            sheet_name = "total"
-            precision, recall, f1, accuracy, output = self.eval_(
-                all_validation_inventories, sheet_name
-            )
-            # Log total metrics
-            self._log_wandb(
-                sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
-            )
-
-            score = f1.compute().mean().item()
-        else:
-            logging.warning("All validation sets are empty.")
-            score = 0
-        return score, results
 
     @torch.inference_mode()
     def predict(self, inventory: Inventory, *metrics: Metric) -> pd.DataFrame:
@@ -165,7 +111,8 @@ class PageSequenceTagger(AbstractPageLearner):
 
         return labels
 
-    def _class_counts(self, inventories: Iterable[Inventory]) -> Counter[SequenceLabel]:
+    @staticmethod
+    def _class_counts(inventories: Iterable[Inventory]) -> Counter[SequenceLabel]:
         """
         Count the number of labels in the given inventories.
 

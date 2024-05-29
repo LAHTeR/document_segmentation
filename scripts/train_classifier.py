@@ -5,9 +5,16 @@ from pathlib import Path
 import torch
 
 from document_segmentation.model.document_classifier import DocumentClassifier
-from document_segmentation.pagexml.annotations.renate_analysis import RenateAnalysis
+from document_segmentation.model.page_learner import AbstractPageLearner
+from document_segmentation.pagexml.annotations.renate_analysis import (
+    RenateAnalysis,
+    RenateAnalysisInv,
+)
 from document_segmentation.pagexml.datamodel.document import Document
-from document_segmentation.settings import RENATE_TANAP_CATEGORISATION_SHEET
+from document_segmentation.settings import (
+    RENATE_ANALYSIS_SHEETS,
+    RENATE_TANAP_CATEGORISATION_SHEET,
+)
 
 if __name__ == "__main__":
     ########################################################################################
@@ -23,6 +30,15 @@ if __name__ == "__main__":
         default=RENATE_TANAP_CATEGORISATION_SHEET,
         help="The sheet with input annotations (Appendix F Renate Analysis).",
     )
+    arg_parser.add_argument(
+        "--renate-analysis-sheet",
+        nargs="*",
+        type=str,
+        default=RENATE_ANALYSIS_SHEETS,
+        help="The sheet with input annotations (Entire inventories from Renate's Analyses).",
+    )
+    arg_parser.add_argument("--split", type=float, default=0.8, help="Train/val split.")
+
     arg_parser.add_argument(
         "--max-documents",
         "--max",
@@ -54,18 +70,30 @@ if __name__ == "__main__":
     # LOAD ANNOTATION SHEETS AND DATA
     ########################################################################################
 
-    sheet = RenateAnalysis(sheet_file=args.renate_categorisation_sheet)
-    documents: list[Document] = list(sheet.documents(n=args.max_documents))
+    training_data: list[Document] = []
+    validation_data: dict[str, list[Document]] = dict()
 
-    assert all(doc.label for doc in documents), "Some documents have no label."
+    sheet = RenateAnalysis(sheet_file=args.renate_categorisation_sheet)
+    docs = list(sheet.documents(n=args.max_documents))
+    train, validation = AbstractPageLearner.split(docs, split=args.split)
+    training_data.extend(train)
+    validation_data[args.renate_categorisation_sheet.name] = validation
+
+    if args.renate_categorisation_sheet:
+        docs = []
+        for inv_sheet in args.renate_analysis_sheet:
+            docs.extend(
+                sheet.documents_from_sheet(
+                    RenateAnalysisInv(sheet_file=inv_sheet), n=args.max_documents
+                )
+            )
+
+        train, validation = AbstractPageLearner.split(docs, split=args.split)
+
+        training_data.extend(train)
+        validation_data["renate_analysis_inv"] = validation
 
     # TODO: add Generale Missiven
-    # TODO: add entire inventories, including front matters
-
-    random.shuffle(documents)
-    split = int(len(documents) * 0.8)
-    training_data = documents[:split]
-    validation_data = documents[split:]
 
     model = DocumentClassifier()
     best_model = model.train_(training_data, validation_data, epochs=args.epochs)

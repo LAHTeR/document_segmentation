@@ -1,4 +1,3 @@
-import logging
 from collections import Counter
 from typing import Iterable
 
@@ -14,28 +13,6 @@ from .page_learner import AbstractPageLearner
 class DocumentClassifier(AbstractPageLearner):
     _MULTI_LABEL: bool = False
     _LABEL_TYPE = Tanap
-
-    def _validate(
-        self, validation_docs: list[Document], *, epoch: int
-    ) -> tuple[float, pd.DataFrame]:
-        results: dict[str, pd.DataFrame] = {}
-
-        if validation_docs:
-            sheet_name = "total"
-            precision, recall, f1, accuracy, output = self.eval_(
-                validation_docs, sheet_name
-            )
-            results[sheet_name] = output
-
-            # Log total metrics
-            self._log_wandb(
-                sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
-            )
-            score = f1.compute().mean().item()
-        else:
-            logging.warning("All validation sets are empty.")
-            score = 0
-        return score, results
 
     @torch.inference_mode()
     def predict(self, document: Document, *metrics: Metric) -> pd.DataFrame:
@@ -75,7 +52,8 @@ class DocumentClassifier(AbstractPageLearner):
             ]
         )
 
-    def _class_counts(self, docs: Iterable[Document]) -> Counter[Tanap]:
+    @staticmethod
+    def _class_counts(docs: Iterable[Document]) -> Counter[Tanap]:
         """Count the number of labels in the given documents.
 
         Returns:

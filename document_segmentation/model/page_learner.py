@@ -21,8 +21,6 @@ from torcheval.metrics import (
 )
 from tqdm import tqdm
 
-from document_segmentation.pagexml.datamodel.document import Document
-
 from .. import settings
 from ..pagexml.datamodel.inventory import (
     Inventory,
@@ -156,23 +154,10 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         softmax = self._softmax(output)
         return softmax
 
-    def _wandb_config(self, training_data, validation_data) -> dict[str, Any]:
-        """Class-specific configuration for Weights & Biases.
-
-        Can be overriden by sub-classes.
-
-        Args:
-            training_data: The training data.
-            validation_data: The validation data.
-        Returns:
-            dict[str, Any]: The configuration dictionary for merging with general WandB configuration.
-        """
-        return {}
-
     def train_(
         self,
-        training_data: list[Inventory | Document],
-        validation_data=None,
+        training_data: list[Inventory],
+        validation_data: dict[str, list[Inventory]] = None,
         *,
         epochs: int = 3,
         weights: list[float] = None,
@@ -217,8 +202,17 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
             if self.wandb_run is None:
                 self.wandb_run = wandb.init(
                     project=self.__class__.__name__,
-                    config=self._wandb_config(training_data, validation_data)
-                    | {
+                    config={
+                        "training data": self._data_config(training_data),
+                        "validation data": {
+                            name: self._data_config(docs)
+                            for name, docs in (validation_data or {}).items()
+                        }
+                        | {
+                            "total": self._data_config(
+                                sum(validation_data.values(), [])
+                            )
+                        },
                         "epochs": epochs,
                         "weights": {
                             label.name: weight
@@ -308,6 +302,55 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
 
         return best_model or self.state_dict()
 
+    @torch.inference_mode()
+    def _validate(
+        self, validation_inventories: dict[str, list[Inventory]], *, epoch: int
+    ) -> tuple[float, pd.DataFrame]:
+        """Validate the model on the given dataset.
+
+        Args:
+            validation_inventories (dict[str, list[Inventory]]): The datasets to validate on.
+            epoch (int): The epoch number.
+        Returns:
+            tuple[float, pd.DataFrame]: The average F1 score and a DataFrame containing the results per row.
+        """
+
+        results: dict[str, pd.DataFrame] = {}
+        for sheet_name, _validation in validation_inventories.items():
+            if _validation:
+                precision, recall, f1, accuracy, output = self.eval_(
+                    _validation, sheet_name
+                )
+                # log metrics per sheet for each epoch
+                self._log_wandb(
+                    sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
+                )
+                results[sheet_name] = output
+            else:
+                logging.warning(f"Empty validation set for '{sheet_name}'.")
+
+        # FIXME: re-running the evaluation on all inventories is redundant
+        all_validation_inventories = [
+            inventory
+            for values in validation_inventories.values()
+            for inventory in values
+        ]
+        if all_validation_inventories:
+            sheet_name = "total"
+            precision, recall, f1, accuracy, output = self.eval_(
+                all_validation_inventories, sheet_name
+            )
+            # Log total metrics
+            self._log_wandb(
+                sheet_name, epoch, metrics=(precision, recall, f1, accuracy)
+            )
+
+            score = f1.compute().mean().item()
+        else:
+            logging.warning("All validation sets are empty.")
+            score = 0
+        return score, results
+
     def _filter_training_data(self, doc: Inventory) -> bool:
         """Filter out training data samples.
 
@@ -353,20 +396,6 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
 
     @abc.abstractmethod
     @torch.inference_mode()
-    def _validate(self, validation_data, *, epoch: int) -> tuple[float, pd.DataFrame]:
-        """Get model predictions for all pages in the given inventory.
-        Metrics are updated in-place.
-
-        Args:
-            validation_data: The data to infer label(s) for.
-            metrics (Metric): The metrics to update.
-        Returns:
-            pd.DataFrame: A DataFrame containing the results per row.
-        """
-        return NotImplemented
-
-    @abc.abstractmethod
-    @torch.inference_mode()
     def predict(self, data, *metrics: Metric) -> pd.DataFrame:
         return NotImplemented
 
@@ -388,8 +417,9 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         """
         return [self._LABEL_TYPE(arg) for arg in model_output.argmax(dim=1).tolist()]
 
+    @staticmethod
     @abc.abstractmethod
-    def _class_counts(self, docs: Iterable[Inventory | Document]) -> Counter:
+    def _class_counts(self, docs: Iterable[Inventory]) -> Counter:
         """Get the frequency of each label in this dataset.
 
         To be implemented by subclasses.
@@ -399,7 +429,7 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         """
         return NotImplemented
 
-    def total_class_weights(self, docs: Iterable[Inventory | Document]) -> list[float]:
+    def total_class_weights(self, docs: Iterable[Inventory]) -> list[float]:
         """Get the inverse frequency of each label in this dataset.
 
         Applies add-one smoothing to avoid division by zero.
@@ -423,3 +453,37 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
         inverse_frequencies[self._LABEL_TYPE.UNK] = 0.0
 
         return inverse_frequencies
+
+    @staticmethod
+    def split(
+        docs: list[Inventory], split: float
+    ) -> tuple[list[Inventory], list[Inventory]]:
+        """Split the dataset into training and validation sets.
+
+        Args:
+            docs (list[Inventory]): The dataset to split.
+            split (float): The fraction of the dataset to use for training.
+        Returns:
+            tuple[list[Inventory], list[Inventory]]: The training and validation datasets.
+        """
+        random.shuffle(docs)
+        split_index = int(len(docs) * split)
+        return docs[:split_index], docs[split_index:]
+
+    def _data_config(self, data: list[Inventory]):
+        """Create an entry for logging properties of a dataset.
+
+        Args:
+            data (list[Inventory]): The dataset; can be Inventory or Document objects
+        Returns:
+            dict[str, Any]: A dictionary ready for logging to WandB.
+
+
+        """
+        return {
+            "documents": len(data),
+            "pages": sum(len(doc) for doc in data),
+            "labels": {
+                label.name: count for label, count in self._class_counts(data).items()
+            },
+        }

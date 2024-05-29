@@ -48,6 +48,10 @@ class TestRenateAnalysis:
         assert [page.scan_nr for page in preprocessed.pages] == expected_scan_nrs
 
     # FIXME: mock request
+    @pytest.mark.skipif(
+        not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
+        reason="No server credentials",
+    )
     def test_documents(self, test_sheet):
         expected_labels = 3 * [Tanap.DAGREGISTERS]
         expected_lengths = [60, 42, 68]
