@@ -164,8 +164,12 @@ class RenateAnalysisInv(Sheet):
         super().__init__(inventory_dir=inventory_dir)
 
         self._data = pd.read_csv(
-            sheet_file, delimiter=";", index_col=self._INDEX_COLUMN, thousands="."
-        )
+            sheet_file,
+            delimiter=";",
+            index_col=self._INDEX_COLUMN,
+            thousands=".",
+            dtype={self._LABEL_COLUMN: str, self._SUB_DOC_COLUMN: str},
+        ).fillna("")
 
         self._id = sheet_file.stem
         self._inventory = Inventory.load_or_download(
