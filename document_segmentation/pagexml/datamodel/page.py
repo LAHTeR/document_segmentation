@@ -5,14 +5,14 @@ from pagexml.model.physical_document_model import PageXMLScan
 from pydantic import BaseModel, PositiveInt, ValidationError, field_validator
 
 from ...settings import MIN_REGION_TEXT_LENGTH
-from .label import Label
+from .label import SequenceLabel
 from .region import Region
 
 
 class Page(BaseModel):
     """Class for representing a page in a PageXML file."""
 
-    label: Label
+    label: SequenceLabel
     scan_nr: PositiveInt
     doc_id: Optional[str] = None
     external_ref: str
@@ -22,7 +22,7 @@ class Page(BaseModel):
     def enum_from_int(cls, value):
         if isinstance(value, int):
             try:
-                value = Label(value)
+                value = SequenceLabel(value)
             except ValueError as e:
                 raise ValidationError from e
         return value
@@ -33,7 +33,7 @@ class Page(BaseModel):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def annotate(self, label: Label) -> "Page":
+    def annotate(self, label: SequenceLabel) -> "Page":
         """Annotate the page with a label in-place.
 
         If the label has already been set to BEGIN or END, it is changed to END_BEGIN.
@@ -51,10 +51,10 @@ class Page(BaseModel):
         return len(self.text()) < max_chars
 
     def empty(self) -> "Page":
-        if self.label != Label.UNK:
+        if self.label != SequenceLabel.UNK:
             logging.warning(f"Emptying page with label '{self.label.name}'.")
         self.regions = []
-        self.label = Label.OUT
+        self.label = SequenceLabel.OUT
         return self
 
     def guess_doc_id(self, inv_nr: str) -> str:
@@ -85,7 +85,7 @@ class Page(BaseModel):
         return self
 
     @classmethod
-    def from_pagexml(cls, label: Label, scan_nr: int, pagexml: PageXMLScan):
+    def from_pagexml(cls, label: SequenceLabel, scan_nr: int, pagexml: PageXMLScan):
         """Create a Page object from a PageXML object.
 
         Args:

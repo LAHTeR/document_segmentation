@@ -4,7 +4,7 @@ import torch
 from torch import nn, optim
 from tqdm import tqdm
 
-from ..pagexml.datamodel.label import Label
+from ..pagexml.datamodel.label import SequenceLabel
 from ..pagexml.datamodel.region import Region
 from ..settings import LANGUAGE_MODEL, REGION_TYPE_EMBEDDING_SIZE
 from .dataset import RegionDataset
@@ -33,7 +33,7 @@ class RegionClassifier(nn.Module, DeviceModule):
 
         self._linear = nn.Linear(
             in_features=self.text_embedding_size + region_type_embedding_size,
-            out_features=len(Label),
+            out_features=len(SequenceLabel),
         )
 
         self._softmax = nn.Softmax(dim=1)
@@ -62,8 +62,10 @@ class RegionClassifier(nn.Module, DeviceModule):
 
         if weights is None:
             weights = dataset.class_weights()
-        if len(weights) != len(Label):
-            raise ValueError(f"Expected {len(Label)} weights, got {len(weights)}.")
+        if len(weights) != len(SequenceLabel):
+            raise ValueError(
+                f"Expected {len(SequenceLabel)} weights, got {len(weights)}."
+            )
 
         criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights)).to(self._device)
         optimizer = optim.Adam(self.parameters(), lr=0.001)

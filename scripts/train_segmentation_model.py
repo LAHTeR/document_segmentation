@@ -16,7 +16,7 @@ from document_segmentation.pagexml.annotations.renate_analysis import (
     RenateAnalysisInv,
 )
 from document_segmentation.pagexml.datamodel.inventory import Inventory
-from document_segmentation.pagexml.datamodel.label import Label
+from document_segmentation.pagexml.datamodel.label import SequenceLabel
 from document_segmentation.settings import (
     GENERALE_MISSIVEN_SHEET,
     RENATE_ANALYSIS_SHEETS,
@@ -79,7 +79,6 @@ if __name__ == "__main__":
 
     training_args = arg_parser.add_argument_group("Training Arguments")
     training_args.add_argument("--epochs", type=int, default=3, help="Number of epochs")
-    training_args.add_argument("--batch-size", type=int, default=64, help="Batch size")
 
     arg_parser.add_argument(
         "--device",
@@ -143,9 +142,8 @@ if __name__ == "__main__":
     ########################################################################################
     model = PageSequenceTagger(device=args.device)
 
-    weights = Inventory.total_class_weights(
-        validation_inventories["renate_analysis_inv"]
-    )
+    weights = model.total_class_weights(validation_inventories["renate_analysis_inv"])
+
     best_model = model.train_(
         list(chain(*training_inventories.values())),
         validation_inventories,
@@ -188,7 +186,7 @@ if __name__ == "__main__":
                 if average is None:
                     writer = csv.DictWriter(
                         args.eval_output,
-                        fieldnames=["Metric"] + [label.name for label in Label],
+                        fieldnames=["Metric"] + [label.name for label in SequenceLabel],
                         delimiter="\t",
                     )
                     writer.writeheader()
@@ -199,7 +197,7 @@ if __name__ == "__main__":
                             | {
                                 label.name: f"{score:.4f}"
                                 for label, score in zip(
-                                    Label, metric.compute().tolist()
+                                    SequenceLabel, metric.compute().tolist()
                                 )
                             }
                         )

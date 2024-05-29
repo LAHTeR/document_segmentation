@@ -1,7 +1,6 @@
 import gzip
 import json
 import logging
-import sys
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -28,7 +27,7 @@ from ...settings import (
     SERVER_USERNAME,
     THUMBNAILS_DIR,
 )
-from .label import Label
+from .label import Label, SequenceLabel
 from .page import Page
 
 
@@ -60,7 +59,7 @@ class Inventory(BaseModel, Dataset):
                 # Not an integer
                 pass
             else:
-                logging.warning("Removing invalid inventory part: '%s'", value)
+                logging.info("Removing invalid inventory part: '%s'", value)
                 value = default_value
         return value
 
@@ -86,9 +85,9 @@ class Inventory(BaseModel, Dataset):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def annotate_scan(self, scan_nr: int, label: Label):
+    def annotate_scan(self, scan_nr: int, label: SequenceLabel):
         try:
-            page: Page = self.get_scan(scan_nr)
+            _, page = self.get_scan(scan_nr)
             page.annotate(label)
         except IndexError as e:
             raise ValueError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
@@ -101,7 +100,7 @@ class Inventory(BaseModel, Dataset):
         """
 
         documents: list[list[Page]] = []
-        if self.pages[0].label in {Label.BOUNDARY, Label.IN}:
+        if self.pages[0].label in {SequenceLabel.BOUNDARY, SequenceLabel.IN}:
             logging.warning(
                 f"First page {self.pages[0]} of inventory {self} is part of a document."
             )
@@ -112,45 +111,45 @@ class Inventory(BaseModel, Dataset):
         # first and last pages ([0],[-1]) are never part of a document
         for prev, page in zip(self.pages[:-2], self.pages[1:-1], strict=True):
             # validate current state
-            if prev.label == Label.OUT and doc is not None:
+            if prev.label == SequenceLabel.OUT and doc is not None:
                 raise RuntimeError(
                     f"Page {page.scan_nr} is inside a document, but no document has been started."
                 )
 
-            if page.label == Label.UNK:
+            if page.label == SequenceLabel.UNK:
                 logging.warning(
                     f"Unlabelled page {page.scan_nr} in inventory {self.inv_nr}"
                 )
 
             # process page label
-            if page.label == Label.BOUNDARY:
-                if prev.label == Label.OUT:
+            if page.label == SequenceLabel.BOUNDARY:
+                if prev.label == SequenceLabel.OUT:
                     # Start of new document
                     doc = [page]
-                elif prev.label == Label.IN:
+                elif prev.label == SequenceLabel.IN:
                     # End of document
                     doc.append(page)
                     documents.append(doc)
                     doc = None
-                elif prev.label == Label.BOUNDARY:
+                elif prev.label == SequenceLabel.BOUNDARY:
                     if doc is not None:
                         documents.append(doc)  # finish previous document
                     doc = [page]  # start new document
-            if page.label == Label.IN:
+            if page.label == SequenceLabel.IN:
                 if doc is None:
                     raise ValueError(
                         f"Page {page.scan_nr} is inside a document, but no document has been started. Previous: {prev}"
                     )
-                if prev.label == Label.OUT:
+                if prev.label == SequenceLabel.OUT:
                     logging.error(f"Invalid label sequence: {prev} -> {page}.")
                     doc = []
                 doc.append(page)
-            elif page.label == Label.OUT:
-                if prev.label == Label.IN:
+            elif page.label == SequenceLabel.OUT:
+                if prev.label == SequenceLabel.IN:
                     logging.error(f"Invalid label sequence: {prev} -> {page}")
                     documents.append(doc)
                     doc = None
-                elif doc and prev.label == Label.BOUNDARY:
+                elif doc and prev.label == SequenceLabel.BOUNDARY:
                     # Previous page was a single page document
                     documents.append(doc)
                     doc = None
@@ -159,12 +158,38 @@ class Inventory(BaseModel, Dataset):
             assert doc, f"Empty document in inventory {self.inv_nr}: {documents}"
         return documents
 
-    def get_scan(self, scan_nr: int) -> Page:
+    def get_scan(self, scan_nr: int) -> tuple[int, Page]:
         """Get the page with the given scan number."""
-        try:
-            return next((page for page in self.pages if page.scan_nr == scan_nr))
-        except StopIteration as e:
-            raise IndexError(f"Scan {scan_nr} not in inventory ({str(self)})") from e
+        for i, page in enumerate(self.pages):
+            if page.scan_nr == scan_nr:
+                return i, page
+        else:
+            raise IndexError(f"Scan {scan_nr} not in inventory ({str(self)})")
+
+    def get_scans(self, start_scan_nr: int, end_scan_nr: int) -> list[Page]:
+        """Get the pages with the given scan numbers.
+
+        This assumes that the scans in the given range are a consecutive sequence.
+
+        Args:
+            start_scan_nr (int): The start scan number (inclusive).
+            end_scan_nr (int): The end scan number (exclusive).
+
+        Returns:
+            list[Page]: The pages with the given scan numbers.
+
+        Raises:
+            RuntimeError: If the difference between start and end scan numbers is not equal to the number of consecutive pages.
+        """
+        start_index, _ = self.get_scan(start_scan_nr)
+        pages: list[Page] = self.pages[
+            start_index : start_index + (end_scan_nr - start_scan_nr)
+        ]
+        if not pages[-1].scan_nr == end_scan_nr - 1:
+            raise RuntimeError(
+                f"Scan nr of last page does not match requested end scan nr {end_scan_nr}: {pages[-1]}"
+            )
+        return pages
 
     def head(self, n: int) -> "Inventory":
         if (not n) or (len(self) <= n):
@@ -177,7 +202,7 @@ class Inventory(BaseModel, Dataset):
             )
 
     def has_labels(self) -> bool:
-        return any(page.label != Label.UNK for page in self.pages)
+        return any(page.label != SequenceLabel.UNK for page in self.pages)
 
     def full_inv_nr(self, *, delimiter: str = "") -> str:
         """Return the full inventory number plus part if applicable as a string.
@@ -189,10 +214,11 @@ class Inventory(BaseModel, Dataset):
         """
         return delimiter.join([str(self.inv_nr), self.inventory_part]).rstrip(delimiter)
 
-    def labels(self) -> list[Label]:
+    def labels(self) -> list[SequenceLabel]:
+        """Get the labels of all pages in this dataset."""
         return [page.label for page in self.pages]
 
-    def class_counts(self) -> Counter[Label]:
+    def class_counts(self) -> Counter[SequenceLabel]:
         return Counter(self.labels())
 
     def class_weights(self) -> list[float]:
@@ -204,13 +230,13 @@ class Inventory(BaseModel, Dataset):
             list[float]: List of frequency of each label in dataset divided by dataset length.
         """
         counts = self.class_counts()
-        weights = [len(self) / (counts[label] + 1) for label in Label]
-        weights[Label.UNK] = 0.0
+        weights = [len(self) / (counts[label] + 1) for label in SequenceLabel]
+        weights[SequenceLabel.UNK] = 0.0
         return weights
 
     def labelled(self) -> list[Page]:
         """Return the labelled pages in the inventory."""
-        return [page for page in self.pages if page.label != Label.UNK]
+        return [page for page in self.pages if page.label != SequenceLabel.UNK]
 
     def labelled_inventories(self) -> Iterable["Inventory"]:
         # TODO: remove this method
@@ -235,14 +261,14 @@ class Inventory(BaseModel, Dataset):
             for page in self.pages:
                 if pages is None:
                     # outside of any document
-                    if page.label != Label.UNK:
+                    if page.label != SequenceLabel.UNK:
                         # new document starting
                         pages = [page]
                     else:
                         pass
                 else:
                     # inside a document
-                    if page.label != Label.UNK:
+                    if page.label != SequenceLabel.UNK:
                         # document continues
                         pages.append(page)
                     else:
@@ -294,17 +320,20 @@ class Inventory(BaseModel, Dataset):
         if not self.has_labels():
             logging.warning(f"No labels in inventory {self.inv_nr}")
         for page in self.pages:
-            if page.label == Label.UNK:
+            if page.label == SequenceLabel.UNK:
                 page.empty()
         return self
 
     def remove_scan(self, scan_nr: int) -> "Inventory":
         """Remove the page with the given scan number."""
-        page = self.get_scan(scan_nr)
-        self.pages.remove(page)
+        i, _ = self.get_scan(scan_nr)
+        self.pages.pop(i)
 
     def remove_empty_pages(
-        self, *, max_length: int = MAX_EMPTY_SEQUENCE, label: Label = Label.OUT
+        self,
+        *,
+        max_length: int = MAX_EMPTY_SEQUENCE,
+        label: SequenceLabel = SequenceLabel.OUT,
     ) -> "Inventory":
         """Remove all unlabelled pages without text.
 
@@ -384,31 +413,6 @@ class Inventory(BaseModel, Dataset):
         with target_file.open(mode) as f:
             f.write(self.model_dump_json())
         return target_file
-
-    @staticmethod
-    def total_class_weights(inventories: Iterable["Inventory"]) -> list[float]:
-        """Get the inverse frequency of each label in this dataset.
-
-        Applies add-one smoothing to avoid division by zero.
-
-        Returns:
-            list[float]: List of frequency of each label in dataset divided by dataset length.
-        """
-        counts: Counter[Label] = sum(
-            (inventory.class_counts() for inventory in inventories), start=Counter()
-        )
-        try:
-            total = counts.total()
-        except AttributeError as e:
-            logging.warning(
-                f"Python version: '{sys.version}': {str(e)}. Using sum(counts.values()) instead."
-            )
-            total = sum(counts.values())
-
-        inverse_freq: list[float] = [total / (counts[label] + 1) for label in Label]
-        inverse_freq[Label.UNK] = 0.0
-
-        return inverse_freq
 
     @staticmethod
     def local_file(inv_nr: int, inventory_part: str, directory: Path) -> Path:
@@ -529,7 +533,9 @@ class Inventory(BaseModel, Dataset):
                     try:
                         pagexml = parse_pagexml_file(tmp_file)
                         scan_nr: int = int(tmp_file.stem.split("_")[-1])
-                        pages.append(Page.from_pagexml(Label.UNK, scan_nr, pagexml))
+                        pages.append(
+                            Page.from_pagexml(SequenceLabel.UNK, scan_nr, pagexml)
+                        )
                     except IsADirectoryError:
                         continue
         inventory = cls(
@@ -540,6 +546,32 @@ class Inventory(BaseModel, Dataset):
         inventory.write(local_file)
 
         return inventory
+
+    def output_row(
+        self,
+        prediction: Label,
+        actual: Label,
+        page: Page,
+        output: torch.Tensor,
+        thumbnail_downloader: Optional["ThumbnailDownloader"] = None,
+        *,
+        output_chars: int = 100,
+    ):
+        row = {
+            "Inventory": self.full_inv_nr(),
+            "Predicted": prediction.name,
+            "Actual": actual.name if actual else "",
+            "Page ID": page.doc_id,
+            f"Text (first {output_chars} characters)": page.text(delimiter="; ")[
+                :output_chars
+            ],
+            "Scores": str(output.tolist()),
+        }
+
+        if thumbnail_downloader and page.doc_id is not None:
+            row.update(thumbnail_downloader.get_metadata(self, page))
+
+        return row
 
 
 class ThumbnailDownloader:
@@ -560,6 +592,27 @@ class ThumbnailDownloader:
         self._thumbnails_dir = thumbnails_dir
 
         self._session = requests.Session()
+
+    def get_metadata(self, inventory: Inventory, page: Page) -> dict:
+        """Get a dictionary with thumbnail metadata for the given page.
+
+        Args:
+            inventory (Inventory): The inventory.
+            page (Page): The page.
+        Returns:
+            dict: A dictionary with thumbnail metadata fields.
+        """
+        if not page.doc_id:
+            raise ValueError(f"Page {page.scan_nr} has no doc_id")
+
+        thumbnail_url = self.thumbnail_url(inventory, page)
+        link: str = inventory.link(page)
+
+        return {
+            "ThumbnailHtml": f"<a href='{link}'><img src='{thumbnail_url}' alt='Thumbnail of the page'/></a>",
+            "ThumbnailUrl": thumbnail_url,
+            "Link": link,
+        }
 
     def get_uuid(self, inventory: Inventory) -> UUID:
         return self._mapping[inventory.full_inv_nr()]
