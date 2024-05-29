@@ -35,7 +35,7 @@ from .page_embedding import PageEmbedding
 class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
-    _LOSS_REDUCTION = "mean"
+    _LOSS_REDUCTION: str = "mean"
     """The reduction method for the loss function.
     See https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
     Can be overriden by subclasses."""
@@ -45,9 +45,9 @@ class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
     Must be set by subclasses.
     """
 
-    _LABEL_TYPE: type[IntEnum]
+    _LABEL_TYPE: type[IntEnum] = NotImplemented
     """The type of label used by the model.
-    Must be set by the sub-classes"""
+    Must be set by subclasses"""
 
     def __init__(
         self,
