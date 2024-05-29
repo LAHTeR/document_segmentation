@@ -93,9 +93,14 @@ if __name__ == "__main__":
         training_data.extend(train)
         validation_data["renate_analysis_inv"] = validation
 
-    # TODO: add Generale Missiven
+    # TODO: add Generale Missiven?
 
     model = DocumentClassifier()
-    best_model = model.train_(training_data, validation_data, epochs=args.epochs)
+    best_model = model.train_(
+        training_data,
+        validation_data,
+        epochs=args.epochs,
+        weights=model.total_class_weights(validation_data["renate_analysis_inv"]),
+    )
 
     torch.save(best_model, args.model_file)
