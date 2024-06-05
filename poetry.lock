@@ -3163,13 +3163,13 @@ stats = ["scipy (>=1.7)", "statsmodels (>=0.12)"]
 
 [[package]]
 name = "sentence-transformers"
-version = "2.7.0"
+version = "3.0.0"
 description = "Multilingual text embeddings"
 optional = false
 python-versions = ">=3.8.0"
 files = [
-    {file = "sentence_transformers-2.7.0-py3-none-any.whl", hash = "sha256:6a7276b05a95931581bbfa4ba49d780b2cf6904fa4a171ec7fd66c343f761c98"},
-    {file = "sentence_transformers-2.7.0.tar.gz", hash = "sha256:2f7df99d1c021dded471ed2d079e9d1e4fc8e30ecb06f957be060511b36f24ea"},
+    {file = "sentence_transformers-3.0.0-py3-none-any.whl", hash = "sha256:9bf851b688b796e5fb06c920921efd5e5e05ee616e85cb3026fbdfe4dcf15bf3"},
+    {file = "sentence_transformers-3.0.0.tar.gz", hash = "sha256:52d4101654ed107a28e9fa5110fce399084b55e7838fd8256471353ddc299033"},
 ]
 
 [package.dependencies]
@@ -3183,7 +3183,8 @@ tqdm = "*"
 transformers = ">=4.34.0,<5.0.0"
 
 [package.extras]
-dev = ["pre-commit", "pytest", "ruff (>=0.3.0)"]
+dev = ["accelerate (>=0.20.3)", "datasets", "pre-commit", "pytest", "ruff (>=0.3.0)"]
+train = ["accelerate (>=0.20.3)", "datasets"]
 
 [[package]]
 name = "sentry-sdk"
@@ -4054,4 +4055,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "dca22b5194ecc07f7ed54da37678cd8d51c2ec9c2b71b2b3e975c6327215e2ba"
+content-hash = "d92d69bf6a918ab7377cb152def60f3c90bae9c2dca582f44e6a490ffeefdb55"
