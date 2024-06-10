@@ -3163,13 +3163,13 @@ stats = ["scipy (>=1.7)", "statsmodels (>=0.12)"]
 
 [[package]]
 name = "sentence-transformers"
-version = "3.0.0"
+version = "3.0.1"
 description = "Multilingual text embeddings"
 optional = false
 python-versions = ">=3.8.0"
 files = [
-    {file = "sentence_transformers-3.0.0-py3-none-any.whl", hash = "sha256:9bf851b688b796e5fb06c920921efd5e5e05ee616e85cb3026fbdfe4dcf15bf3"},
-    {file = "sentence_transformers-3.0.0.tar.gz", hash = "sha256:52d4101654ed107a28e9fa5110fce399084b55e7838fd8256471353ddc299033"},
+    {file = "sentence_transformers-3.0.1-py3-none-any.whl", hash = "sha256:01050cc4053c49b9f5b78f6980b5a72db3fd3a0abb9169b1792ac83875505ee6"},
+    {file = "sentence_transformers-3.0.1.tar.gz", hash = "sha256:8a3d2c537cc4d1014ccc20ac92be3d6135420a3bc60ae29a3a8a9b4bb35fbff6"},
 ]
 
 [package.dependencies]
@@ -4055,4 +4055,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "e07ab4902ed372f1584cd060a25fbc16fbad69079d6d14852b053c09edb67e14"
+content-hash = "42469a37be58fed8d0faca1bcfeca536d3ac6d5f96fa370375aa5b71f02c5b0a"
