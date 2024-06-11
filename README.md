@@ -12,7 +12,46 @@
 ![Build & Test](https://github.com/LAHTeR/document_segmentation/actions/workflows/build-test.yaml/badge.svg?branch=feature/badges)
 ![Ruff](https://github.com/LAHTeR/document_segmentation/actions/workflows/ruff.yaml/badge.svg?branch=feature/badges)
 
-## Prerequsites
+## Overview
+
+This repository provides tooling for processing VOC inventories to
+
+1. extract document boundaries and
+1. classify documents
+
+For both cases, two scripts exist respectively:
+
+1. train a new model
+2. apply a model
+
+### Definitions and Workflow
+
+- An _inventory_ is a collection of pages.
+- A _document_ is a subset of such pages; a document can start and end on the same page, or stretch over hundreds of pages.
+- A document falls in a `TANAP category`, as defined in the `Tanap` class in [label.py](document_segmentation/pagexml/datamodel/label.py).
+
+There are two separate tasks defined in this repository:
+
+- segmenting inventories: identify the boundaries of individual documents inside an inventory
+- classifying documents: identify the category of a document
+
+### Training and Applying Models
+
+For each task, there is a script to train a model:
+
+- [train_segmentation_model.py](scripts/train_segmentation_model.py)
+- [train_classifier.py](scripts/train_classifier.py)
+
+Both produce a model file; run either script with the `--help` argument for the specifics.
+
+In order to apply a model as produced by the respective training script, call
+
+- [extract_docs.py](scripts/extract_docs.py) for the document segmentation model
+- [classify_documents.py](scripts/classify_documents.py) for the document classification model
+
+Again, run any of the scripts with the `--help` argument to get the specific usage.
+
+## Prerequisites
 
 ### Install Poetry
 
@@ -36,7 +75,7 @@ poetry install
 
 ## Usage
 
-To *train* a model run the [`scripts/train_model.py`](scripts/train_segmentation_model.py) script.
+To _train_ a model run the [`scripts/train_model.py`](scripts/train_segmentation_model.py) script.
 It downloads the necessary data from the HUC server into the local temporary directory.
 
 Set your HUC credentials in the `HUC_USER` and `HUC_PASSWORD` environment variables or in [`settings.py`](document_segmentation/settings.py), and run the script.
@@ -86,6 +125,11 @@ poetry run pytest
 ```
 
 ### Architecture
+
+Both document segmentation and classification are based on page embeddings that are defined in the `PageEmbedding` class.
+The models are implemented in the `PageSequenceTagger` and the `DocumentClassifier` class respectively, both are sub-classes of the `AbstractPageLearner` class (see diagram below).
+
+Details like layer sizes and other hyper-parameters are defined in [settings.py](document_segmentation/settings.py).
 
 #### Classes Diagram
 
