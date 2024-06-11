@@ -1,6 +1,6 @@
 import logging
 from collections import Counter
-from typing import Iterable
+from typing import Iterable, Optional
 
 import pandas as pd
 import torch
@@ -96,9 +96,11 @@ class PageSequenceTagger(AbstractPageLearner):
             curr = SequenceLabel(model_output[i].argmax().item())
             next = SequenceLabel(model_output[i + 1].argmax().item())
 
-            correction = None
+            correction: Optional[SequenceLabel] = None
             if prev == SequenceLabel.OUT and next == SequenceLabel.IN:
-                correction: SequenceLabel = SequenceLabel.BOUNDARY
+                correction = SequenceLabel.BOUNDARY
+            elif curr == SequenceLabel.IN and next == SequenceLabel.OUT:
+                correction = SequenceLabel.BOUNDARY
 
             if correction is not None and curr != correction:
                 logging.warning(
