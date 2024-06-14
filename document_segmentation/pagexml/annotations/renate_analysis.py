@@ -101,16 +101,21 @@ class RenateAnalysis(Sheet):
             pd.notna(self._data["Code TANAP document category"])
         ].head(n)
 
-        for row in tqdm(
-            categories.itertuples(),
+        for _, row in tqdm(
+            categories.iterrows(),
             desc="Reading docs",
             total=n or len(categories),
             unit="row",
         ):
-            inventory = Inventory.load_or_download(row.INVENTARISNUMMER, row.DEEL)
-            tanap_category = row["Code TANAP document category"]
-            document_type: DocumentType = self._document_type(tanap_category)
-
+            inventory = Inventory.load_or_download(
+                row[self._INV_NR_COLUMN], row[self._DEEL_VAN_INVENTARIS_COL]
+            )
+            tanap_id = row["ID in TANAP database"]
+            try:
+                document_type: DocumentType = self._document_type(tanap_id)
+            except ValueError as e:
+                logging.error(f"Could not get category for TANAP ID {tanap_id}: {e}")
+                continue
             yield Document(
                 inv_nr=inventory.inv_nr,
                 inventory_part=inventory.inventory_part,
