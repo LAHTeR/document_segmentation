@@ -62,3 +62,36 @@ class Tanap(Label):
 
     FRONT_MATTER = 15
     """Front or back matter of a document."""
+
+
+class DocumentType(Label):
+    UNK = 0
+
+    AKTE = 1
+    APPOINTEMENT = 2
+    BRIEF = 3
+    DAGREGISTER = 4
+    EIS = 5
+    FACTUUR = 6
+    GROOTBOEK = 7
+    INSTRUCTIE = 8
+    INVENTARIS = 9
+    LIJST = 10
+    LIQUIDATIE = 11
+    MEMORIE = 12
+    MISCELLANEOUS = 13
+    NOTULEN = 14
+    OVEREENKOMST = 15
+    PAS = 16
+    PROCESSTUK = 17
+    RAPPORT = 18
+    REGISTER = 19
+    REKENING = 20
+    REKEST = 21
+    RENDEMENT = 22
+    RESOLUTIE = 23
+    SENTENTIE = 24
+    VERKLARING = 25
+    WETGEVING = 26
+
+    FRONT_MATTER = 27
