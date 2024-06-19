@@ -100,7 +100,7 @@ class TestRenateAnalysis:
         )
 
         docs = list(test_sheet.documents_from_sheet(sheet))
-        doc_scan_nr_1 = docs[16]
+        doc_scan_nr_1 = docs[17]
         assert (
             doc_scan_nr_1.inv_nr,
             doc_scan_nr_1.label,
