@@ -88,6 +88,11 @@ class TestRenateAnalysis:
             assert document.label == label
             assert len(document) == length
 
+    # FIXME: mock request
+    @pytest.mark.skipif(
+        not (settings.SERVER_USERNAME and settings.SERVER_PASSWORD),
+        reason="No server credentials",
+    )
     def test_documents_from_sheet(self, test_sheet, tmp_path):
         sheet = RenateAnalysisInv(
             settings.ANNOTATIONS_DIR / "Analysis Renate 1547.csv",
