@@ -115,18 +115,15 @@ class TestRenateAnalysis:
         assert test_sheet._tanap_category(tanap_id) == expected_category
 
     @pytest.mark.parametrize(
-        "tanap_doc_id,expected,expected_exception",
+        "tanap_doc_id,expected",
         [
-            (1, DocumentType.BRIEF, does_not_raise()),
-            (12, DocumentType.REGISTER, pytest.raises(ValueError)),
-            (170132, DocumentType.RENDEMENT, does_not_raise()),
+            (1, DocumentType.BRIEF),
+            (12, DocumentType.REGISTER),
+            (170132, DocumentType.RENDEMENT),
         ],
     )
-    def test_document_type(
-        self, test_sheet, tanap_doc_id: int, expected: DocumentType, expected_exception
-    ):
-        with expected_exception:
-            assert test_sheet._document_type(tanap_doc_id) == expected
+    def test_document_type(self, test_sheet, tanap_doc_id: int, expected: DocumentType):
+        assert test_sheet._document_type(tanap_doc_id) == expected
 
 
 class TestRenateAnalysisInv:

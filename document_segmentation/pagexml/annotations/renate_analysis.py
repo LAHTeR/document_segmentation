@@ -56,8 +56,7 @@ class DocumentTypeSheet:
 
 class RenateAnalysis(Sheet):
     _RUBRIEK_REGEX = re.compile(r"RUBRIEK:([^;]+);")
-    # FIXME: allow for multiple fields, separated by '|'
-    _ARCHIEFSTUK_REGEX = re.compile(r"ARCHIEFSTUK:(.+)$")
+    _ARCHIEFSTUK_REGEX = re.compile(r"ARCHIEFSTUK:([^\|]+)")
 
     def __init__(
         self,
