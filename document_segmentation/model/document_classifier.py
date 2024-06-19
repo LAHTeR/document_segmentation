@@ -6,13 +6,13 @@ import torch
 from torcheval.metrics import Metric
 
 from ..pagexml.datamodel.document import Document
-from ..pagexml.datamodel.label import Tanap
+from ..pagexml.datamodel.label import DocumentType
 from .page_learner import AbstractPageLearner
 
 
 class DocumentClassifier(AbstractPageLearner):
     _MULTI_LABEL: bool = False
-    _LABEL_TYPE = Tanap
+    _LABEL_TYPE = DocumentType
 
     @torch.inference_mode()
     def predict(self, document: Document, *metrics: Metric) -> pd.DataFrame:
@@ -27,8 +27,8 @@ class DocumentClassifier(AbstractPageLearner):
             pd.DataFrame: A DataFrame containing the results per row.
         """
         model_output: torch.Tensor = self(document.pages)
-        predicted: Tanap = Tanap(model_output.argmax().item())
-        actual: Tanap = document.label
+        predicted: DocumentType = DocumentType(model_output.argmax().item())
+        actual: DocumentType = document.label
 
         for metric in metrics:
             metric.update(
@@ -53,7 +53,7 @@ class DocumentClassifier(AbstractPageLearner):
         )
 
     @staticmethod
-    def _class_counts(docs: Iterable[Document]) -> Counter[Tanap]:
+    def _class_counts(docs: Iterable[Document]) -> Counter[DocumentType]:
         """Count the number of labels in the given documents.
 
         Returns:

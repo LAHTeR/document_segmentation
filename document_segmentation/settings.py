@@ -18,6 +18,12 @@ RENATE_ANALYSIS_SHEETS: tuple[Path] = list(
     ANNOTATIONS_DIR.glob("Analysis Renate ????.csv")
 )
 
+DOCUMENT_TYPE_TANAP_MAPPING_FILE: Path = (
+    ANNOTATIONS_DIR
+    / "Work in progress document types TANAP categories, Renate Smit.csv"
+)
+"""The CSV file providing mappings from TANAP categories to document types."""
+
 GENERALE_MISSIVEN_SHEET: Path = (
     ANNOTATIONS_DIR / "Overzicht van Generale Missiven in 1.04.02 v.3.csv"
 )
