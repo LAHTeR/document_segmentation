@@ -16,7 +16,7 @@ class TestSheet:
 
     @pytest.mark.parametrize(
         "sheet, length, min_inv, max_inv",
-        [(RenateAnalysis(), 162, 1055, 10426), (GeneraleMissiven(), 914, 1068, 7957)],
+        [(RenateAnalysis(), 165, 1055, 10426), (GeneraleMissiven(), 914, 1068, 7957)],
     )
     def test_init(self, sheet, length, min_inv, max_inv):
         """Read the sheet and check the length and inventory numbers."""
