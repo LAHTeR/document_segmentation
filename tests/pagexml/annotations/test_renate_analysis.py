@@ -1,16 +1,42 @@
+from contextlib import nullcontext as does_not_raise
 from pathlib import Path
 
 import pytest
 
 from document_segmentation import settings
 from document_segmentation.pagexml.annotations.renate_analysis import (
+    DocumentTypeSheet,
     RenateAnalysis,
     RenateAnalysisInv,
 )
 from document_segmentation.pagexml.datamodel.inventory import Inventory
-from document_segmentation.pagexml.datamodel.label import SequenceLabel, Tanap
+from document_segmentation.pagexml.datamodel.label import (
+    DocumentType,
+    SequenceLabel,
+    Tanap,
+)
 
 from ...conftest import DATA_DIR
+
+
+class TestDocumentTypeSheet:
+    @pytest.fixture(scope="session")
+    def sheet(self):
+        return DocumentTypeSheet.from_file(settings.DOCUMENT_TYPE_TANAP_MAPPING_FILE)
+
+    @pytest.mark.parametrize(
+        "tanap_category,expected_document_type,expected_exception",
+        [
+            ("1.1", DocumentType.DAGREGISTER, does_not_raise()),
+            ("14.2", DocumentType.MISCELLANEOUS, does_not_raise()),
+            ("INVALID", DocumentType.MISCELLANEOUS, pytest.raises(ValueError)),
+        ],
+    )
+    def test_document_type(
+        self, sheet, tanap_category, expected_document_type, expected_exception
+    ):
+        with expected_exception:
+            sheet.document_type(tanap_category) == expected_document_type
 
 
 class TestRenateAnalysis:
@@ -53,7 +79,7 @@ class TestRenateAnalysis:
         reason="No server credentials",
     )
     def test_documents(self, test_sheet):
-        expected_labels = 3 * [Tanap.DAGREGISTERS]
+        expected_labels = 3 * [DocumentType.DAGREGISTER]
         expected_lengths = [60, 42, 68]
 
         for document, label, length in zip(
@@ -61,6 +87,20 @@ class TestRenateAnalysis:
         ):
             assert document.label == label
             assert len(document) == length
+
+    def test_documents_from_sheet(self, test_sheet, tmp_path):
+        sheet = RenateAnalysisInv(
+            settings.ANNOTATIONS_DIR / "Analysis Renate 1547.csv",
+            inventory_dir=tmp_path,
+        )
+
+        docs = list(test_sheet.documents_from_sheet(sheet))
+        doc_scan_nr_1 = docs[16]
+        assert (
+            doc_scan_nr_1.inv_nr,
+            doc_scan_nr_1.label,
+            len(doc_scan_nr_1.pages),
+        ) == (1547, DocumentType.FRONT_MATTER, 1)
 
     @pytest.mark.parametrize(
         "tanap_id,expected_category",

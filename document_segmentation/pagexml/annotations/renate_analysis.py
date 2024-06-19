@@ -56,6 +56,7 @@ class DocumentTypeSheet:
 
 class RenateAnalysis(Sheet):
     _RUBRIEK_REGEX = re.compile(r"RUBRIEK:([^;]+);")
+    # FIXME: allow for multiple fields, separated by '|'
     _ARCHIEFSTUK_REGEX = re.compile(r"ARCHIEFSTUK:(.+)$")
 
     def __init__(
@@ -147,20 +148,18 @@ class RenateAnalysis(Sheet):
                 try:
                     # tanap_category = self._tanap_category(int(tanap_id))
                     document_type: DocumentType = self._document_type(tanap_id)
+                    yield Document(
+                        inv_nr=sheet._inventory.inv_nr,
+                        inventory_part=sheet._inventory.inventory_part,
+                        label=document_type,
+                        pages=pages,
+                    )
                 except ValueError as e:
                     logging.error(
                         f"Could not get category for TANAP ID {tanap_id}: {e}"
                     )
-                    continue
-                yield Document(
-                    inv_nr=sheet._inventory.inv_nr,
-                    inventory_part=sheet._inventory.inventory_part,
-                    label=document_type,
-                    pages=pages,
-                )
-
             else:
-                # Non-document rows
+                # Outside document rows
                 for idx, row in rows.iterrows():
                     non_doc_type = row["Type of non-document page"]
                     if pd.notna(non_doc_type) and non_doc_type not in {"Empty", ""}:
@@ -173,7 +172,7 @@ class RenateAnalysis(Sheet):
                         yield Document(
                             inv_nr=sheet._inventory.inv_nr,
                             inventory_part=sheet._inventory.inventory_part,
-                            label=Tanap.FRONT_MATTER,
+                            label=DocumentType.FRONT_MATTER,
                             pages=[page],
                         )
             count += 1
