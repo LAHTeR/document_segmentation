@@ -25,7 +25,7 @@ class RegionEmbedding(nn.Module, DeviceModule):
     def __init__(
         self,
         *,
-        transformer_model_name: str = LANGUAGE_MODEL,
+        transformer_model_name: str,
         output_size: int = REGION_EMBEDDING_OUTPUT_SIZE,
         region_type_embedding_size: int = REGION_TYPE_EMBEDDING_SIZE,
         line_separator: str = "\n",
@@ -174,6 +174,26 @@ class RegionEmbedding(nn.Module, DeviceModule):
             dim=-1,
         )
         return self._linear(region_inputs)
+
+    @classmethod
+    def from_model_name(cls, model_name: str = LANGUAGE_MODEL, **kwargs):
+        """Try to autodetect the model type from the model name.
+
+        Can be either a standard BERT model or a SentenceBERT model,
+        resulting in RegionEmbedding or RegionEmbeddingSentenceTransformer respectively.
+
+        Args:
+            model_name: str the name of the model (using HuggingFace identifiers)
+            **kwargs: passed to the selected class constructor.
+        Returns:
+            a (sub-class of a) RegionEmbedding model
+        """
+
+        if "sentence".casefold() in model_name.casefold():
+            cls = RegionEmbeddingSentenceTransformer
+
+        logging.info(f"Using a '{cls.__name__}' model.")
+        return cls(transformer_model_name=model_name, **kwargs)
 
 
 class RegionEmbeddingSentenceTransformer(RegionEmbedding):
