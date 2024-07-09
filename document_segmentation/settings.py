@@ -59,11 +59,13 @@ LANGUAGE_MODEL: str = os.getenv(
     "LANGUAGE_MODEL",
     "NetherlandsForensicInstitute/robbert-2022-dutch-sentence-transformers",
 )
-"""The name of the language model to use for the region classifier.
+"""The name of the language model to use for the region embeddings.
 
-The type of model needs to be with the RegionClassifier class:
-- use RegionClassifier for standard transformer models
-- use RegionClassifierSentenceTransformer for SentenceTransformer models
+The PageEmbedding classes can use different RegionEmbedding classes, depending on the language model type:
+- RegionEmbedding for standard BERT models
+- RegionEmbeddingSentenceTransformer for SentenceTransformer models
+
+The class is auto-detected in RegionEmbedding.from_model_name() based on the model name.
 """
 
 MIN_REGION_TEXT_LENGTH: int = 20
