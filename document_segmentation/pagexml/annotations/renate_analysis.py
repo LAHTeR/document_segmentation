@@ -185,7 +185,7 @@ class RenateAnalysis(Sheet):
 
     def _tanap_type(self, tanap_doc_id: int) -> str:
         try:
-            return self._tanap.at[tanap_doc_id, "TYPE"].strip()
+            return self._tanap.at[tanap_doc_id, "TYPE"].strip().replace(" br ", "|")
         except TypeError as e:
             raise ValueError(f"Could not find type for TANAP ID {tanap_doc_id}: '{e}")
 

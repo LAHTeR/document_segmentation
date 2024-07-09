@@ -125,6 +125,7 @@ class TestRenateAnalysis:
             (1, DocumentType.BRIEF),
             (12, DocumentType.REGISTER),
             (170132, DocumentType.RENDEMENT),
+            (56969, DocumentType.MEMORIE),
         ],
     )
     def test_document_type(self, test_sheet, tanap_doc_id: int, expected: DocumentType):
