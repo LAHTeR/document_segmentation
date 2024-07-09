@@ -40,8 +40,13 @@ class DocumentTypeSheet:
                 raise IndexError(
                     f"There should be exactly one document type for TANAP category {tanap_sub_category}, but found {len(document_type)}."
                 )
-
-            return DocumentType[document_type.iloc[0].strip().upper()]
+            document_type = document_type.iat[0]
+            if pd.notna(document_type):
+                return DocumentType[document_type.strip().upper()]
+            else:
+                raise ValueError(
+                    f"Could not get document type for TANAP category '{tanap_sub_category}'."
+                )
         except IndexError as e:
             raise ValueError(
                 f"Could not find document type for TANAP category {tanap_sub_category}: {e}"
@@ -212,9 +217,18 @@ class RenateAnalysis(Sheet):
                 f"Could not extract 'archiefstuk' for TANAP document {tanap_doc_id}"
             )
 
-        if not len(tanap_sub_category) == 1:
-            raise ValueError(f"Could not find category for rubriek '{archiefstuk}'.")
-        return self._document_types.document_type(tanap_sub_category.iloc[0]["Code"])
+        if len(tanap_sub_category) == 0:
+            raise ValueError(
+                f"Could not find category for archiefstuk '{archiefstuk}'."
+            )
+        elif len(tanap_sub_category) > 1:
+            raise ValueError(
+                f"Multiple categories found for archiefstuk '{archiefstuk}'."
+            )
+        else:
+            return self._document_types.document_type(
+                tanap_sub_category.iloc[0]["Code"]
+            )
 
 
 class RenateAnalysisInv(Sheet):
