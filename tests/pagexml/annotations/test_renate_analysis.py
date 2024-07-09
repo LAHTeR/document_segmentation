@@ -99,13 +99,13 @@ class TestRenateAnalysis:
             inventory_dir=tmp_path,
         )
 
-        docs = list(test_sheet.documents_from_sheet(sheet))
-        doc_scan_nr_1 = docs[17]
-        assert (
-            doc_scan_nr_1.inv_nr,
-            doc_scan_nr_1.label,
-            len(doc_scan_nr_1.pages),
-        ) == (1547, DocumentType.FRONT_MATTER, 1)
+        docs = test_sheet.documents_from_sheet(sheet)
+        # sort to restore order by scan_nr:
+        doc = sorted(docs, key=lambda d: d.pages[0].scan_nr)[0]
+
+        assert doc.inv_nr == 1547
+        assert doc.label == DocumentType.FRONT_MATTER
+        assert len(doc.pages) == 1
 
     @pytest.mark.parametrize(
         "tanap_id,expected_category",
