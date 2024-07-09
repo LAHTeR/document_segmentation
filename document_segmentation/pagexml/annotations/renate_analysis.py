@@ -36,10 +36,15 @@ class DocumentTypeSheet:
                 self._data["Code"] == str(tanap_sub_category)
             ]["Documenttype"]
 
-            if len(document_type) != 1:
+            if document_type.empty:
                 raise IndexError(
-                    f"There should be exactly one document type for TANAP category {tanap_sub_category}, but found {len(document_type)}."
+                    f"No document type for TANAP category {tanap_sub_category} found."
                 )
+            elif not document_type.is_unique:
+                raise ValueError(
+                    f"Found multiple document types for TANAP category {tanap_sub_category}: {document_type.unique()}."
+                )
+
             document_type = document_type.iat[0]
             if pd.notna(document_type):
                 return DocumentType[document_type.strip().upper()]
@@ -185,7 +190,7 @@ class RenateAnalysis(Sheet):
 
     def _tanap_type(self, tanap_doc_id: int) -> str:
         try:
-            return self._tanap.at[tanap_doc_id, "TYPE"].strip()
+            return self._tanap.at[tanap_doc_id, "TYPE"].strip().replace(" br ", "|")
         except TypeError as e:
             raise ValueError(f"Could not find type for TANAP ID {tanap_doc_id}: '{e}")
 
@@ -217,18 +222,16 @@ class RenateAnalysis(Sheet):
                 f"Could not extract 'archiefstuk' for TANAP document {tanap_doc_id}"
             )
 
-        if len(tanap_sub_category) == 0:
+        if tanap_sub_category.empty:
             raise ValueError(
                 f"Could not find category for archiefstuk '{archiefstuk}'."
             )
         elif len(tanap_sub_category) > 1:
-            raise ValueError(
-                f"Multiple categories found for archiefstuk '{archiefstuk}'."
+            logging.warning(
+                f"Multiple categories found for archiefstuk '{archiefstuk}'. Proceeding with first entry."
             )
-        else:
-            return self._document_types.document_type(
-                tanap_sub_category.iloc[0]["Code"]
-            )
+
+        return self._document_types.document_type(tanap_sub_category.iloc[0]["Code"])
 
 
 class RenateAnalysisInv(Sheet):
