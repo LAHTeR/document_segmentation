@@ -7,7 +7,7 @@ from typing import Optional
 import torch
 
 
-class DeviceModule(abc.ABC):
+class DeviceModuleMixIn(abc.ABC):
     """A MixIn class for moving all Torch (sub-)modules to a device."""
 
     # FIXME: only move to device if not already on the device
@@ -22,7 +22,7 @@ class DeviceModule(abc.ABC):
             self
         """
 
-        self._device = device or DeviceModule.get_device()
+        self._device = device or DeviceModuleMixIn.get_device()
 
         logging.info(f"Using device: {self._device}")
 

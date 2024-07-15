@@ -28,11 +28,11 @@ from ..pagexml.datamodel.inventory import (
 )
 from ..pagexml.datamodel.page import Page
 from ..settings import LEARNING_RATE, PAGE_SEQUENCE_TAGGER_RNN_CONFIG, WEIGHT_DECAY
-from .device_module import DeviceModule
+from .device_module import DeviceModuleMixIn
 from .page_embedding import PageEmbedding
 
 
-class AbstractPageLearner(nn.Module, DeviceModule, abc.ABC):
+class AbstractPageLearner(nn.Module, DeviceModuleMixIn, abc.ABC):
     """A page sequence tagger that uses an RNN over the regions on a page."""
 
     _LOSS_REDUCTION: str = "mean"

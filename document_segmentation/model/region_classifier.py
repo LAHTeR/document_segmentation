@@ -8,11 +8,11 @@ from ..pagexml.datamodel.label import SequenceLabel
 from ..pagexml.datamodel.region import Region
 from ..settings import LANGUAGE_MODEL, REGION_TYPE_EMBEDDING_SIZE
 from .dataset import RegionDataset
-from .device_module import DeviceModule
+from .device_module import DeviceModuleMixIn
 from .region_embedding import RegionEmbeddingSentenceTransformer
 
 
-class RegionClassifier(nn.Module, DeviceModule):
+class RegionClassifier(nn.Module, DeviceModuleMixIn):
     def __init__(
         self,
         *,

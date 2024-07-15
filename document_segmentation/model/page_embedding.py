@@ -12,11 +12,11 @@ from ..settings import (
     PAGE_EMBEDDING_OUTPUT_SIZE,
     PAGE_EMBEDDING_RNN_CONFIG,
 )
-from .device_module import DeviceModule
+from .device_module import DeviceModuleMixIn
 from .region_embedding import RegionEmbedding
 
 
-class PageEmbedding(nn.Module, DeviceModule):
+class PageEmbedding(nn.Module, DeviceModuleMixIn):
     """Embeds a page using a Transformer model and a GRU over the regions on a page."""
 
     def __init__(
