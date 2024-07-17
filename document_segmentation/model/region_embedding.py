@@ -16,10 +16,10 @@ from ..settings import (
     REGION_EMBEDDING_OUTPUT_SIZE,
     REGION_TYPE_EMBEDDING_SIZE,
 )
-from .device_module import DeviceModule
+from .device_module import DeviceModuleMixIn
 
 
-class RegionEmbedding(nn.Module, DeviceModule):
+class RegionEmbedding(nn.Module, DeviceModuleMixIn):
     """A module to create a representation of a region using a Transformer model."""
 
     def __init__(
