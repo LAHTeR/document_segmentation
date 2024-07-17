@@ -34,13 +34,11 @@ class Page(BaseModel):
         return self.__repr__()
 
     def annotate(self, label: SequenceLabel) -> "Page":
-        """Annotate the page with a label in-place.
-
-        If the label has already been set to BEGIN or END, it is changed to END_BEGIN.
-        """
+        """Annotate the page with a label in-place."""
         if self.label:
+            level = logging.INFO if label == self.label else logging.WARNING
             logging.log(
-                level=logging.INFO if label == self.label else logging.WARNING,
+                level=level,
                 msg=f"Overwriting label '{self.label.name}' with '{label.name}'. Scan: {self}",
             )
 
@@ -48,9 +46,21 @@ class Page(BaseModel):
         return self
 
     def is_shorter_than(self, *, max_chars=MIN_REGION_TEXT_LENGTH) -> bool:
+        """Check if the region text is shorter than the given number of characters.
+
+        Args:
+            max_chars: the number of characters to check against. Defaults to settings.MIN_REGION_TEXT_LENGTH.
+        Returns:
+            True if the region text is shorter than the given number of characters.
+        """
         return len(self.text()) < max_chars
 
     def empty(self) -> "Page":
+        """Empty the page in-place.
+
+        Returns:
+            the page without any regions, and with OUT label.
+        """
         if self.label != SequenceLabel.UNK:
             logging.warning(f"Emptying page with label '{self.label.name}'.")
         self.regions = []
@@ -76,10 +86,12 @@ class Page(BaseModel):
         return delimiter.join(line for region in self.regions for line in region.lines)
 
     def filter_short_regions(self, min_chars: int = 1) -> "Page":
-        """Remove regions with fewer than `min_chars` characters.
+        """Remove regions with fewer than `min_chars` characters in-place.
 
         Args:
             min_chars (int, optional): The minimum number of characters in a region. Defaults to 1.
+        Returns:
+            the same Page object with the short regions removed.
         """
         self.regions = [region for region in self.regions if len(region) >= min_chars]
         return self
