@@ -42,14 +42,16 @@ For each task, there is a script to train a model:
 - [train_segmentation_model.py](scripts/train_segmentation_model.py)
 - [train_classifier.py](scripts/train_classifier.py)
 
-Both produce a model file; run either script with the `--help` argument for the specifics.
+See below for instructions on installing prerequisites and running the scripts.
+
+Both produce a model file; run either script with the `--help` argument for the specific arguments.
 
 In order to apply a model as produced by the respective training script, call
 
 - [extract_docs.py](scripts/extract_docs.py) for the document segmentation model
 - [classify_documents.py](scripts/classify_documents.py) for the document classification model
 
-Again, run any of the scripts with the `--help` argument to get the specific usage.
+As above, run any of the scripts with the `--help` argument to get the specific usage.
 
 ## Prerequisites
 
@@ -84,9 +86,10 @@ Set your HUC credentials in the `HUC_USER` and `HUC_PASSWORD` environment variab
 HUC_USER=... HUC_PASSWORD=... poetry run python scripts/train_model.py
 ```
 
+Without the credentials, the script is not able to download the inventories, but can proceed with previously downloaded ones.
 Add the `--help` flag to see all available options.
 
-To label the pages of one or more inventories using a previously trained model, use the [`scripts/predict_inventories.py`](scripts/predict_inventories.py) script, for instance:
+To extract the documents of one or more inventories using a previously trained model, use the [`scripts/predict_inventories.py`](scripts/predict_inventories.py) script, for instance:
 
 ```console
 poetry run python scripts/predict_inventories.py --model model.pt --inventory 1547,1548 --output 1547_1548.csv
@@ -100,7 +103,7 @@ Add the `--help` flag to see all available options.
 
 This project uses
 
-- Python >= 3.9 <= 3.12
+- Python version >= 3.9 and <= 3.12
 - [Poetry](https://python-poetry.org/) for package management
 - [PyTest](https://docs.pytest.org) for unit testing
 - [Ruff](https://github.com/astral-sh/ruff) for linting and formatting
@@ -126,10 +129,16 @@ poetry run pytest
 
 ### Architecture
 
-Both document segmentation and classification are based on page embeddings that are defined in the `PageEmbedding` class.
+Both document segmentation and classification are based on page embeddings -- defined in the `PageEmbedding` class --, and region embeddings -- defined in the `RegionEmbedding` class.
 The models are implemented in the `PageSequenceTagger` and the `DocumentClassifier` class respectively, both are sub-classes of the `AbstractPageLearner` class (see diagram below).
+These classes are used for document boundary detection and document type classification respectively.
 
-Details like layer sizes and other hyper-parameters are defined in [settings.py](document_segmentation/settings.py).
+The `Inventory` class is the main data class.
+It holds sequences of pages and labels, and is inherited by the `Document` class, for using different labels.
+
+The `Sheet` class and its sub-classes are used for reading and processing the annotated data from CSV/Excel sheets as stored in the [annotations](document_segmentation/data/annotations/) directory.
+
+(Hyper-)parameters like layer sizes and language model are defined in [settings.py](document_segmentation/settings.py).
 
 #### Classes Diagram
 
