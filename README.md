@@ -48,8 +48,9 @@ Both produce a model file; run either script with the `--help` argument for the 
 
 In order to apply a model as produced by the respective training script, call
 
-- [extract_docs.py](scripts/extract_docs.py) for the document segmentation model
-- [classify_documents.py](scripts/classify_documents.py) for the document classification model
+- [extract_docs.py](scripts/extract_docs.py) for extracting documents from an inventory
+- [predict_inventories](scripts/predict_inventories.py) is variation and applies the document segmentation model on multiple inventories, optionally generating a CSV file with thumbnail for human evaluation.
+- TODO: [classify_documents.py](scripts/classify_documents.py) for classifying documents
 
 As above, run any of the scripts with the `--help` argument to get the specific usage.
 
