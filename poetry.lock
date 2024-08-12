@@ -1340,29 +1340,24 @@ files = [
     {file = "matplotlib-3.9.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dd2a59ff4b83d33bca3b5ec58203cc65985367812cb8c257f3e101632be86d92"},
     {file = "matplotlib-3.9.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0fc001516ffcf1a221beb51198b194d9230199d6842c540108e4ce109ac05cc0"},
     {file = "matplotlib-3.9.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:83c6a792f1465d174c86d06f3ae85a8fe36e6f5964633ae8106312ec0921fdf5"},
-    {file = "matplotlib-3.9.1-cp310-cp310-win_amd64.whl", hash = "sha256:421851f4f57350bcf0811edd754a708d2275533e84f52f6760b740766c6747a7"},
     {file = "matplotlib-3.9.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:b3fce58971b465e01b5c538f9d44915640c20ec5ff31346e963c9e1cd66fa812"},
     {file = "matplotlib-3.9.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:a973c53ad0668c53e0ed76b27d2eeeae8799836fd0d0caaa4ecc66bf4e6676c0"},
     {file = "matplotlib-3.9.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:82cd5acf8f3ef43f7532c2f230249720f5dc5dd40ecafaf1c60ac8200d46d7eb"},
     {file = "matplotlib-3.9.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ab38a4f3772523179b2f772103d8030215b318fef6360cb40558f585bf3d017f"},
     {file = "matplotlib-3.9.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:2315837485ca6188a4b632c5199900e28d33b481eb083663f6a44cfc8987ded3"},
-    {file = "matplotlib-3.9.1-cp311-cp311-win_amd64.whl", hash = "sha256:a0c977c5c382f6696caf0bd277ef4f936da7e2aa202ff66cad5f0ac1428ee15b"},
     {file = "matplotlib-3.9.1-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:565d572efea2b94f264dd86ef27919515aa6d629252a169b42ce5f570db7f37b"},
     {file = "matplotlib-3.9.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:6d397fd8ccc64af2ec0af1f0efc3bacd745ebfb9d507f3f552e8adb689ed730a"},
     {file = "matplotlib-3.9.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:26040c8f5121cd1ad712abffcd4b5222a8aec3a0fe40bc8542c94331deb8780d"},
     {file = "matplotlib-3.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d12cb1837cffaac087ad6b44399d5e22b78c729de3cdae4629e252067b705e2b"},
     {file = "matplotlib-3.9.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:0e835c6988edc3d2d08794f73c323cc62483e13df0194719ecb0723b564e0b5c"},
-    {file = "matplotlib-3.9.1-cp312-cp312-win_amd64.whl", hash = "sha256:44a21d922f78ce40435cb35b43dd7d573cf2a30138d5c4b709d19f00e3907fd7"},
     {file = "matplotlib-3.9.1-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:0c584210c755ae921283d21d01f03a49ef46d1afa184134dd0f95b0202ee6f03"},
     {file = "matplotlib-3.9.1-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:11fed08f34fa682c2b792942f8902e7aefeed400da71f9e5816bea40a7ce28fe"},
     {file = "matplotlib-3.9.1-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0000354e32efcfd86bda75729716b92f5c2edd5b947200be9881f0a671565c33"},
     {file = "matplotlib-3.9.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4db17fea0ae3aceb8e9ac69c7e3051bae0b3d083bfec932240f9bf5d0197a049"},
     {file = "matplotlib-3.9.1-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:208cbce658b72bf6a8e675058fbbf59f67814057ae78165d8a2f87c45b48d0ff"},
-    {file = "matplotlib-3.9.1-cp39-cp39-win_amd64.whl", hash = "sha256:dc23f48ab630474264276be156d0d7710ac6c5a09648ccdf49fef9200d8cbe80"},
     {file = "matplotlib-3.9.1-pp39-pypy39_pp73-macosx_10_15_x86_64.whl", hash = "sha256:3fda72d4d472e2ccd1be0e9ccb6bf0d2eaf635e7f8f51d737ed7e465ac020cb3"},
     {file = "matplotlib-3.9.1-pp39-pypy39_pp73-macosx_11_0_arm64.whl", hash = "sha256:84b3ba8429935a444f1fdc80ed930babbe06725bcf09fbeb5c8757a2cd74af04"},
     {file = "matplotlib-3.9.1-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b918770bf3e07845408716e5bbda17eadfc3fcbd9307dc67f37d6cf834bb3d98"},
-    {file = "matplotlib-3.9.1-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:f1f2e5d29e9435c97ad4c36fb6668e89aee13d48c75893e25cef064675038ac9"},
     {file = "matplotlib-3.9.1.tar.gz", hash = "sha256:de06b19b8db95dd33d0dc17c926c7c9ebed9f572074b6fac4f65068a6814d010"},
 ]
 
@@ -1639,6 +1634,7 @@ description = "Nvidia JIT LTO Library"
 optional = false
 python-versions = ">=3"
 files = [
+    {file = "nvidia_nvjitlink_cu12-12.5.82-py3-none-manylinux2014_aarch64.whl", hash = "sha256:98103729cc5226e13ca319a10bbf9433bbbd44ef64fe72f45f067cacc14b8d27"},
     {file = "nvidia_nvjitlink_cu12-12.5.82-py3-none-manylinux2014_x86_64.whl", hash = "sha256:f9b37bc5c8cf7509665cb6ada5aaa0ce65618f2332b7d3e78e9790511f111212"},
     {file = "nvidia_nvjitlink_cu12-12.5.82-py3-none-win_amd64.whl", hash = "sha256:e782564d705ff0bf61ac3e1bf730166da66dd2fe9012f111ede5fc49b64ae697"},
 ]
@@ -3973,18 +3969,19 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "wandb"
-version = "0.17.4"
+version = "0.17.6"
 description = "A CLI and library for interacting with the Weights & Biases API."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "wandb-0.17.4-py3-none-any.whl", hash = "sha256:807d600a86ee9e2df66b64af738caa6eb3b5e04a30b296b9a7c940ede759f4a7"},
-    {file = "wandb-0.17.4-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:02a00fe5e86ac04c07936d1fe7e7d9111d9546a3a844ac00d89735df0290cef8"},
-    {file = "wandb-0.17.4-py3-none-macosx_11_0_arm64.whl", hash = "sha256:78eb7e6a530848fc47792e95563b406019bed7c4dadb54415a982cd4900b7c75"},
-    {file = "wandb-0.17.4-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:91bd3bc5b76f880732c6169288ac64d59a016fd8227d3a74bdc69d457639ef17"},
-    {file = "wandb-0.17.4-py3-none-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:40aa85e0fc6d875f9597c6c02e968bc35a571ddac1cbfac2223fcdb941bf1214"},
-    {file = "wandb-0.17.4-py3-none-win32.whl", hash = "sha256:fec9378ae2ed8c4cf29bb5ef9bd2889f0085b6566d7b9dd7b789718519c46447"},
-    {file = "wandb-0.17.4-py3-none-win_amd64.whl", hash = "sha256:94b78c1a74222a0970580cd953c21562bb57af1c2e14a4e48ab07b8fbcb64f08"},
+    {file = "wandb-0.17.6-py3-none-any.whl", hash = "sha256:30c4f110d406368a4653fa137ad04e8ba0a68dee25836de55c3ca384b23e30c2"},
+    {file = "wandb-0.17.6-py3-none-macosx_10_14_x86_64.whl", hash = "sha256:c554897b9b9a38490fa86d972975528b424daf5bcf35a5249ef2d25bf99986c2"},
+    {file = "wandb-0.17.6-py3-none-macosx_11_0_arm64.whl", hash = "sha256:4015215335b4cff6268342339022382a38a7e086a8388c8b52df53bc6f18f39a"},
+    {file = "wandb-0.17.6-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d38c52fdd0add655e0c3d408d7d0a84a19ec559512b157b8d42e9f67d98b3004"},
+    {file = "wandb-0.17.6-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:86743223a5f0c76a5c5ebc5a077aaa87221545ff8f12ba754c51a0bc1fe1e67e"},
+    {file = "wandb-0.17.6-py3-none-win32.whl", hash = "sha256:247b1c9677fd633a460201f421d4fd4f370e7243d06257fab0ad1bb728ddcc1c"},
+    {file = "wandb-0.17.6-py3-none-win_amd64.whl", hash = "sha256:51954f993b372c20812616838302183f0e3abf137614f05d80c7c17c307bfff9"},
+    {file = "wandb-0.17.6.tar.gz", hash = "sha256:416739f293d59b95bcb189ecbaeb19b3a74ff2b80d501a90b93e6b6f9435c017"},
 ]
 
 [package.dependencies]
@@ -4008,9 +4005,9 @@ typing-extensions = {version = "*", markers = "python_version < \"3.10\""}
 aws = ["boto3"]
 azure = ["azure-identity", "azure-storage-blob"]
 gcp = ["google-cloud-storage"]
-importers = ["filelock", "mlflow", "polars", "rich", "tenacity"]
+importers = ["filelock", "mlflow", "polars (<=1.2.1)", "rich", "tenacity"]
 kubeflow = ["google-cloud-storage", "kubernetes", "minio", "sh"]
-launch = ["awscli", "azure-containerregistry", "azure-identity", "azure-storage-blob", "boto3", "botocore", "chardet", "google-auth", "google-cloud-aiplatform", "google-cloud-artifact-registry", "google-cloud-compute", "google-cloud-storage", "iso8601", "kubernetes", "kubernetes-asyncio", "nbconvert", "nbformat", "optuna", "pydantic", "pyyaml (>=6.0.0)", "tomli", "typing-extensions"]
+launch = ["awscli", "azure-containerregistry", "azure-identity", "azure-storage-blob", "boto3", "botocore", "chardet", "google-auth", "google-cloud-aiplatform", "google-cloud-artifact-registry", "google-cloud-compute", "google-cloud-storage", "iso8601", "jsonschema", "kubernetes", "kubernetes-asyncio", "nbconvert", "nbformat", "optuna", "pydantic", "pyyaml (>=6.0.0)", "tomli", "typing-extensions"]
 media = ["bokeh", "moviepy", "numpy", "pillow", "plotly (>=5.18.0)", "rdkit-pypi", "soundfile"]
 models = ["cloudpickle"]
 perf = ["orjson"]
@@ -4057,4 +4054,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "a7bc85906bd3d7fa7e97c9e4f23babb073640c639dd3aba9f9b86db75ef124b6"
+content-hash = "aa35037293a0d530e7d73dd1fbb8a12073c7c10ec7ff80038b5dd84e8cd95c8b"
