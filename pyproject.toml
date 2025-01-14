@@ -18,7 +18,7 @@ scikit-learn = "^1.6.1"
 torcheval = "^0.0.7"
 pydantic = "^2.10.5"
 sentence-transformers = "^3.3.1"
-wandb = "^0.19.1"
+wandb = "^0.19.3"
 pillow = "^11.1.0"
 
 
